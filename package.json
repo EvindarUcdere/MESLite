@@ -1,0 +1,16 @@
+{
+  "name": "mes-lite",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "web",
+    "mobile"
+  ],
+  "scripts": {
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:web": "npm --workspace web run dev",
+    "dev:mobile": "npm --workspace mobile run start",
+    "build:web": "npm --workspace web run build"
+  }
+}

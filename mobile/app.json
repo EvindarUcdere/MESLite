@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "MES Lite",
+    "slug": "mes-lite-mobile",
+    "scheme": "meslite",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic"
+  }
+}

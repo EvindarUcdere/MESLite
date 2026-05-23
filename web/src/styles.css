@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #17202a;
+  background: #f4f7f9;
+}
+
+.auth-page,
+.dashboard-page {
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.auth-panel {
+  width: min(420px, 100%);
+  margin: 80px auto;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.auth-panel form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-panel label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.auth-panel input,
+.auth-panel button {
+  min-height: 42px;
+  border-radius: 6px;
+  border: 1px solid #c8d3dd;
+  padding: 0 12px;
+}
+
+.auth-panel button {
+  color: #ffffff;
+  background: #256f6c;
+  border: 0;
+  font-weight: 700;
+}
+
+.dashboard-page header {
+  margin-bottom: 24px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.summary-grid article {
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.summary-grid span {
+  display: block;
+  color: #60707d;
+  font-size: 14px;
+}
+
+.summary-grid strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 30px;
+}

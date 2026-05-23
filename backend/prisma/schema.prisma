@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PRODUCTION_MANAGER
+  OPERATOR
+  QUALITY_STAFF
+  VIEWER
+}
+
+enum MachineStatus {
+  IDLE
+  RUNNING
+  STOPPED
+  MAINTENANCE
+}
+
+enum WorkOrderStatus {
+  PLANNED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum QualityStatus {
+  PASSED
+  FAILED
+  PARTIAL
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  name               String
+  email              String             @unique
+  passwordHash       String
+  role               UserRole           @default(OPERATOR)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdWorkOrders  WorkOrder[]        @relation("CreatedWorkOrders")
+  assignedWorkOrders WorkOrder[]        @relation("AssignedWorkOrders")
+  productionLogs     ProductionLog[]
+  qualityChecks      QualityCheck[]
+  machineStatusLogs  MachineStatusLog[]
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  code            String      @unique
+  name            String
+  unit            String      @default("pcs")
+  targetCycleTime Int?
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  workOrders      WorkOrder[]
+}
+
+model ProductionLine {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  machines    Machine[]
+}
+
+model Machine {
+  id                 String             @id @default(uuid())
+  code               String             @unique
+  name               String
+  productionLineId   String
+  status             MachineStatus      @default(IDLE)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  productionLine     ProductionLine     @relation(fields: [productionLineId], references: [id])
+  workOrders         WorkOrder[]
+  productionLogs     ProductionLog[]
+  machineStatusLogs  MachineStatusLog[]
+}
+
+model Shift {
+  id             String          @id @default(uuid())
+  name           String          @unique
+  startTime      String
+  endTime        String
+  isActive       Boolean         @default(true)
+  productionLogs ProductionLog[]
+}
+
+model WorkOrder {
+  id                 String             @id @default(uuid())
+  orderNo            String             @unique
+  productId          String
+  machineId          String?
+  assignedOperatorId String?
+  plannedQuantity    Int
+  producedQuantity   Int                @default(0)
+  scrapQuantity      Int                @default(0)
+  status             WorkOrderStatus    @default(PLANNED)
+  plannedStartDate   DateTime?
+  plannedEndDate     DateTime?
+  actualStartDate    DateTime?
+  actualEndDate      DateTime?
+  createdById        String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  product            Product            @relation(fields: [productId], references: [id])
+  machine            Machine?           @relation(fields: [machineId], references: [id])
+  assignedOperator   User?              @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
+  createdBy          User               @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+  productionLogs     ProductionLog[]
+  qualityChecks      QualityCheck[]
+}
+
+model ProductionLog {
+  id               String     @id @default(uuid())
+  workOrderId      String
+  operatorId       String
+  machineId        String
+  shiftId          String?
+  producedQuantity Int
+  scrapQuantity    Int        @default(0)
+  startedAt        DateTime?
+  endedAt          DateTime?
+  note             String?
+  createdAt        DateTime   @default(now())
+  workOrder        WorkOrder  @relation(fields: [workOrderId], references: [id])
+  operator         User       @relation(fields: [operatorId], references: [id])
+  machine          Machine    @relation(fields: [machineId], references: [id])
+  shift            Shift?     @relation(fields: [shiftId], references: [id])
+}
+
+model QualityCheck {
+  id             String        @id @default(uuid())
+  workOrderId    String
+  checkedById    String
+  status         QualityStatus
+  defectQuantity Int           @default(0)
+  defectReason   String?
+  note           String?
+  checkedAt      DateTime      @default(now())
+  workOrder      WorkOrder     @relation(fields: [workOrderId], references: [id])
+  checkedBy      User          @relation(fields: [checkedById], references: [id])
+}
+
+model MachineStatusLog {
+  id          String        @id @default(uuid())
+  machineId   String
+  status      MachineStatus
+  reason      String?
+  changedById String
+  createdAt   DateTime      @default(now())
+  machine     Machine       @relation(fields: [machineId], references: [id])
+  changedBy   User          @relation(fields: [changedById], references: [id])
+}

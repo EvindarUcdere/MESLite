@@ -1,0 +1,33 @@
+# Development Plan
+
+## Phase 1: Foundation
+
+- Initialize independent Git repository in `MESLite`.
+- Add monorepo workspaces for backend, web, and mobile.
+- Define Prisma schema and seed data.
+- Build auth, role, error, validation, and socket foundations.
+
+## Phase 2: Backend MVP
+
+- Complete CRUD for users, production lines, machines, products, and shifts.
+- Add work order lifecycle actions.
+- Add production logs and quality checks.
+- Add dashboard and report aggregations.
+
+## Phase 3: Web MVP
+
+- Login and protected routes.
+- Operational dashboard.
+- Work orders, machines, products, quality, reports, and users.
+- Realtime live monitor.
+
+## Phase 4: Mobile MVP
+
+- Operator login.
+- Assigned work orders.
+- Work order detail and lifecycle actions.
+- Production, scrap, machine status, and quality entries.
+
+## Extension Rule
+
+Every new feature should be added as a module with its own route, controller, service, validation, and tests. Shared behavior belongs in `middlewares`, `config`, or `utils` only when at least two modules need it.
