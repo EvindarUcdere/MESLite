@@ -1,13 +1,9 @@
-import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
 import { useAuthStore } from "../store/authStore.js";
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const clearSession = useAuthStore((state) => state.clearSession);
   const [summary, setSummary] = useState(null);
   const [live, setLive] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,11 +38,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  function handleLogout() {
-    clearSession();
-    navigate("/login");
-  }
-
   const cards = [
     ["Active Orders", summary?.activeWorkOrders ?? 0],
     ["Today Produced", summary?.todayProducedQuantity ?? 0],
@@ -55,15 +46,12 @@ export default function Dashboard() {
   ];
 
   return (
-    <main className="dashboard-page">
-      <header>
+    <div className="page-stack">
+      <header className="page-header">
         <div>
           <h1>MES Lite Dashboard</h1>
           <p>{user?.name ?? "Production overview"}</p>
         </div>
-        <button className="icon-button" type="button" onClick={handleLogout} aria-label="Sign out" title="Sign out">
-          <LogOut size={18} />
-        </button>
       </header>
       {error ? <p className="form-error">{error}</p> : null}
       <section className="summary-grid">
@@ -105,6 +93,6 @@ export default function Dashboard() {
           </div>
         </article>
       </section>
-    </main>
+    </div>
   );
 }

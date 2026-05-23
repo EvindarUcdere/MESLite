@@ -17,6 +17,39 @@ async function main() {
     }
   });
 
+  await prisma.user.upsert({
+    where: { email: "manager@meslite.local" },
+    update: {},
+    create: {
+      name: "Production Manager",
+      email: "manager@meslite.local",
+      passwordHash,
+      role: "PRODUCTION_MANAGER"
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "operator@meslite.local" },
+    update: {},
+    create: {
+      name: "Line Operator",
+      email: "operator@meslite.local",
+      passwordHash,
+      role: "OPERATOR"
+    }
+  });
+
+  await prisma.user.upsert({
+    where: { email: "quality@meslite.local" },
+    update: {},
+    create: {
+      name: "Quality Staff",
+      email: "quality@meslite.local",
+      passwordHash,
+      role: "QUALITY_STAFF"
+    }
+  });
+
   const product = await prisma.product.upsert({
     where: { code: "PRD-001" },
     update: {},
