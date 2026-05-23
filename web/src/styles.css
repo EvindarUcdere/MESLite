@@ -266,12 +266,31 @@ body {
 }
 
 .work-order-form input,
-.work-order-form select {
+.work-order-form select,
+.stack-form input,
+.stack-form select,
+.compact-select {
   min-height: 40px;
   padding: 0 10px;
   border: 1px solid #c8d3dd;
   border-radius: 6px;
   background: #ffffff;
+}
+
+.stack-form {
+  display: grid;
+  gap: 14px;
+}
+
+.stack-form label {
+  display: grid;
+  gap: 6px;
+  color: #33424d;
+  font-size: 14px;
+}
+
+.compact-select {
+  min-width: 150px;
 }
 
 .primary-button {

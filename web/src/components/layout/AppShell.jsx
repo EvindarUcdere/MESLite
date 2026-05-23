@@ -1,4 +1,4 @@
-import { BarChart3, ClipboardCheck, ClipboardList, LogOut } from "lucide-react";
+import { BarChart3, Boxes, ClipboardCheck, ClipboardList, Cpu, LogOut } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore.js";
 
@@ -27,6 +27,14 @@ export function AppShell() {
           <NavLink to="/work-orders">
             <ClipboardList size={18} />
             Work Orders
+          </NavLink>
+          <NavLink to="/products">
+            <Boxes size={18} />
+            Products
+          </NavLink>
+          <NavLink to="/machines">
+            <Cpu size={18} />
+            Machines
           </NavLink>
           <NavLink to="/quality">
             <ClipboardCheck size={18} />
