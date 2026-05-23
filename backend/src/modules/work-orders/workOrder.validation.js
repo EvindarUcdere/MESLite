@@ -17,3 +17,15 @@ export const updateStatusSchema = z.object({
     status: z.enum(["PLANNED", "IN_PROGRESS", "PAUSED", "COMPLETED", "CANCELLED"])
   })
 });
+
+export const assignOperatorSchema = z.object({
+  body: z.object({
+    operatorId: z.string().uuid()
+  })
+});
+
+export const assignMachineSchema = z.object({
+  body: z.object({
+    machineId: z.string().uuid()
+  })
+});

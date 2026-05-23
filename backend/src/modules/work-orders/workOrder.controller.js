@@ -19,3 +19,28 @@ export async function updateStatus(req, res) {
   const workOrder = await workOrderService.updateWorkOrderStatus(req.params.id, req.validated.body.status);
   res.json({ data: workOrder });
 }
+
+export async function assignOperator(req, res) {
+  const workOrder = await workOrderService.assignOperator(req.params.id, req.validated.body.operatorId);
+  res.json({ data: workOrder });
+}
+
+export async function assignMachine(req, res) {
+  const workOrder = await workOrderService.assignMachine(req.params.id, req.validated.body.machineId);
+  res.json({ data: workOrder });
+}
+
+export async function start(req, res) {
+  const workOrder = await workOrderService.startWorkOrder(req.params.id);
+  res.json({ data: workOrder });
+}
+
+export async function pause(req, res) {
+  const workOrder = await workOrderService.pauseWorkOrder(req.params.id);
+  res.json({ data: workOrder });
+}
+
+export async function complete(req, res) {
+  const workOrder = await workOrderService.completeWorkOrder(req.params.id);
+  res.json({ data: workOrder });
+}

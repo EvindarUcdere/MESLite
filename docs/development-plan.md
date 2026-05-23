@@ -20,6 +20,7 @@
 - `production-lines`: line master data with machine relations.
 - `shifts`: shift master data for production reports.
 - `machines`: machine CRUD plus status changes and status history.
+- `work-orders`: assignment and lifecycle actions for start, pause, and completion.
 - `production-logs`: operator entries update work order totals in a transaction.
 - `quality-checks`: quality outcomes are tracked by work order and quality staff.
 

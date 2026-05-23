@@ -24,6 +24,8 @@
 - Machine status changes write both the current machine state and a status history record.
 - API responses never expose password hashes.
 - Role checks stay in route files so access rules are visible at the API boundary.
+- Operators use lifecycle actions such as start, pause, and complete instead of free-form status updates.
+- A work order must have both an operator and a machine before production can start.
 
 ## Module Boundaries
 
