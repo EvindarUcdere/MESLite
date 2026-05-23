@@ -188,6 +188,14 @@ body {
   font-size: 18px;
 }
 
+.chart-panel {
+  min-height: 320px;
+}
+
+.recharts-wrapper {
+  font-size: 12px;
+}
+
 .status-list {
   display: grid;
   gap: 10px;

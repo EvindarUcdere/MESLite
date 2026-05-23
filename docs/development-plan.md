@@ -34,6 +34,7 @@ The production log transaction is important because dashboard totals should neve
 - Work Orders screen supports creating, starting, pausing, and completing orders.
 - Production Entry records produced and scrap quantities against started work orders.
 - Quality screen records inspection results and defect information for produced work orders.
+- Dashboard includes Recharts visuals for production, scrap, machine status, work order status, and quality results.
 
 ## Phase 3: Web MVP
 
