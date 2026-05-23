@@ -37,6 +37,7 @@ The production log transaction is important because dashboard totals should neve
 - Dashboard includes Recharts visuals for production, scrap, machine status, work order status, and quality results.
 - Products and Machines screens manage master data used by work order planning.
 - Users screen allows admins to create users and manage active/passive status for factory roles.
+- User editing supports role changes, profile updates, optional password reset, and deactivation instead of deletion.
 
 ## Phase 3: Web MVP
 

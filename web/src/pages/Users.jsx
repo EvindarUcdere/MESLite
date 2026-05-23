@@ -1,6 +1,6 @@
-import { Plus } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createUser, getUsers, updateUserStatus } from "../api/masterData.api.js";
+import { createUser, getUsers, updateUser, updateUserStatus } from "../api/masterData.api.js";
 
 const ROLE_LABELS = {
   ADMIN: "Admin",
@@ -15,10 +15,18 @@ export default function Users() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "User123!",
+    role: "OPERATOR",
+    isActive: true
+  });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    password: "",
     role: "OPERATOR",
     isActive: true
   });
@@ -61,6 +69,32 @@ export default function Users() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateEditForm(field, value) {
+    setEditForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function selectUser(user) {
+    setSelectedUser(user);
+    setEditForm({
+      name: user.name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      isActive: user.isActive
+    });
+  }
+
+  function clearSelection() {
+    setSelectedUser(null);
+    setEditForm({
+      name: "",
+      email: "",
+      password: "",
+      role: "OPERATOR",
+      isActive: true
+    });
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -91,6 +125,33 @@ export default function Users() {
       await loadUsers();
     } catch (_error) {
       setError("Kullanıcı durumu güncellenemedi.");
+    }
+  }
+
+  async function handleUpdate(event) {
+    event.preventDefault();
+
+    if (!selectedUser) {
+      return;
+    }
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      await updateUser(selectedUser.id, {
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role,
+        isActive: editForm.isActive,
+        ...(editForm.password ? { password: editForm.password } : {})
+      });
+      await loadUsers();
+      clearSelection();
+    } catch (_error) {
+      setError("Kullanıcı güncellenemedi.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -137,6 +198,55 @@ export default function Users() {
         </form>
       </section>
 
+      {selectedUser ? (
+        <section className="panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Kullanıcı Düzenle</h2>
+              <p className="muted-text">Geçmiş kayıtları korumak için kullanıcılar silinmez, pasife alınır.</p>
+            </div>
+            <button className="icon-button" type="button" onClick={clearSelection} aria-label="Düzenlemeyi kapat" title="Düzenlemeyi kapat">
+              <X size={18} />
+            </button>
+          </div>
+          <form className="work-order-form" onSubmit={handleUpdate}>
+            <label>
+              Ad Soyad
+              <input value={editForm.name} onChange={(event) => updateEditForm("name", event.target.value)} required />
+            </label>
+            <label>
+              E-posta
+              <input value={editForm.email} onChange={(event) => updateEditForm("email", event.target.value)} type="email" required />
+            </label>
+            <label>
+              Şifre Sıfırla
+              <input value={editForm.password} onChange={(event) => updateEditForm("password", event.target.value)} type="text" minLength="8" placeholder="Boş bırakılırsa değişmez" />
+            </label>
+            <label>
+              Rol
+              <select value={editForm.role} onChange={(event) => updateEditForm("role", event.target.value)} required>
+                <option value="OPERATOR">Operatör</option>
+                <option value="PRODUCTION_MANAGER">Üretim Yöneticisi</option>
+                <option value="QUALITY_STAFF">Kalite Personeli</option>
+                <option value="VIEWER">İzleyici</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </label>
+            <label>
+              Durum
+              <select value={editForm.isActive ? "active" : "passive"} onChange={(event) => updateEditForm("isActive", event.target.value === "active")}>
+                <option value="active">Aktif</option>
+                <option value="passive">Pasif</option>
+              </select>
+            </label>
+            <button className="primary-button" type="submit" disabled={isSubmitting}>
+              <Pencil size={18} />
+              {isSubmitting ? "Güncelleniyor..." : "Güncelle"}
+            </button>
+          </form>
+        </section>
+      ) : null}
+
       <section className="panel">
         <h2>Kullanıcı Listesi</h2>
         <div className="table-wrap">
@@ -147,12 +257,12 @@ export default function Users() {
                 <th>E-posta</th>
                 <th>Rol</th>
                 <th>Durum</th>
-                <th>Durum Güncelle</th>
+                <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id}>
+                <tr key={user.id} className={selectedUser?.id === user.id ? "selected-row" : ""}>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
                   <td>{ROLE_LABELS[user.role] ?? user.role}</td>
@@ -160,10 +270,14 @@ export default function Users() {
                     <span className={`status-pill ${user.isActive ? "quality-passed" : "status-cancelled"}`}>{user.isActive ? "Aktif" : "Pasif"}</span>
                   </td>
                   <td>
-                    <select className="compact-select" value={user.isActive ? "active" : "passive"} onChange={(event) => handleStatusChange(user.id, event.target.value === "active")}>
-                      <option value="active">Aktif</option>
-                      <option value="passive">Pasif</option>
-                    </select>
+                    <div className="action-row">
+                      <button type="button" onClick={() => selectUser(user)} title="Düzenle">
+                        <Pencil size={16} />
+                      </button>
+                      <button type="button" onClick={() => handleStatusChange(user.id, !user.isActive)} title={user.isActive ? "Pasife al" : "Aktife al"}>
+                        {user.isActive ? "Pasife Al" : "Aktife Al"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

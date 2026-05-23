@@ -28,6 +28,7 @@
 - Operators use lifecycle actions such as start, pause, and complete instead of free-form status updates.
 - A work order must have both an operator and a machine before production can start.
 - Dashboard endpoints provide operational summaries; detailed historical analytics belong in the reports module.
+- Users are deactivated instead of deleted so historical production, quality, and machine status records remain auditable.
 
 ## Module Boundaries
 

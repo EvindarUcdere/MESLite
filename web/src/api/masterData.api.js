@@ -45,6 +45,11 @@ export async function createUser(payload) {
   return response.data.data;
 }
 
+export async function updateUser(userId, payload) {
+  const response = await apiClient.put(`/users/${userId}`, payload);
+  return response.data.data;
+}
+
 export async function updateUserStatus(userId, isActive) {
   const response = await apiClient.patch(`/users/${userId}/status`, { isActive });
   return response.data.data;
