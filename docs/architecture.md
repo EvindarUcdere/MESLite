@@ -17,6 +17,14 @@
 5. Quality staff adds quality checks when needed.
 6. Web dashboard updates through REST and Socket.io events.
 
+## Backend Consistency Rules
+
+- Production quantity changes are recorded through `production-logs`.
+- A production log write also updates the related work order totals in the same database transaction.
+- Machine status changes write both the current machine state and a status history record.
+- API responses never expose password hashes.
+- Role checks stay in route files so access rules are visible at the API boundary.
+
 ## Module Boundaries
 
 - `auth`: login, token issuing, current user.

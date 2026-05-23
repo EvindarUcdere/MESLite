@@ -4,6 +4,10 @@ export function findProducts() {
   return prisma.product.findMany({ orderBy: { createdAt: "desc" } });
 }
 
+export function findProductById(id) {
+  return prisma.product.findUnique({ where: { id } });
+}
+
 export function createProduct(data) {
   return prisma.product.create({ data });
 }

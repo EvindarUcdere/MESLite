@@ -4,10 +4,13 @@ import { allowRoles } from "../../middlewares/role.middleware.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import * as machineController from "./machine.controller.js";
-import { updateMachineStatusSchema } from "./machine.validation.js";
+import { createMachineSchema, updateMachineSchema, updateMachineStatusSchema } from "./machine.validation.js";
 
 export const machineRoutes = Router();
 
 machineRoutes.use(requireAuth);
 machineRoutes.get("/", asyncHandler(machineController.list));
+machineRoutes.get("/:id", asyncHandler(machineController.detail));
+machineRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(createMachineSchema), asyncHandler(machineController.create));
+machineRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateMachineSchema), asyncHandler(machineController.update));
 machineRoutes.patch("/:id/status", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), validate(updateMachineStatusSchema), asyncHandler(machineController.updateStatus));

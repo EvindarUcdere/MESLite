@@ -10,5 +10,6 @@ export const productRoutes = Router();
 
 productRoutes.use(requireAuth);
 productRoutes.get("/", asyncHandler(productController.list));
+productRoutes.get("/:id", asyncHandler(productController.detail));
 productRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(createProductSchema), asyncHandler(productController.create));
 productRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateProductSchema), asyncHandler(productController.update));

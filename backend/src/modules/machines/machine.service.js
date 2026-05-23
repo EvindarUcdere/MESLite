@@ -8,6 +8,34 @@ export function findMachines() {
   });
 }
 
+export function findMachineById(id) {
+  return prisma.machine.findUnique({
+    where: { id },
+    include: {
+      productionLine: true,
+      machineStatusLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 20
+      }
+    }
+  });
+}
+
+export function createMachine(data) {
+  return prisma.machine.create({
+    data,
+    include: { productionLine: true }
+  });
+}
+
+export function updateMachine(id, data) {
+  return prisma.machine.update({
+    where: { id },
+    data,
+    include: { productionLine: true }
+  });
+}
+
 export async function updateMachineStatus(machineId, userId, { status, reason }) {
   const result = await prisma.$transaction(async (tx) => {
     const machine = await tx.machine.update({

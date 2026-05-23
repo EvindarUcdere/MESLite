@@ -14,6 +14,17 @@
 - Add production logs and quality checks.
 - Add dashboard and report aggregations.
 
+### Current Backend Progress
+
+- `users`: admin-only user administration with safe password hashing and password-free responses.
+- `production-lines`: line master data with machine relations.
+- `shifts`: shift master data for production reports.
+- `machines`: machine CRUD plus status changes and status history.
+- `production-logs`: operator entries update work order totals in a transaction.
+- `quality-checks`: quality outcomes are tracked by work order and quality staff.
+
+The production log transaction is important because dashboard totals should never depend on a log existing without the related work order totals being updated.
+
 ## Phase 3: Web MVP
 
 - Login and protected routes.

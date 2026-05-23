@@ -5,6 +5,11 @@ export async function list(_req, res) {
   res.json({ data: products });
 }
 
+export async function detail(req, res) {
+  const product = await productService.findProductById(req.params.id);
+  res.json({ data: product });
+}
+
 export async function create(req, res) {
   const product = await productService.createProduct(req.validated.body);
   res.status(201).json({ data: product });
