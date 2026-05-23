@@ -12,6 +12,34 @@ const STATUS_LABELS = {
   CANCELLED: "İptal"
 };
 
+function getApiErrorMessage(error, fallback) {
+  return error?.response?.data?.message ?? fallback;
+}
+
+function getStartBlockReason(workOrder) {
+  if (!["PLANNED", "PAUSED"].includes(workOrder.status)) {
+    return "Sadece planlanan veya duraklatılan iş emirleri başlatılabilir.";
+  }
+
+  if (!workOrder.machineId) {
+    return "Başlatmak için makine atanmalı.";
+  }
+
+  if (!workOrder.assignedOperatorId) {
+    return "Başlatmak için operatör atanmalı.";
+  }
+
+  return "";
+}
+
+function canPause(workOrder) {
+  return workOrder.status === "IN_PROGRESS";
+}
+
+function canComplete(workOrder) {
+  return ["IN_PROGRESS", "PAUSED"].includes(workOrder.status) && workOrder.producedQuantity > 0;
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -49,7 +77,7 @@ export default function WorkOrders() {
 
   const activeMachines = useMemo(() => machines.filter((machine) => machine.isActive), [machines]);
   const productionCandidates = useMemo(
-    () => workOrders.filter((workOrder) => ["IN_PROGRESS", "PAUSED"].includes(workOrder.status) && workOrder.machineId),
+    () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
   );
 
@@ -122,21 +150,21 @@ export default function WorkOrders() {
         plannedQuantity: 100
       }));
       await loadData();
-    } catch (_error) {
-      setError("İş emri oluşturulamadı.");
+    } catch (error) {
+      setError(getApiErrorMessage(error, "İş emri oluşturulamadı."));
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function runAction(action) {
+  async function runAction(action, fallbackMessage = "İşlem tamamlanamadı.") {
     setError("");
 
     try {
       await action();
       await loadData();
-    } catch (_error) {
-      setError("İşlem tamamlanamadı.");
+    } catch (error) {
+      setError(getApiErrorMessage(error, fallbackMessage));
     }
   }
 
@@ -150,6 +178,11 @@ export default function WorkOrders() {
 
       if (!selectedWorkOrder?.machineId) {
         setError("Makine atanmış ve başlatılmış bir iş emri seçin.");
+        return;
+      }
+
+      if (Number(productionForm.producedQuantity) === 0 && Number(productionForm.scrapQuantity) === 0) {
+        setError("Üretim veya fire adedinden en az biri sıfırdan büyük olmalı.");
         return;
       }
 
@@ -168,8 +201,8 @@ export default function WorkOrders() {
         note: ""
       }));
       await loadData();
-    } catch (_error) {
-      setError("Üretim girişi kaydedilemedi.");
+    } catch (error) {
+      setError(getApiErrorMessage(error, "Üretim girişi kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -256,6 +289,10 @@ export default function WorkOrders() {
             <tbody>
               {workOrders.map((workOrder) => {
                 const progress = workOrder.plannedQuantity > 0 ? Math.round((workOrder.producedQuantity / workOrder.plannedQuantity) * 100) : 0;
+                const startBlockReason = getStartBlockReason(workOrder);
+                const startDisabled = Boolean(startBlockReason);
+                const pauseDisabled = !canPause(workOrder);
+                const completeDisabled = !canComplete(workOrder);
 
                 return (
                   <tr key={workOrder.id}>
@@ -272,13 +309,28 @@ export default function WorkOrders() {
                     <td>{formatDate(workOrder.updatedAt)}</td>
                     <td>
                       <div className="action-row">
-                        <button type="button" onClick={() => runAction(() => startWorkOrder(workOrder.id))} title="Başlat">
+                        <button
+                          type="button"
+                          onClick={() => runAction(() => startWorkOrder(workOrder.id), "İş emri başlatılamadı.")}
+                          disabled={startDisabled}
+                          title={startBlockReason || "Başlat"}
+                        >
                           <Play size={16} />
                         </button>
-                        <button type="button" onClick={() => runAction(() => pauseWorkOrder(workOrder.id))} title="Duraklat">
+                        <button
+                          type="button"
+                          onClick={() => runAction(() => pauseWorkOrder(workOrder.id), "İş emri duraklatılamadı.")}
+                          disabled={pauseDisabled}
+                          title={pauseDisabled ? "Sadece üretimdeki iş emirleri duraklatılabilir." : "Duraklat"}
+                        >
                           <TimerReset size={16} />
                         </button>
-                        <button type="button" onClick={() => runAction(() => completeWorkOrder(workOrder.id))} title="Tamamla">
+                        <button
+                          type="button"
+                          onClick={() => runAction(() => completeWorkOrder(workOrder.id), "İş emri tamamlanamadı.")}
+                          disabled={completeDisabled}
+                          title={completeDisabled ? "Tamamlamak için iş emri başlamış ve üretim girişi yapılmış olmalı." : "Tamamla"}
+                        >
                           <Square size={16} />
                         </button>
                       </div>
@@ -333,7 +385,7 @@ export default function WorkOrders() {
             Kaydet
           </button>
         </form>
-        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Üretim girişi için önce makine atanmış bir iş emrini başlatın.</p> : null}
+        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Üretim girişi için önce operatör ve makine atanmış bir iş emrini başlatın.</p> : null}
       </section>
     </div>
   );

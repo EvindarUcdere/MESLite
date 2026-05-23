@@ -371,6 +371,11 @@ th {
   border-radius: 6px;
 }
 
+.action-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .selected-row {
   background: #f0fdfa;
 }

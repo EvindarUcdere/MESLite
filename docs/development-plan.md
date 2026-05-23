@@ -38,6 +38,7 @@ The production log transaction is important because dashboard totals should neve
 - Products and Machines screens manage master data used by work order planning.
 - Users screen allows admins to create users and manage active/passive status for factory roles.
 - User editing supports role changes, profile updates, optional password reset, and deactivation instead of deletion.
+- Work order action buttons are guarded by lifecycle rules to reduce invalid user actions in the web UI.
 
 ## Phase 3: Web MVP
 
