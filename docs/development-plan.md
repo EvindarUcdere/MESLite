@@ -33,6 +33,7 @@ The production log transaction is important because dashboard totals should neve
 - Dashboard reads real summary and live overview data from the API.
 - Work Orders screen supports creating, starting, pausing, and completing orders.
 - Production Entry records produced and scrap quantities against started work orders.
+- Quality screen records inspection results and defect information for produced work orders.
 
 ## Phase 3: Web MVP
 

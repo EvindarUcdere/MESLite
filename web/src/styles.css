@@ -349,6 +349,21 @@ th {
   background: #fee4e2;
 }
 
+.quality-passed {
+  color: #14523f;
+  background: #d9f2e8;
+}
+
+.quality-partial {
+  color: #78350f;
+  background: #fef0c7;
+}
+
+.quality-failed {
+  color: #912018;
+  background: #fee4e2;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
