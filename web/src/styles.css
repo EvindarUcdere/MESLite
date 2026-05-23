@@ -50,8 +50,27 @@ body {
   font-weight: 700;
 }
 
+.auth-panel button:disabled {
+  opacity: 0.7;
+}
+
 .dashboard-page header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 24px;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #17202a;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
 }
 
 .summary-grid {
@@ -77,4 +96,78 @@ body {
   display: block;
   margin-top: 10px;
   font-size: 30px;
+}
+
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.panel {
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.status-row {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #edf1f5;
+}
+
+.status-row:first-child {
+  border-top: 0;
+}
+
+.status-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.status-row span,
+.empty-state {
+  color: #60707d;
+  font-size: 14px;
+}
+
+.status-pill {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #17202a;
+  background: #edf1f5;
+}
+
+.status-running {
+  color: #14523f;
+  background: #d9f2e8;
+}
+
+.status-stopped,
+.status-maintenance {
+  color: #78350f;
+  background: #fef0c7;
+}
+
+.form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
 }
