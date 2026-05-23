@@ -22,28 +22,28 @@ export function AppShell() {
         <nav>
           <NavLink to="/" end>
             <BarChart3 size={18} />
-            Dashboard
+            Üretim Paneli
           </NavLink>
           <NavLink to="/work-orders">
             <ClipboardList size={18} />
-            Work Orders
+            İş Emirleri
           </NavLink>
           <NavLink to="/products">
             <Boxes size={18} />
-            Products
+            Ürünler
           </NavLink>
           <NavLink to="/machines">
             <Cpu size={18} />
-            Machines
+            Makineler
           </NavLink>
           <NavLink to="/quality">
             <ClipboardCheck size={18} />
-            Quality
+            Kalite
           </NavLink>
         </nav>
         <button className="logout-button" type="button" onClick={handleLogout}>
           <LogOut size={18} />
-          Sign out
+          Çıkış Yap
         </button>
       </aside>
       <section className="content-shell">

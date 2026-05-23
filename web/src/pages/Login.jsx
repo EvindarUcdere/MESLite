@@ -21,7 +21,7 @@ export default function Login() {
       setSession(session);
       navigate("/");
     } catch (_error) {
-      setError("Email or password is incorrect.");
+      setError("E-posta veya şifre hatalı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -31,19 +31,19 @@ export default function Login() {
     <main className="auth-page">
       <section className="auth-panel">
         <h1>MES Lite</h1>
-        <p>Factory production tracking</p>
+        <p>Fabrika üretim takip sistemi</p>
         <form onSubmit={handleSubmit}>
           <label>
-            Email
+            E-posta
             <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="admin@meslite.local" />
           </label>
           <label>
-            Password
+            Şifre
             <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="Admin123!" />
           </label>
           {error ? <p className="form-error">{error}</p> : null}
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}
           </button>
         </form>
       </section>

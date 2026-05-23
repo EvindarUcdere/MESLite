@@ -32,7 +32,7 @@ export default function Products() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Products could not be loaded.");
+          setError("Ürünler yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -67,7 +67,7 @@ export default function Products() {
       setForm({ code: "", name: "", unit: "pcs", targetCycleTime: "" });
       await loadProducts();
     } catch (_error) {
-      setError("Product could not be created.");
+      setError("Ürün oluşturulamadı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -77,50 +77,50 @@ export default function Products() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>Products</h1>
-          <p>Manage product master data used by work orders.</p>
+          <h1>Ürünler</h1>
+          <p>İş emirlerinde kullanılacak ürün ana verilerini yönetin.</p>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
       <section className="panel">
-        <h2>Create Product</h2>
+        <h2>Ürün Oluştur</h2>
         <form className="work-order-form" onSubmit={handleSubmit}>
           <label>
-            Code
+            Kod
             <input value={form.code} onChange={(event) => updateForm("code", event.target.value)} placeholder="PRD-002" required />
           </label>
           <label>
-            Name
+            Ad
             <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="Assembly Part" required />
           </label>
           <label>
-            Unit
+            Birim
             <input value={form.unit} onChange={(event) => updateForm("unit", event.target.value)} placeholder="pcs" required />
           </label>
           <label>
-            Target Cycle Time
+            Hedef Çevrim Süresi
             <input value={form.targetCycleTime} onChange={(event) => updateForm("targetCycleTime", event.target.value)} type="number" min="1" placeholder="45" />
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             <Plus size={18} />
-            {isSubmitting ? "Creating..." : "Create"}
+            {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
           </button>
         </form>
       </section>
 
       <section className="panel">
-        <h2>Product List</h2>
+        <h2>Ürün Listesi</h2>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Unit</th>
-                <th>Target Cycle</th>
-                <th>Status</th>
+                <th>Kod</th>
+                <th>Ad</th>
+                <th>Birim</th>
+                <th>Hedef Çevrim</th>
+                <th>Durum</th>
               </tr>
             </thead>
             <tbody>
@@ -131,13 +131,13 @@ export default function Products() {
                   <td>{product.unit}</td>
                   <td>{product.targetCycleTime ? `${product.targetCycleTime}s` : "-"}</td>
                   <td>
-                    <span className={`status-pill ${product.isActive ? "quality-passed" : "status-cancelled"}`}>{product.isActive ? "ACTIVE" : "PASSIVE"}</span>
+                    <span className={`status-pill ${product.isActive ? "quality-passed" : "status-cancelled"}`}>{product.isActive ? "Aktif" : "Pasif"}</span>
                   </td>
                 </tr>
               ))}
               {!isLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan="5">No products yet.</td>
+                  <td colSpan="5">Henüz ürün yok.</td>
                 </tr>
               ) : null}
             </tbody>

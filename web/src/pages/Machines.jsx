@@ -2,6 +2,13 @@ import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createMachine, createProductionLine, getMachines, getProductionLines, updateMachineStatus } from "../api/masterData.api.js";
 
+const STATUS_LABELS = {
+  IDLE: "Boşta",
+  RUNNING: "Çalışıyor",
+  STOPPED: "Duruşta",
+  MAINTENANCE: "Bakımda"
+};
+
 export default function Machines() {
   const [machines, setMachines] = useState([]);
   const [productionLines, setProductionLines] = useState([]);
@@ -39,7 +46,7 @@ export default function Machines() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Machine data could not be loaded.");
+          setError("Makine verileri yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -76,7 +83,7 @@ export default function Machines() {
       setLineForm({ name: "", description: "" });
       await loadData();
     } catch (_error) {
-      setError("Production line could not be created.");
+      setError("Üretim hattı oluşturulamadı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -92,7 +99,7 @@ export default function Machines() {
       setMachineForm((current) => ({ ...current, code: "", name: "" }));
       await loadData();
     } catch (_error) {
-      setError("Machine could not be created.");
+      setError("Makine oluşturulamadı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -102,10 +109,10 @@ export default function Machines() {
     setError("");
 
     try {
-      await updateMachineStatus(machineId, { status, reason: "Updated from web dashboard" });
+      await updateMachineStatus(machineId, { status, reason: "Web panelinden güncellendi" });
       await loadData();
     } catch (_error) {
-      setError("Machine status could not be updated.");
+      setError("Makine durumu güncellenemedi.");
     }
   }
 
@@ -113,8 +120,8 @@ export default function Machines() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>Machines</h1>
-          <p>Manage production lines, machines, and current machine status.</p>
+          <h1>Makineler</h1>
+          <p>Üretim hatlarını, makineleri ve güncel makine durumlarını yönetin.</p>
         </div>
       </header>
 
@@ -122,38 +129,38 @@ export default function Machines() {
 
       <section className="operations-grid">
         <article className="panel">
-          <h2>Create Production Line</h2>
+          <h2>Üretim Hattı Oluştur</h2>
           <form className="stack-form" onSubmit={handleCreateLine}>
             <label>
-              Name
-              <input value={lineForm.name} onChange={(event) => updateLineForm("name", event.target.value)} placeholder="Line B" required />
+              Ad
+              <input value={lineForm.name} onChange={(event) => updateLineForm("name", event.target.value)} placeholder="Hat B" required />
             </label>
             <label>
-              Description
-              <input value={lineForm.description} onChange={(event) => updateLineForm("description", event.target.value)} placeholder="Optional description" />
+              Açıklama
+              <input value={lineForm.description} onChange={(event) => updateLineForm("description", event.target.value)} placeholder="İsteğe bağlı açıklama" />
             </label>
             <button className="primary-button" type="submit" disabled={isSubmitting}>
               <Plus size={18} />
-              Create Line
+              Hat Oluştur
             </button>
           </form>
         </article>
 
         <article className="panel">
-          <h2>Create Machine</h2>
+          <h2>Makine Oluştur</h2>
           <form className="stack-form" onSubmit={handleCreateMachine}>
             <label>
-              Code
+              Kod
               <input value={machineForm.code} onChange={(event) => updateMachineForm("code", event.target.value)} placeholder="MCH-002" required />
             </label>
             <label>
-              Name
-              <input value={machineForm.name} onChange={(event) => updateMachineForm("name", event.target.value)} placeholder="Press Machine" required />
+              Ad
+              <input value={machineForm.name} onChange={(event) => updateMachineForm("name", event.target.value)} placeholder="Pres Makinesi" required />
             </label>
             <label>
-              Production Line
+              Üretim Hattı
               <select value={machineForm.productionLineId} onChange={(event) => updateMachineForm("productionLineId", event.target.value)} required>
-                <option value="">Select line</option>
+                <option value="">Hat seçin</option>
                 {productionLines.map((line) => (
                   <option key={line.id} value={line.id}>
                     {line.name}
@@ -162,33 +169,33 @@ export default function Machines() {
               </select>
             </label>
             <label>
-              Status
+              Durum
               <select value={machineForm.status} onChange={(event) => updateMachineForm("status", event.target.value)} required>
-                <option value="IDLE">IDLE</option>
-                <option value="RUNNING">RUNNING</option>
-                <option value="STOPPED">STOPPED</option>
-                <option value="MAINTENANCE">MAINTENANCE</option>
+                <option value="IDLE">Boşta</option>
+                <option value="RUNNING">Çalışıyor</option>
+                <option value="STOPPED">Duruşta</option>
+                <option value="MAINTENANCE">Bakımda</option>
               </select>
             </label>
             <button className="primary-button" type="submit" disabled={isSubmitting || productionLines.length === 0}>
               <Plus size={18} />
-              Create Machine
+              Makine Oluştur
             </button>
           </form>
         </article>
       </section>
 
       <section className="panel">
-        <h2>Machine List</h2>
+        <h2>Makine Listesi</h2>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Line</th>
-                <th>Status</th>
-                <th>Set Status</th>
+                <th>Kod</th>
+                <th>Ad</th>
+                <th>Hat</th>
+                <th>Durum</th>
+                <th>Durum Güncelle</th>
               </tr>
             </thead>
             <tbody>
@@ -198,21 +205,21 @@ export default function Machines() {
                   <td>{machine.name}</td>
                   <td>{machine.productionLine?.name ?? "-"}</td>
                   <td>
-                    <span className={`status-pill status-${machine.status.toLowerCase()}`}>{machine.status}</span>
+                    <span className={`status-pill status-${machine.status.toLowerCase()}`}>{STATUS_LABELS[machine.status] ?? machine.status}</span>
                   </td>
                   <td>
                     <select className="compact-select" value={machine.status} onChange={(event) => handleStatusChange(machine.id, event.target.value)}>
-                      <option value="IDLE">IDLE</option>
-                      <option value="RUNNING">RUNNING</option>
-                      <option value="STOPPED">STOPPED</option>
-                      <option value="MAINTENANCE">MAINTENANCE</option>
+                      <option value="IDLE">Boşta</option>
+                      <option value="RUNNING">Çalışıyor</option>
+                      <option value="STOPPED">Duruşta</option>
+                      <option value="MAINTENANCE">Bakımda</option>
                     </select>
                   </td>
                 </tr>
               ))}
               {!isLoading && machines.length === 0 ? (
                 <tr>
-                  <td colSpan="5">No machines yet.</td>
+                  <td colSpan="5">Henüz makine yok.</td>
                 </tr>
               ) : null}
             </tbody>

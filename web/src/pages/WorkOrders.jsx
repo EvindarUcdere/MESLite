@@ -4,12 +4,20 @@ import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 
+const STATUS_LABELS = {
+  PLANNED: "Planlandı",
+  IN_PROGRESS: "Üretimde",
+  PAUSED: "Duraklatıldı",
+  COMPLETED: "Tamamlandı",
+  CANCELLED: "İptal"
+};
+
 function formatDate(value) {
   if (!value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("tr-TR", {
     month: "short",
     day: "2-digit",
     hour: "2-digit",
@@ -69,7 +77,7 @@ export default function WorkOrders() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Work order data could not be loaded.");
+          setError("İş emri verileri yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -115,7 +123,7 @@ export default function WorkOrders() {
       }));
       await loadData();
     } catch (_error) {
-      setError("Work order could not be created.");
+      setError("İş emri oluşturulamadı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -128,7 +136,7 @@ export default function WorkOrders() {
       await action();
       await loadData();
     } catch (_error) {
-      setError("Action could not be completed.");
+      setError("İşlem tamamlanamadı.");
     }
   }
 
@@ -141,7 +149,7 @@ export default function WorkOrders() {
       const selectedWorkOrder = workOrders.find((workOrder) => workOrder.id === productionForm.workOrderId);
 
       if (!selectedWorkOrder?.machineId) {
-        setError("Select a started work order with an assigned machine.");
+        setError("Makine atanmış ve başlatılmış bir iş emri seçin.");
         return;
       }
 
@@ -161,7 +169,7 @@ export default function WorkOrders() {
       }));
       await loadData();
     } catch (_error) {
-      setError("Production entry could not be saved.");
+      setError("Üretim girişi kaydedilemedi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -171,24 +179,24 @@ export default function WorkOrders() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>Work Orders</h1>
-          <p>Plan, assign, and control production orders.</p>
+          <h1>İş Emirleri</h1>
+          <p>Üretim emirlerini planlayın, atayın ve takip edin.</p>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
       <section className="panel">
-        <h2>Create Work Order</h2>
+        <h2>İş Emri Oluştur</h2>
         <form className="work-order-form" onSubmit={handleCreate}>
           <label>
-            Order No
+            İş Emri No
             <input value={form.orderNo} onChange={(event) => updateForm("orderNo", event.target.value)} placeholder="WO-001" required />
           </label>
           <label>
-            Product
+            Ürün
             <select value={form.productId} onChange={(event) => updateForm("productId", event.target.value)} required>
-              <option value="">Select product</option>
+              <option value="">Ürün seçin</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
                   {product.code} - {product.name}
@@ -197,9 +205,9 @@ export default function WorkOrders() {
             </select>
           </label>
           <label>
-            Machine
+            Makine
             <select value={form.machineId} onChange={(event) => updateForm("machineId", event.target.value)}>
-              <option value="">Assign later</option>
+              <option value="">Sonra ata</option>
               {activeMachines.map((machine) => (
                 <option key={machine.id} value={machine.id}>
                   {machine.code} - {machine.name}
@@ -208,9 +216,9 @@ export default function WorkOrders() {
             </select>
           </label>
           <label>
-            Operator
+            Operatör
             <select value={form.assignedOperatorId} onChange={(event) => updateForm("assignedOperatorId", event.target.value)}>
-              <option value="">Assign later</option>
+              <option value="">Sonra ata</option>
               {operators.map((operator) => (
                 <option key={operator.id} value={operator.id}>
                   {operator.name}
@@ -219,30 +227,30 @@ export default function WorkOrders() {
             </select>
           </label>
           <label>
-            Planned Qty
+            Planlanan Adet
             <input value={form.plannedQuantity} onChange={(event) => updateForm("plannedQuantity", event.target.value)} type="number" min="1" required />
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             <Plus size={18} />
-            {isSubmitting ? "Creating..." : "Create"}
+            {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
           </button>
         </form>
       </section>
 
       <section className="panel">
-        <h2>Order List</h2>
+        <h2>İş Emri Listesi</h2>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Order</th>
-                <th>Product</th>
-                <th>Status</th>
-                <th>Progress</th>
-                <th>Machine</th>
-                <th>Operator</th>
-                <th>Updated</th>
-                <th>Actions</th>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Durum</th>
+                <th>İlerleme</th>
+                <th>Makine</th>
+                <th>Operatör</th>
+                <th>Güncelleme</th>
+                <th>İşlemler</th>
               </tr>
             </thead>
             <tbody>
@@ -254,7 +262,7 @@ export default function WorkOrders() {
                     <td>{workOrder.orderNo}</td>
                     <td>{workOrder.product.name}</td>
                     <td>
-                      <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{workOrder.status}</span>
+                      <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</span>
                     </td>
                     <td>
                       {workOrder.producedQuantity}/{workOrder.plannedQuantity} ({progress}%)
@@ -264,13 +272,13 @@ export default function WorkOrders() {
                     <td>{formatDate(workOrder.updatedAt)}</td>
                     <td>
                       <div className="action-row">
-                        <button type="button" onClick={() => runAction(() => startWorkOrder(workOrder.id))} title="Start">
+                        <button type="button" onClick={() => runAction(() => startWorkOrder(workOrder.id))} title="Başlat">
                           <Play size={16} />
                         </button>
-                        <button type="button" onClick={() => runAction(() => pauseWorkOrder(workOrder.id))} title="Pause">
+                        <button type="button" onClick={() => runAction(() => pauseWorkOrder(workOrder.id))} title="Duraklat">
                           <TimerReset size={16} />
                         </button>
-                        <button type="button" onClick={() => runAction(() => completeWorkOrder(workOrder.id))} title="Complete">
+                        <button type="button" onClick={() => runAction(() => completeWorkOrder(workOrder.id))} title="Tamamla">
                           <Square size={16} />
                         </button>
                       </div>
@@ -280,7 +288,7 @@ export default function WorkOrders() {
               })}
               {!isLoading && workOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8">No work orders yet.</td>
+                  <td colSpan="8">Henüz iş emri yok.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -289,12 +297,12 @@ export default function WorkOrders() {
       </section>
 
       <section className="panel">
-        <h2>Production Entry</h2>
+        <h2>Üretim Girişi</h2>
         <form className="work-order-form" onSubmit={handleProductionEntry}>
           <label>
-            Work Order
+            İş Emri
             <select value={productionForm.workOrderId} onChange={(event) => updateProductionForm("workOrderId", event.target.value)} required>
-              <option value="">Select started order</option>
+              <option value="">Başlatılmış iş emri seçin</option>
               {productionCandidates.map((workOrder) => (
                 <option key={workOrder.id} value={workOrder.id}>
                   {workOrder.orderNo} - {workOrder.product.name}
@@ -303,7 +311,7 @@ export default function WorkOrders() {
             </select>
           </label>
           <label>
-            Produced Qty
+            Üretilen Adet
             <input
               value={productionForm.producedQuantity}
               onChange={(event) => updateProductionForm("producedQuantity", event.target.value)}
@@ -313,19 +321,19 @@ export default function WorkOrders() {
             />
           </label>
           <label>
-            Scrap Qty
+            Fire Adedi
             <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
           </label>
           <label>
-            Note
-            <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="Optional note" />
+            Not
+            <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="İsteğe bağlı not" />
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting || productionCandidates.length === 0}>
             <Plus size={18} />
-            Save Entry
+            Kaydet
           </button>
         </form>
-        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Start a work order with an assigned machine before logging production.</p> : null}
+        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Üretim girişi için önce makine atanmış bir iş emrini başlatın.</p> : null}
       </section>
     </div>
   );

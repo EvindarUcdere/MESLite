@@ -18,8 +18,23 @@ const STATUS_COLORS = {
   FAILED: "#dc2626"
 };
 
+const STATUS_LABELS = {
+  PLANNED: "Planlandı",
+  IN_PROGRESS: "Üretimde",
+  PAUSED: "Duraklatıldı",
+  COMPLETED: "Tamamlandı",
+  CANCELLED: "İptal",
+  IDLE: "Boşta",
+  RUNNING: "Çalışıyor",
+  STOPPED: "Duruşta",
+  MAINTENANCE: "Bakımda",
+  PASSED: "Geçti",
+  PARTIAL: "Kısmi",
+  FAILED: "Kaldı"
+};
+
 function mapCountsToChartData(counts = {}) {
-  return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  return Object.entries(counts).map(([name, value]) => ({ name, label: STATUS_LABELS[name] ?? name, value }));
 }
 
 export default function Dashboard() {
@@ -42,7 +57,7 @@ export default function Dashboard() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Dashboard data could not be loaded.");
+          setError("Panel verileri yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -59,19 +74,19 @@ export default function Dashboard() {
   }, []);
 
   const cards = [
-    ["Active Orders", summary?.activeWorkOrders ?? 0],
-    ["Today Produced", summary?.todayProducedQuantity ?? 0],
-    ["Today Scrap Rate", `${summary?.todayScrapRate ?? 0}%`],
-    ["Running Machines", summary?.runningMachines ?? 0]
+    ["Aktif İş Emirleri", summary?.activeWorkOrders ?? 0],
+    ["Bugünkü Üretim", summary?.todayProducedQuantity ?? 0],
+    ["Bugünkü Fire Oranı", `${summary?.todayScrapRate ?? 0}%`],
+    ["Çalışan Makineler", summary?.runningMachines ?? 0]
   ];
   const productionChartData = [
     {
-      name: "Today",
+      name: "Bugün",
       produced: summary?.todayProducedQuantity ?? 0,
       scrap: summary?.todayScrapQuantity ?? 0
     },
     {
-      name: "Total",
+      name: "Toplam",
       produced: summary?.producedQuantity ?? 0,
       scrap: summary?.scrapQuantity ?? 0
     }
@@ -84,8 +99,8 @@ export default function Dashboard() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>MES Lite Dashboard</h1>
-          <p>{user?.name ?? "Production overview"}</p>
+          <h1>Üretim Paneli</h1>
+          <p>{user?.name ?? "Üretim genel görünümü"}</p>
         </div>
       </header>
       {error ? <p className="form-error">{error}</p> : null}
@@ -99,7 +114,7 @@ export default function Dashboard() {
       </section>
       <section className="operations-grid">
         <article className="panel chart-panel">
-          <h2>Production vs Scrap</h2>
+          <h2>Üretim ve Fire</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={productionChartData}>
               <CartesianGrid stroke="#edf1f5" vertical={false} />
@@ -107,17 +122,17 @@ export default function Dashboard() {
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="produced" name="Produced" fill="#256f6c" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="scrap" name="Scrap" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="produced" name="Üretim" fill="#256f6c" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="scrap" name="Fire" fill="#dc2626" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </article>
         <article className="panel chart-panel">
-          <h2>Machine Status</h2>
+          <h2>Makine Durumları</h2>
           {machineStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={machineStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={machineStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {machineStatusData.map((entry) => (
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
                   ))}
@@ -127,15 +142,15 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="empty-state">No machine status data.</p>
+            <p className="empty-state">Makine durum verisi yok.</p>
           )}
         </article>
         <article className="panel chart-panel">
-          <h2>Work Order Status</h2>
+          <h2>İş Emri Durumları</h2>
           {workOrderStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={workOrderStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={workOrderStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {workOrderStatusData.map((entry) => (
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
                   ))}
@@ -145,15 +160,15 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="empty-state">No work order status data.</p>
+            <p className="empty-state">İş emri durum verisi yok.</p>
           )}
         </article>
         <article className="panel chart-panel">
-          <h2>Quality Results</h2>
+          <h2>Kalite Sonuçları</h2>
           {qualityStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={qualityStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={qualityStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {qualityStatusData.map((entry) => (
                     <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
                   ))}
@@ -163,11 +178,11 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <p className="empty-state">No quality result data.</p>
+            <p className="empty-state">Kalite sonucu verisi yok.</p>
           )}
         </article>
         <article className="panel">
-          <h2>Machines</h2>
+          <h2>Makineler</h2>
           <div className="status-list">
             {(live?.machines ?? []).map((machine) => (
               <div key={machine.id} className="status-row">
@@ -175,13 +190,13 @@ export default function Dashboard() {
                   <strong>{machine.code}</strong>
                   <span>{machine.name}</span>
                 </div>
-                <span className={`status-pill status-${machine.status.toLowerCase()}`}>{machine.status}</span>
+                <span className={`status-pill status-${machine.status.toLowerCase()}`}>{STATUS_LABELS[machine.status] ?? machine.status}</span>
               </div>
             ))}
           </div>
         </article>
         <article className="panel">
-          <h2>Active Work Orders</h2>
+          <h2>Aktif İş Emirleri</h2>
           <div className="status-list">
             {(live?.activeWorkOrders ?? []).map((workOrder) => (
               <div key={workOrder.id} className="status-row">
@@ -192,22 +207,22 @@ export default function Dashboard() {
                 <span>{workOrder.progressPercent}%</span>
               </div>
             ))}
-            {!isLoading && (live?.activeWorkOrders ?? []).length === 0 ? <p className="empty-state">No active work orders.</p> : null}
+            {!isLoading && (live?.activeWorkOrders ?? []).length === 0 ? <p className="empty-state">Aktif iş emri yok.</p> : null}
           </div>
         </article>
       </section>
       <section className="panel">
-        <h2>Recent Production Logs</h2>
+        <h2>Son Üretim Kayıtları</h2>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Work Order</th>
-                <th>Product</th>
-                <th>Machine</th>
-                <th>Operator</th>
-                <th>Produced</th>
-                <th>Scrap</th>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Makine</th>
+                <th>Operatör</th>
+                <th>Üretim</th>
+                <th>Fire</th>
               </tr>
             </thead>
             <tbody>
@@ -223,7 +238,7 @@ export default function Dashboard() {
               ))}
               {!isLoading && (live?.recentProductionLogs ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan="6">No production logs yet.</td>
+                  <td colSpan="6">Henüz üretim kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>

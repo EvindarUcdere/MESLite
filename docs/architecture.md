@@ -7,6 +7,7 @@
 - Make every feature module isolated so new modules can be added without touching unrelated code.
 - Use enums for stable business states such as roles, work order status, and machine status.
 - Keep realtime events as notifications of committed backend changes, not a replacement for REST APIs.
+- Keep source code and API names in English, but present the web UI in Turkish for local factory users.
 
 ## Core Workflow
 

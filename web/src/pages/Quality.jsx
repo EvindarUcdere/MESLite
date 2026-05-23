@@ -3,12 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
 
+const QUALITY_LABELS = {
+  PASSED: "Geçti",
+  PARTIAL: "Kısmi",
+  FAILED: "Kaldı"
+};
+
 function formatDate(value) {
   if (!value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("tr-TR", {
     month: "short",
     day: "2-digit",
     hour: "2-digit",
@@ -55,7 +61,7 @@ export default function Quality() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Quality data could not be loaded.");
+          setError("Kalite verileri yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -97,7 +103,7 @@ export default function Quality() {
       }));
       await loadData();
     } catch (_error) {
-      setError("Quality check could not be saved.");
+      setError("Kalite kontrol kaydı oluşturulamadı.");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,20 +113,20 @@ export default function Quality() {
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>Quality</h1>
-          <p>Record inspection outcomes for produced work orders.</p>
+          <h1>Kalite</h1>
+          <p>Üretimi yapılan iş emirleri için kalite sonuçlarını kaydedin.</p>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
       <section className="panel">
-        <h2>Quality Entry</h2>
+        <h2>Kalite Girişi</h2>
         <form className="work-order-form" onSubmit={handleSubmit}>
           <label>
-            Work Order
+            İş Emri
             <select value={form.workOrderId} onChange={(event) => updateForm("workOrderId", event.target.value)} required>
-              <option value="">Select produced order</option>
+              <option value="">Üretimi yapılmış iş emri seçin</option>
               {checkCandidates.map((workOrder) => (
                 <option key={workOrder.id} value={workOrder.id}>
                   {workOrder.orderNo} - {workOrder.product.name}
@@ -129,46 +135,46 @@ export default function Quality() {
             </select>
           </label>
           <label>
-            Result
+            Sonuç
             <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} required>
-              <option value="PASSED">PASSED</option>
-              <option value="PARTIAL">PARTIAL</option>
-              <option value="FAILED">FAILED</option>
+              <option value="PASSED">Geçti</option>
+              <option value="PARTIAL">Kısmi</option>
+              <option value="FAILED">Kaldı</option>
             </select>
           </label>
           <label>
-            Defect Qty
+            Hatalı Adet
             <input value={form.defectQuantity} onChange={(event) => updateForm("defectQuantity", event.target.value)} type="number" min="0" required />
           </label>
           <label>
-            Defect Reason
-            <input value={form.defectReason} onChange={(event) => updateForm("defectReason", event.target.value)} placeholder="Scratch, dimension, material..." />
+            Hata Nedeni
+            <input value={form.defectReason} onChange={(event) => updateForm("defectReason", event.target.value)} placeholder="Çizik, ölçü hatası, malzeme..." />
           </label>
           <label>
-            Note
-            <input value={form.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="Optional note" />
+            Not
+            <input value={form.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="İsteğe bağlı not" />
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting || checkCandidates.length === 0}>
             <Plus size={18} />
-            Save Check
+            Kaydet
           </button>
         </form>
-        {!isLoading && checkCandidates.length === 0 ? <p className="empty-state">Log production before recording a quality check.</p> : null}
+        {!isLoading && checkCandidates.length === 0 ? <p className="empty-state">Kalite girişi için önce üretim kaydı girin.</p> : null}
       </section>
 
       <section className="panel">
-        <h2>Recent Checks</h2>
+        <h2>Son Kalite Kontrolleri</h2>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Work Order</th>
-                <th>Product</th>
-                <th>Result</th>
-                <th>Defects</th>
-                <th>Reason</th>
-                <th>Checked By</th>
-                <th>Checked At</th>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Sonuç</th>
+                <th>Hatalı</th>
+                <th>Neden</th>
+                <th>Kontrol Eden</th>
+                <th>Kontrol Zamanı</th>
               </tr>
             </thead>
             <tbody>
@@ -177,7 +183,7 @@ export default function Quality() {
                   <td>{check.workOrder.orderNo}</td>
                   <td>{check.workOrder.product.name}</td>
                   <td>
-                    <span className={`status-pill quality-${check.status.toLowerCase()}`}>{check.status}</span>
+                    <span className={`status-pill quality-${check.status.toLowerCase()}`}>{QUALITY_LABELS[check.status] ?? check.status}</span>
                   </td>
                   <td>{check.defectQuantity}</td>
                   <td>{check.defectReason ?? "-"}</td>
@@ -187,7 +193,7 @@ export default function Quality() {
               ))}
               {!isLoading && qualityChecks.length === 0 ? (
                 <tr>
-                  <td colSpan="7">No quality checks yet.</td>
+                  <td colSpan="7">Henüz kalite kontrol kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>
