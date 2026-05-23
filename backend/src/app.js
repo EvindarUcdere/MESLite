@@ -15,6 +15,16 @@ export function createApp() {
   app.use(express.json());
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
+  app.get("/", (_req, res) => {
+    res.json({
+      service: "MES Lite API",
+      status: "running",
+      docs: "/api/docs",
+      health: "/health",
+      apiBase: "/api"
+    });
+  });
+
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", service: "mes-lite-api" });
   });
