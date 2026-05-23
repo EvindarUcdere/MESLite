@@ -7,3 +7,4 @@ export const dashboardRoutes = Router();
 
 dashboardRoutes.use(requireAuth);
 dashboardRoutes.get("/summary", asyncHandler(dashboardController.summary));
+dashboardRoutes.get("/live", asyncHandler(dashboardController.live));

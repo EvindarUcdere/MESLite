@@ -26,6 +26,7 @@
 - Role checks stay in route files so access rules are visible at the API boundary.
 - Operators use lifecycle actions such as start, pause, and complete instead of free-form status updates.
 - A work order must have both an operator and a machine before production can start.
+- Dashboard endpoints provide operational summaries; detailed historical analytics belong in the reports module.
 
 ## Module Boundaries
 

@@ -23,6 +23,7 @@
 - `work-orders`: assignment and lifecycle actions for start, pause, and completion.
 - `production-logs`: operator entries update work order totals in a transaction.
 - `quality-checks`: quality outcomes are tracked by work order and quality staff.
+- `dashboard`: summary and live overview data for operational monitoring.
 
 The production log transaction is important because dashboard totals should never depend on a log existing without the related work order totals being updated.
 
