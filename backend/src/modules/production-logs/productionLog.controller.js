@@ -11,7 +11,7 @@ export async function detail(req, res) {
 }
 
 export async function create(req, res) {
-  const log = await productionLogService.createProductionLog(req.user.id, req.validated.body);
+  const log = await productionLogService.createProductionLog(req.user, req.validated.body);
   res.status(201).json({ data: log });
 }
 

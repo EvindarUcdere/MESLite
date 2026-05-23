@@ -1,6 +1,7 @@
 import { Play, Plus, Square, TimerReset } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
+import { createProductionLog } from "../api/productionLogs.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 
 function formatDate(value) {
@@ -31,8 +32,18 @@ export default function WorkOrders() {
     assignedOperatorId: "",
     plannedQuantity: 100
   });
+  const [productionForm, setProductionForm] = useState({
+    workOrderId: "",
+    producedQuantity: 10,
+    scrapQuantity: 0,
+    note: ""
+  });
 
   const activeMachines = useMemo(() => machines.filter((machine) => machine.isActive), [machines]);
+  const productionCandidates = useMemo(
+    () => workOrders.filter((workOrder) => ["IN_PROGRESS", "PAUSED"].includes(workOrder.status) && workOrder.machineId),
+    [workOrders]
+  );
 
   async function loadData() {
     setError("");
@@ -78,6 +89,10 @@ export default function WorkOrders() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function updateProductionForm(field, value) {
+    setProductionForm((current) => ({ ...current, [field]: value }));
+  }
+
   async function handleCreate(event) {
     event.preventDefault();
     setError("");
@@ -114,6 +129,41 @@ export default function WorkOrders() {
       await loadData();
     } catch (_error) {
       setError("Action could not be completed.");
+    }
+  }
+
+  async function handleProductionEntry(event) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const selectedWorkOrder = workOrders.find((workOrder) => workOrder.id === productionForm.workOrderId);
+
+      if (!selectedWorkOrder?.machineId) {
+        setError("Select a started work order with an assigned machine.");
+        return;
+      }
+
+      await createProductionLog({
+        workOrderId: selectedWorkOrder.id,
+        machineId: selectedWorkOrder.machineId,
+        producedQuantity: Number(productionForm.producedQuantity),
+        scrapQuantity: Number(productionForm.scrapQuantity),
+        ...(productionForm.note ? { note: productionForm.note } : {})
+      });
+
+      setProductionForm((current) => ({
+        ...current,
+        producedQuantity: 10,
+        scrapQuantity: 0,
+        note: ""
+      }));
+      await loadData();
+    } catch (_error) {
+      setError("Production entry could not be saved.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -236,6 +286,46 @@ export default function WorkOrders() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="panel">
+        <h2>Production Entry</h2>
+        <form className="work-order-form" onSubmit={handleProductionEntry}>
+          <label>
+            Work Order
+            <select value={productionForm.workOrderId} onChange={(event) => updateProductionForm("workOrderId", event.target.value)} required>
+              <option value="">Select started order</option>
+              {productionCandidates.map((workOrder) => (
+                <option key={workOrder.id} value={workOrder.id}>
+                  {workOrder.orderNo} - {workOrder.product.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Produced Qty
+            <input
+              value={productionForm.producedQuantity}
+              onChange={(event) => updateProductionForm("producedQuantity", event.target.value)}
+              type="number"
+              min="0"
+              required
+            />
+          </label>
+          <label>
+            Scrap Qty
+            <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
+          </label>
+          <label>
+            Note
+            <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="Optional note" />
+          </label>
+          <button className="primary-button" type="submit" disabled={isSubmitting || productionCandidates.length === 0}>
+            <Plus size={18} />
+            Save Entry
+          </button>
+        </form>
+        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Start a work order with an assigned machine before logging production.</p> : null}
       </section>
     </div>
   );

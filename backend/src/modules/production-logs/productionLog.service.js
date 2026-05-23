@@ -23,12 +23,24 @@ export function findProductionLogById(id) {
   });
 }
 
-export async function createProductionLog(operatorId, data) {
+export async function createProductionLog(actor, data) {
   if (data.producedQuantity === 0 && data.scrapQuantity === 0) {
     throw new ApiError(400, "Produced or scrap quantity must be greater than zero");
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({ where: { id: data.workOrderId } });
+
+    if (!workOrder) {
+      throw new ApiError(404, "Work order not found");
+    }
+
+    const operatorId = actor.role === "OPERATOR" ? actor.id : workOrder.assignedOperatorId;
+
+    if (!operatorId) {
+      throw new ApiError(400, "Assigned operator is required before logging production");
+    }
+
     const log = await tx.productionLog.create({
       data: {
         workOrderId: data.workOrderId,
@@ -44,7 +56,7 @@ export async function createProductionLog(operatorId, data) {
       include: includeRelations
     });
 
-    const workOrder = await tx.workOrder.update({
+    const updatedWorkOrder = await tx.workOrder.update({
       where: { id: data.workOrderId },
       data: {
         producedQuantity: { increment: data.producedQuantity },
@@ -52,7 +64,7 @@ export async function createProductionLog(operatorId, data) {
       }
     });
 
-    return { log, workOrder };
+    return { log, workOrder: updatedWorkOrder };
   });
 
   emitEvent("production:logged", result.log);
