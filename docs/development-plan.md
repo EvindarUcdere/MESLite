@@ -36,6 +36,7 @@ The production log transaction is important because dashboard totals should neve
 - Quality screen records inspection results and defect information for produced work orders.
 - Dashboard includes Recharts visuals for production, scrap, machine status, work order status, and quality results.
 - Products and Machines screens manage master data used by work order planning.
+- Users screen allows admins to create users and manage active/passive status for factory roles.
 
 ## Phase 3: Web MVP
 

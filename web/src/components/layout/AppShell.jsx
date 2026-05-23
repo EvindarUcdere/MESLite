@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, ClipboardCheck, ClipboardList, Cpu, LogOut } from "lucide-react";
+import { BarChart3, Boxes, ClipboardCheck, ClipboardList, Cpu, LogOut, Users } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore.js";
 
@@ -39,6 +39,10 @@ export function AppShell() {
           <NavLink to="/quality">
             <ClipboardCheck size={18} />
             Kalite
+          </NavLink>
+          <NavLink to="/users">
+            <Users size={18} />
+            Kullanıcılar
           </NavLink>
         </nav>
         <button className="logout-button" type="button" onClick={handleLogout}>
