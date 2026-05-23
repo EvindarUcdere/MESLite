@@ -34,7 +34,11 @@ const STATUS_LABELS = {
 };
 
 function mapCountsToChartData(counts = {}) {
-  return Object.entries(counts).map(([name, value]) => ({ name, label: STATUS_LABELS[name] ?? name, value }));
+  return Object.entries(counts).map(([status, value]) => ({
+    status,
+    name: STATUS_LABELS[status] ?? status,
+    value
+  }));
 }
 
 export default function Dashboard() {
@@ -132,9 +136,9 @@ export default function Dashboard() {
           {machineStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={machineStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={machineStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {machineStatusData.map((entry) => (
-                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
+                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -150,9 +154,9 @@ export default function Dashboard() {
           {workOrderStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={workOrderStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={workOrderStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {workOrderStatusData.map((entry) => (
-                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
+                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -168,9 +172,9 @@ export default function Dashboard() {
           {qualityStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={qualityStatusData} dataKey="value" nameKey="label" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                <Pie data={qualityStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
                   {qualityStatusData.map((entry) => (
-                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? "#64748b"} />
+                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
                   ))}
                 </Pie>
                 <Tooltip />
