@@ -18,6 +18,22 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
+function getRemainingQuantity(workOrder) {
+  return Math.max(workOrder.plannedQuantity - workOrder.producedQuantity, 0);
+}
+
+function getProgressPercent(workOrder) {
+  if (!workOrder.plannedQuantity) {
+    return 0;
+  }
+
+  return Math.min(Math.round((workOrder.producedQuantity / workOrder.plannedQuantity) * 100), 100);
+}
+
+function getMachineName(workOrder) {
+  return workOrder.machine?.name ?? "Makine atanmamış";
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -38,6 +54,7 @@ export default function App() {
   const selectedWorkOrder = assignedWorkOrders.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const productionCandidates = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId);
   const selectedProductionWorkOrder = productionCandidates.find((workOrder) => workOrder.id === selectedWorkOrderId);
+  const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
 
   async function loadWorkOrders() {
     const data = await getWorkOrders();
@@ -198,9 +215,11 @@ export default function App() {
           >
             <View>
               <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
-              <Text style={styles.muted}>{workOrder.product.name}</Text>
               <Text style={styles.muted}>
-                {workOrder.producedQuantity}/{workOrder.plannedQuantity} adet
+                {workOrder.product.code} - {workOrder.product.name}
+              </Text>
+              <Text style={styles.muted}>
+                {getRemainingQuantity(workOrder)} adet kaldı
               </Text>
             </View>
             <Text style={styles.statusText}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</Text>
@@ -211,8 +230,62 @@ export default function App() {
 
       {selectedWorkOrder ? (
         <View style={styles.card}>
+          <View style={styles.detailHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>İş Emri Detayı</Text>
+              <Text style={styles.muted}>{selectedWorkOrder.orderNo}</Text>
+            </View>
+            <Text style={styles.statusBadge}>{STATUS_LABELS[selectedWorkOrder.status] ?? selectedWorkOrder.status}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailBox}>
+              <Text style={styles.detailLabel}>Ürün Kodu</Text>
+              <Text style={styles.detailValue}>{selectedWorkOrder.product.code}</Text>
+            </View>
+            <View style={styles.detailBox}>
+              <Text style={styles.detailLabel}>Ürün</Text>
+              <Text style={styles.detailValue}>{selectedWorkOrder.product.name}</Text>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailBox}>
+              <Text style={styles.detailLabel}>Makine</Text>
+              <Text style={styles.detailValue}>{getMachineName(selectedWorkOrder)}</Text>
+            </View>
+            <View style={styles.detailBox}>
+              <Text style={styles.detailLabel}>Kalan</Text>
+              <Text style={styles.detailValue}>{getRemainingQuantity(selectedWorkOrder)} adet</Text>
+            </View>
+          </View>
+
+          <View style={styles.kpiRow}>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiValue}>{selectedWorkOrder.plannedQuantity}</Text>
+              <Text style={styles.detailLabel}>Plan</Text>
+            </View>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiValue}>{selectedWorkOrder.producedQuantity}</Text>
+              <Text style={styles.detailLabel}>Üretim</Text>
+            </View>
+            <View style={styles.kpiBox}>
+              <Text style={styles.kpiValue}>{selectedWorkOrder.scrapQuantity}</Text>
+              <Text style={styles.detailLabel}>Fire</Text>
+            </View>
+          </View>
+
+          <View>
+            <View style={styles.progressHeader}>
+              <Text style={styles.detailLabel}>İlerleme</Text>
+              <Text style={styles.detailValue}>{selectedProgressPercent}%</Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${selectedProgressPercent}%` }]} />
+            </View>
+          </View>
+
           <Text style={styles.sectionTitle}>İş Emri Aksiyonları</Text>
-          <Text style={styles.muted}>{selectedWorkOrder.orderNo}</Text>
           <View style={styles.actionRow}>
             <Pressable
               style={[styles.primaryButton, !["PLANNED", "PAUSED"].includes(selectedWorkOrder.status) ? styles.disabledButton : null]}
@@ -336,6 +409,84 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
     color: "#17202a"
+  },
+  detailHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: "#256f6c",
+    backgroundColor: "#d9f2e8",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  detailRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  detailBox: {
+    flex: 1,
+    gap: 4,
+    minHeight: 66,
+    justifyContent: "center",
+    padding: 10,
+    backgroundColor: "#f7fafc",
+    borderColor: "#edf1f5",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  detailLabel: {
+    color: "#60707d",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  detailValue: {
+    color: "#17202a",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  kpiRow: {
+    flexDirection: "row",
+    gap: 10
+  },
+  kpiBox: {
+    flex: 1,
+    gap: 2,
+    minHeight: 64,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    backgroundColor: "#f7fafc",
+    borderColor: "#edf1f5",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  kpiValue: {
+    color: "#17202a",
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  progressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8
+  },
+  progressTrack: {
+    height: 10,
+    overflow: "hidden",
+    backgroundColor: "#edf1f5",
+    borderRadius: 999
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#256f6c",
+    borderRadius: 999
   },
   label: {
     color: "#33424d",
