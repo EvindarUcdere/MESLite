@@ -13,3 +13,16 @@ apiClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("mes_lite_token");
+      localStorage.removeItem("mes_lite_user");
+      window.location.assign("/login");
+    }
+
+    return Promise.reject(error);
+  }
+);

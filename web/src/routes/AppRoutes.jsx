@@ -9,6 +9,8 @@ import Reports from "../pages/Reports.jsx";
 import Users from "../pages/Users.jsx";
 import WorkOrders from "../pages/WorkOrders.jsx";
 import { ProtectedRoute } from "./ProtectedRoute.jsx";
+import { RoleRoute } from "./RoleRoute.jsx";
+import { ROLE_GROUPS } from "../utils/roles.js";
 
 export function AppRoutes() {
   return (
@@ -17,12 +19,22 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/work-orders" element={<WorkOrders />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/machines" element={<Machines />} />
-          <Route path="/quality" element={<Quality />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/users" element={<Users />} />
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.production} />}>
+            <Route path="/work-orders" element={<WorkOrders />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
+            <Route path="/products" element={<Products />} />
+            <Route path="/machines" element={<Machines />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.quality} />}>
+            <Route path="/quality" element={<Quality />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.management} />}>
+            <Route path="/reports" element={<Reports />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.adminOnly} />}>
+            <Route path="/users" element={<Users />} />
+          </Route>
           <Route path="*" element={<Dashboard />} />
         </Route>
       </Route>

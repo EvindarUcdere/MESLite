@@ -1,14 +1,7 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createUser, getUsers, updateUser, updateUserStatus } from "../api/masterData.api.js";
-
-const ROLE_LABELS = {
-  ADMIN: "Admin",
-  PRODUCTION_MANAGER: "Üretim Yöneticisi",
-  OPERATOR: "Operatör",
-  QUALITY_STAFF: "Kalite Personeli",
-  VIEWER: "İzleyici"
-};
+import { ROLE_LABELS } from "../utils/roles.js";
 
 export default function Users() {
   const [users, setUsers] = useState([]);
