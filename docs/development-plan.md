@@ -57,6 +57,13 @@ The production log transaction is important because dashboard totals should neve
 - Work order detail and lifecycle actions.
 - Production, scrap, machine status, and quality entries.
 
+### Current Mobile Progress
+
+- Expo mobile app connects to the same Express API with Axios.
+- Operator session is stored with AsyncStorage so the user does not need to log in after every app refresh.
+- Operator can see assigned work orders, start/pause/complete eligible work orders, and record produced/scrap quantities.
+- Mobile API URL is environment-based with `EXPO_PUBLIC_API_URL` so emulator, physical phone, and deploy setups can use different backend addresses without code changes.
+
 ## Extension Rule
 
 Every new feature should be added as a module with its own route, controller, service, validation, and tests. Shared behavior belongs in `middlewares`, `config`, or `utils` only when at least two modules need it.
