@@ -12,6 +12,7 @@ const STATUS_LABELS = {
   CANCELLED: "İptal"
 };
 
+const QUICK_QUANTITIES = [1, 5, 10, 25];
 const fullScreenHeight = Platform.OS === "web" ? "100vh" : "100%";
 
 function getErrorMessage(error, fallback) {
@@ -46,6 +47,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const assignedWorkOrders = useMemo(
     () => workOrders.filter((workOrder) => !user?.id || workOrder.assignedOperatorId === user.id),
@@ -55,6 +57,7 @@ export default function App() {
   const productionCandidates = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId);
   const selectedProductionWorkOrder = productionCandidates.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
+  const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
 
   async function loadWorkOrders() {
     const data = await getWorkOrders();
@@ -93,6 +96,7 @@ export default function App() {
 
   async function handleLogin() {
     setError("");
+    setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
@@ -115,6 +119,7 @@ export default function App() {
 
   async function runAction(action, fallbackMessage) {
     setError("");
+    setSuccessMessage("");
     setIsSubmitting(true);
 
     try {
@@ -131,6 +136,9 @@ export default function App() {
     const produced = Number(producedQuantity);
     const scrap = Number(scrapQuantity);
 
+    setError("");
+    setSuccessMessage("");
+
     if (!selectedProductionWorkOrder?.machineId) {
       setError("Üretim girişi için makinesi atanmış ve üretimde olan iş emri seçin.");
       return;
@@ -146,21 +154,39 @@ export default function App() {
       return;
     }
 
-    await runAction(
-      () =>
-        createProductionLog({
-          workOrderId: selectedProductionWorkOrder.id,
-          machineId: selectedProductionWorkOrder.machineId,
-          producedQuantity: produced,
-          scrapQuantity: scrap,
-          ...(note ? { note } : {})
-        }),
-      "Üretim girişi kaydedilemedi."
-    );
+    if (produced > selectedProductionRemaining) {
+      setError(`Üretilen adet kalan miktarı aşamaz. Kalan: ${selectedProductionRemaining} adet.`);
+      return;
+    }
 
-    setProducedQuantity("10");
-    setScrapQuantity("0");
-    setNote("");
+    setIsSubmitting(true);
+
+    try {
+      await createProductionLog({
+        workOrderId: selectedProductionWorkOrder.id,
+        machineId: selectedProductionWorkOrder.machineId,
+        producedQuantity: produced,
+        scrapQuantity: scrap,
+        ...(note ? { note } : {})
+      });
+      await loadWorkOrders();
+      setSuccessMessage(`${produced} üretim ve ${scrap} fire kaydı alındı.`);
+      setProducedQuantity("10");
+      setScrapQuantity("0");
+      setNote("");
+    } catch (productionError) {
+      setError(getErrorMessage(productionError, "Üretim girişi kaydedilemedi."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function fillQuickQuantity(quantity) {
+    if (!selectedProductionWorkOrder) {
+      return;
+    }
+
+    setProducedQuantity(String(Math.min(quantity, selectedProductionRemaining)));
   }
 
   if (isLoading) {
@@ -204,6 +230,7 @@ export default function App() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Atanmış İş Emirleri</Text>
@@ -336,8 +363,31 @@ export default function App() {
           ))}
         </View>
         {!productionCandidates.length ? <Text style={styles.muted}>Üretim girişi için üretimde olan iş emri yok.</Text> : null}
+        {selectedProductionWorkOrder ? (
+          <View style={styles.productionNotice}>
+            <Text style={styles.detailLabel}>Seçili iş emri</Text>
+            <Text style={styles.detailValue}>
+              {selectedProductionWorkOrder.orderNo} - {selectedProductionWorkOrder.product.code}
+            </Text>
+            <Text style={styles.muted}>
+              {selectedProductionRemaining} adet kaldı, makine: {getMachineName(selectedProductionWorkOrder)}
+            </Text>
+          </View>
+        ) : null}
         <Text style={styles.label}>Üretilen Adet</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={producedQuantity} onChangeText={setProducedQuantity} />
+        <View style={styles.quickRow}>
+          {QUICK_QUANTITIES.map((quantity) => (
+            <Pressable
+              key={quantity}
+              style={[styles.quickButton, !selectedProductionWorkOrder ? styles.disabledButton : null]}
+              onPress={() => fillQuickQuantity(quantity)}
+              disabled={!selectedProductionWorkOrder}
+            >
+              <Text style={styles.quickButtonText}>{quantity}</Text>
+            </Pressable>
+          ))}
+        </View>
         <Text style={styles.label}>Fire Adedi</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={scrapQuantity} onChangeText={setScrapQuantity} />
         <Text style={styles.label}>Not</Text>
@@ -535,8 +585,40 @@ const styles = StyleSheet.create({
     color: "#b42318",
     fontWeight: "700"
   },
+  success: {
+    color: "#157347",
+    fontWeight: "800"
+  },
   muted: {
     color: "#60707d"
+  },
+  productionNotice: {
+    gap: 4,
+    padding: 12,
+    backgroundColor: "#f0fdfa",
+    borderColor: "#b9eadb",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  quickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  quickButton: {
+    minWidth: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#edf1f5",
+    borderColor: "#dbe3ea",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  quickButtonText: {
+    color: "#17202a",
+    fontWeight: "800"
   },
   orderRow: {
     flexDirection: "row",
