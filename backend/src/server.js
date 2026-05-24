@@ -1,6 +1,7 @@
 import http from "node:http";
 import { Server } from "socket.io";
 import { createApp } from "./app.js";
+import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { initSocket } from "./config/socket.js";
 
@@ -8,10 +9,7 @@ const app = createApp();
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: env.corsOrigin,
-    credentials: true
-  }
+  cors: corsOptions
 });
 
 initSocket(io);

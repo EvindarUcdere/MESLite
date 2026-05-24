@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { mountSwagger } from "./config/swagger.js";
 import { errorHandler, notFoundHandler } from "./middlewares/error.middleware.js";
@@ -11,7 +12,7 @@ export function createApp() {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(cors(corsOptions));
   app.use(express.json());
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
