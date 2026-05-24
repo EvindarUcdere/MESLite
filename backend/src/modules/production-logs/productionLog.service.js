@@ -35,6 +35,24 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(404, "Work order not found");
     }
 
+    if (workOrder.status !== "IN_PROGRESS") {
+      throw new ApiError(400, "Production can only be logged for in-progress work orders");
+    }
+
+    if (!workOrder.machineId || workOrder.machineId !== data.machineId) {
+      throw new ApiError(400, "Production log machine must match the work order machine");
+    }
+
+    if (actor.role === "OPERATOR" && workOrder.assignedOperatorId !== actor.id) {
+      throw new ApiError(403, "Operator can only log production for assigned work orders");
+    }
+
+    const remainingQuantity = workOrder.plannedQuantity - workOrder.producedQuantity;
+
+    if (data.producedQuantity > remainingQuantity) {
+      throw new ApiError(400, `Produced quantity exceeds remaining planned quantity (${remainingQuantity})`);
+    }
+
     const operatorId = actor.role === "OPERATOR" ? actor.id : workOrder.assignedOperatorId;
 
     if (!operatorId) {
@@ -79,8 +97,24 @@ export async function updateProductionLog(id, data) {
     throw new ApiError(404, "Production log not found");
   }
 
+  const workOrder = await prisma.workOrder.findUnique({ where: { id: current.workOrderId } });
+
+  if (!workOrder) {
+    throw new ApiError(404, "Work order not found");
+  }
+
   const producedDelta = data.producedQuantity === undefined ? 0 : data.producedQuantity - current.producedQuantity;
   const scrapDelta = data.scrapQuantity === undefined ? 0 : data.scrapQuantity - current.scrapQuantity;
+  const nextProducedQuantity = workOrder.producedQuantity + producedDelta;
+  const nextScrapQuantity = workOrder.scrapQuantity + scrapDelta;
+
+  if (nextProducedQuantity < 0 || nextScrapQuantity < 0) {
+    throw new ApiError(400, "Production totals cannot become negative");
+  }
+
+  if (nextProducedQuantity > workOrder.plannedQuantity) {
+    throw new ApiError(400, `Produced quantity exceeds planned quantity (${workOrder.plannedQuantity})`);
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const log = await tx.productionLog.update({
