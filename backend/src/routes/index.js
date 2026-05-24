@@ -6,6 +6,7 @@ import { productionLineRoutes } from "../modules/production-lines/productionLine
 import { productionLogRoutes } from "../modules/production-logs/productionLog.routes.js";
 import { productRoutes } from "../modules/products/product.routes.js";
 import { qualityCheckRoutes } from "../modules/quality-checks/qualityCheck.routes.js";
+import { reportRoutes } from "../modules/reports/report.routes.js";
 import { shiftRoutes } from "../modules/shifts/shift.routes.js";
 import { userRoutes } from "../modules/users/user.routes.js";
 import { workOrderRoutes } from "../modules/work-orders/workOrder.routes.js";
@@ -19,6 +20,7 @@ apiRoutes.use("/production-lines", productionLineRoutes);
 apiRoutes.use("/production-logs", productionLogRoutes);
 apiRoutes.use("/products", productRoutes);
 apiRoutes.use("/quality-checks", qualityCheckRoutes);
+apiRoutes.use("/reports", reportRoutes);
 apiRoutes.use("/shifts", shiftRoutes);
 apiRoutes.use("/users", userRoutes);
 apiRoutes.use("/work-orders", workOrderRoutes);

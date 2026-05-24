@@ -39,6 +39,7 @@ The production log transaction is important because dashboard totals should neve
 - Users screen allows admins to create users and manage active/passive status for factory roles.
 - User editing supports role changes, profile updates, optional password reset, and deactivation instead of deletion.
 - Work order action buttons are guarded by lifecycle rules to reduce invalid user actions in the web UI.
+- Reports screen summarizes production, scrap, machine performance, product performance, work order status, and quality outcomes.
 
 ## Phase 3: Web MVP
 

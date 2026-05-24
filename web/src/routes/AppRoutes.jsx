@@ -5,6 +5,7 @@ import Login from "../pages/Login.jsx";
 import Machines from "../pages/Machines.jsx";
 import Products from "../pages/Products.jsx";
 import Quality from "../pages/Quality.jsx";
+import Reports from "../pages/Reports.jsx";
 import Users from "../pages/Users.jsx";
 import WorkOrders from "../pages/WorkOrders.jsx";
 import { ProtectedRoute } from "./ProtectedRoute.jsx";
@@ -20,6 +21,7 @@ export function AppRoutes() {
           <Route path="/products" element={<Products />} />
           <Route path="/machines" element={<Machines />} />
           <Route path="/quality" element={<Quality />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/users" element={<Users />} />
           <Route path="*" element={<Dashboard />} />
         </Route>
