@@ -130,6 +130,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+}
+
+.live-indicator {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: #14523f;
+  background: #d9f2e8;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.live-indicator span {
+  width: 8px;
+  height: 8px;
+  background: #16a34a;
+  border-radius: 999px;
 }
 
 .icon-button {

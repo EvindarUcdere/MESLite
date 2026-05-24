@@ -41,6 +41,7 @@ The production log transaction is important because dashboard totals should neve
 - Work order action buttons are guarded by lifecycle rules to reduce invalid user actions in the web UI.
 - Reports screen summarizes production, scrap, machine performance, product performance, work order status, and quality outcomes.
 - Frontend menu and protected routes now follow role-based access rules.
+- Dashboard listens to Socket.io events and refreshes production data when work orders, machines, production logs, or quality checks change.
 
 ## Phase 3: Web MVP
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
+import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 
 const STATUS_COLORS = {
@@ -47,17 +48,38 @@ export default function Dashboard() {
   const [live, setLive] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+
+  async function loadDashboard({ showLoading = false } = {}) {
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
+    try {
+      const [summaryData, liveData] = await Promise.all([getDashboardSummary(), getLiveOverview()]);
+
+      setSummary(summaryData);
+      setLive(liveData);
+      setLastUpdatedAt(new Date());
+      setError("");
+    } catch (_error) {
+      setError("Panel verileri yüklenemedi.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadDashboard() {
+    async function loadInitialDashboard() {
       try {
         const [summaryData, liveData] = await Promise.all([getDashboardSummary(), getLiveOverview()]);
 
         if (isMounted) {
           setSummary(summaryData);
           setLive(liveData);
+          setLastUpdatedAt(new Date());
         }
       } catch (_error) {
         if (isMounted) {
@@ -70,12 +92,19 @@ export default function Dashboard() {
       }
     }
 
-    loadDashboard();
+    loadInitialDashboard();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useSocket({
+    "machine:statusChanged": () => loadDashboard(),
+    "workOrder:updated": () => loadDashboard(),
+    "production:logged": () => loadDashboard(),
+    "quality:checked": () => loadDashboard()
+  });
 
   const cards = [
     ["Aktif İş Emirleri", summary?.activeWorkOrders ?? 0],
@@ -105,6 +134,10 @@ export default function Dashboard() {
         <div>
           <h1>Üretim Paneli</h1>
           <p>{user?.name ?? "Üretim genel görünümü"}</p>
+        </div>
+        <div className="live-indicator">
+          <span />
+          {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
         </div>
       </header>
       {error ? <p className="form-error">{error}</p> : null}
