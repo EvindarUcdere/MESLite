@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog } from "./src/api/productionLogs.api";
 import { completeWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "./src/api/workOrders.api";
@@ -11,6 +11,8 @@ const STATUS_LABELS = {
   COMPLETED: "Tamamlandı",
   CANCELLED: "İptal"
 };
+
+const fullScreenHeight = Platform.OS === "web" ? "100vh" : "100%";
 
 function getErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
@@ -149,7 +151,6 @@ export default function App() {
       <View style={styles.centered}>
         <ActivityIndicator color="#256f6c" />
         <Text style={styles.muted}>Yükleniyor...</Text>
-        <StatusBar barStyle="dark-content" />
       </View>
     );
   }
@@ -169,7 +170,6 @@ export default function App() {
             <Text style={styles.primaryButtonText}>{isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}</Text>
           </Pressable>
         </View>
-        <StatusBar barStyle="dark-content" />
       </View>
     );
   }
@@ -278,7 +278,6 @@ export default function App() {
         </Pressable>
       </View>
 
-      <StatusBar barStyle="dark-content" />
     </ScrollView>
   );
 }
@@ -290,6 +289,7 @@ const styles = StyleSheet.create({
   },
   pageContent: {
     gap: 16,
+    minHeight: fullScreenHeight,
     padding: 20,
     paddingTop: 48
   },
@@ -297,6 +297,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     gap: 12,
+    minHeight: fullScreenHeight,
     padding: 20,
     backgroundColor: "#f4f7f9"
   },
@@ -305,6 +306,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
+    minHeight: fullScreenHeight,
     backgroundColor: "#f4f7f9"
   },
   header: {
