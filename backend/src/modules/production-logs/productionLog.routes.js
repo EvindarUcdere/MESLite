@@ -11,5 +11,5 @@ export const productionLogRoutes = Router();
 productionLogRoutes.use(requireAuth);
 productionLogRoutes.get("/", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productionLogController.list));
 productionLogRoutes.get("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productionLogController.detail));
-productionLogRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), validate(createProductionLogSchema), asyncHandler(productionLogController.create));
+productionLogRoutes.post("/", allowRoles("ADMIN", "OPERATOR"), validate(createProductionLogSchema), asyncHandler(productionLogController.create));
 productionLogRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateProductionLogSchema), asyncHandler(productionLogController.update));

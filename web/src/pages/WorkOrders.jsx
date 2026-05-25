@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
+import { useAuthStore } from "../store/authStore.js";
+import { ROLES } from "../utils/roles.js";
 
 const STATUS_LABELS = {
   PLANNED: "Planlandı",
@@ -54,6 +56,7 @@ function formatDate(value) {
 }
 
 export default function WorkOrders() {
+  const user = useAuthStore((state) => state.user);
   const [workOrders, setWorkOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [machines, setMachines] = useState([]);
@@ -80,6 +83,7 @@ export default function WorkOrders() {
     () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
   );
+  const canCreateManualProductionLog = user?.role === ROLES.ADMIN;
 
   async function loadData() {
     setError("");
@@ -213,7 +217,7 @@ export default function WorkOrders() {
       <header className="page-header">
         <div>
           <h1>İş Emirleri</h1>
-          <p>Üretim emirlerini planlayın, atayın ve takip edin.</p>
+          <p>İş emirlerini planlayın, makine ve operatör atayın; saha üretim kayıtlarını mobil operatör uygulamasından takip edin.</p>
         </div>
       </header>
 
@@ -271,7 +275,12 @@ export default function WorkOrders() {
       </section>
 
       <section className="panel">
-        <h2>İş Emri Listesi</h2>
+        <div className="section-title-row">
+          <div>
+            <h2>İş Emri Listesi</h2>
+            <p className="muted-text">Başlatma, duraklatma ve tamamlama butonları yönetici müdahalesi içindir; normal üretim akışı mobil operatör ekranından ilerler.</p>
+          </div>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -348,45 +357,59 @@ export default function WorkOrders() {
         </div>
       </section>
 
-      <section className="panel">
-        <h2>Üretim Girişi</h2>
-        <form className="work-order-form" onSubmit={handleProductionEntry}>
-          <label>
-            İş Emri
-            <select value={productionForm.workOrderId} onChange={(event) => updateProductionForm("workOrderId", event.target.value)} required>
-              <option value="">Başlatılmış iş emri seçin</option>
-              {productionCandidates.map((workOrder) => (
-                <option key={workOrder.id} value={workOrder.id}>
-                  {workOrder.orderNo} - {workOrder.product.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Üretilen Adet
-            <input
-              value={productionForm.producedQuantity}
-              onChange={(event) => updateProductionForm("producedQuantity", event.target.value)}
-              type="number"
-              min="0"
-              required
-            />
-          </label>
-          <label>
-            Fire Adedi
-            <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
-          </label>
-          <label>
-            Not
-            <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="İsteğe bağlı not" />
-          </label>
-          <button className="primary-button" type="submit" disabled={isSubmitting || productionCandidates.length === 0}>
-            <Plus size={18} />
-            Kaydet
-          </button>
-        </form>
-        {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Üretim girişi için önce operatör ve makine atanmış bir iş emrini başlatın.</p> : null}
-      </section>
+      {canCreateManualProductionLog ? (
+        <section className="panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Manuel Üretim Girişi</h2>
+              <p className="muted-text">Sadece admin düzeltmesi için kullanılır. Normal üretim kayıtları mobil operatör ekranından girilmelidir.</p>
+            </div>
+          </div>
+          <form className="work-order-form" onSubmit={handleProductionEntry}>
+            <label>
+              İş Emri
+              <select value={productionForm.workOrderId} onChange={(event) => updateProductionForm("workOrderId", event.target.value)} required>
+                <option value="">Başlatılmış iş emri seçin</option>
+                {productionCandidates.map((workOrder) => (
+                  <option key={workOrder.id} value={workOrder.id}>
+                    {workOrder.orderNo} - {workOrder.product.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Üretilen Adet
+              <input
+                value={productionForm.producedQuantity}
+                onChange={(event) => updateProductionForm("producedQuantity", event.target.value)}
+                type="number"
+                min="0"
+                required
+              />
+            </label>
+            <label>
+              Fire Adedi
+              <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
+            </label>
+            <label>
+              Not
+              <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="İsteğe bağlı not" />
+            </label>
+            <button className="primary-button" type="submit" disabled={isSubmitting || productionCandidates.length === 0}>
+              <Plus size={18} />
+              Kaydet
+            </button>
+          </form>
+          {!isLoading && productionCandidates.length === 0 ? <p className="empty-state">Üretim girişi için önce operatör ve makine atanmış bir iş emrini başlatın.</p> : null}
+        </section>
+      ) : (
+        <section className="panel info-panel">
+          <h2>Saha Üretim Akışı</h2>
+          <p className="muted-text">
+            Üretim ve fire adetleri operatör tarafından mobil uygulamada girilir. Bu ekran planlama, atama, durum takibi ve gerektiğinde yönetici müdahalesi için kullanılır.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

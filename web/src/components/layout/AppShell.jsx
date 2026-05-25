@@ -15,7 +15,7 @@ const navigationItems = [
     to: "/work-orders",
     label: "İş Emirleri",
     icon: ClipboardList,
-    roles: ROLE_GROUPS.production
+    roles: ROLE_GROUPS.planning
   },
   {
     to: "/products",

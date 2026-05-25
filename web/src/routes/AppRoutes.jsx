@@ -19,7 +19,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.production} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/work-orders" element={<WorkOrders />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>

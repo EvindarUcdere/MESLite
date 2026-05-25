@@ -204,6 +204,11 @@ body {
   border-radius: 8px;
 }
 
+.info-panel {
+  border-color: #b9eadb;
+  background: #f0fdfa;
+}
+
 .panel h2 {
   margin: 0 0 14px;
   font-size: 18px;
