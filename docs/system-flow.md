@@ -175,7 +175,7 @@ Yönetici web panelinde:
 
 kolonunda bu notu görür.
 
-Operatör Notları paneli, kritik saha notlarının tablo içinde kaybolmadan yönetici tarafından fark edilmesi için kullanılır.
+Operatör Notları paneli, son 24 saatte girilen kritik saha notlarının tablo içinde kaybolmadan yönetici tarafından fark edilmesi için kullanılır.
 
 Bu, operatör ile yönetici arasındaki ilk iletişim kanalıdır. Faz 2'de bu yapı daha gelişmiş yorum, bildirim veya aksiyon takibi sistemine dönüşebilir.
 

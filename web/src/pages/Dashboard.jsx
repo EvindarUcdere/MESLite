@@ -138,7 +138,7 @@ export default function Dashboard() {
   const machineStatusData = mapCountsToChartData(summary?.machineStatusCounts);
   const workOrderStatusData = mapCountsToChartData(summary?.workOrderStatusCounts);
   const qualityStatusData = mapCountsToChartData(summary?.qualityStatusCounts);
-  const operatorNotes = (live?.recentProductionLogs ?? []).filter((log) => Boolean(log.note?.trim())).slice(0, 5);
+  const operatorNotes = live?.operatorNotes ?? [];
 
   return (
     <div className="page-stack">
@@ -165,7 +165,7 @@ export default function Dashboard() {
         <div className="section-title-row">
           <div>
             <h2>Operatör Notları</h2>
-            <p className="muted-text">Mobil uygulamadan girilen son saha notları.</p>
+            <p className="muted-text">Son 24 saatte mobil uygulamadan girilen saha notları.</p>
           </div>
           <span className="note-counter">{operatorNotes.length}</span>
         </div>

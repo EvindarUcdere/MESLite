@@ -10,6 +10,13 @@ function getTodayRange() {
   return { start, end };
 }
 
+function getLast24HoursRange() {
+  const start = new Date();
+  start.setHours(start.getHours() - 24);
+
+  return { start };
+}
+
 function normalizeGroupCounts(groups, key) {
   return groups.reduce((acc, item) => {
     acc[item[key]] = item._count._all;
@@ -100,7 +107,9 @@ export async function getSummary() {
 }
 
 export async function getLiveOverview() {
-  const [activeWorkOrders, machines, recentProductionLogs, recentQualityChecks] = await Promise.all([
+  const { start: operatorNotesStart } = getLast24HoursRange();
+
+  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, recentQualityChecks] = await Promise.all([
     prisma.workOrder.findMany({
       where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
       include: {
@@ -139,6 +148,31 @@ export async function getLiveOverview() {
       orderBy: { createdAt: "desc" },
       take: 10
     }),
+    prisma.productionLog.findMany({
+      where: {
+        createdAt: {
+          gte: operatorNotesStart
+        },
+        note: {
+          not: null
+        }
+      },
+      include: {
+        workOrder: { include: { product: true } },
+        operator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        machine: true,
+        shift: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    }),
     prisma.qualityCheck.findMany({
       include: {
         workOrder: { include: { product: true } },
@@ -163,6 +197,7 @@ export async function getLiveOverview() {
     })),
     machines,
     recentProductionLogs,
+    operatorNotes: operatorNotes.filter((log) => log.note?.trim()),
     recentQualityChecks
   };
 }
