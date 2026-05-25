@@ -19,6 +19,14 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
+function getConnectionMessage(error) {
+  if (error?.message === "Network Error" || error?.code === "ERR_NETWORK") {
+    return "Backend bağlantısı kurulamadı. API server açık mı kontrol edin.";
+  }
+
+  return getErrorMessage(error, "İş emirleri yüklenemedi.");
+}
+
 function getRemainingQuantity(workOrder) {
   return Math.max(workOrder.plannedQuantity - workOrder.producedQuantity, 0);
 }
@@ -60,8 +68,15 @@ export default function App() {
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
 
   async function loadWorkOrders() {
-    const data = await getWorkOrders();
-    setWorkOrders(data);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const data = await getWorkOrders();
+      setWorkOrders(data);
+    } catch (loadError) {
+      setError(getConnectionMessage(loadError));
+    }
   }
 
   useEffect(() => {
@@ -73,12 +88,11 @@ export default function App() {
 
         if (session.token && session.user && isMounted) {
           setUser(session.user);
-          const data = await getWorkOrders();
-          setWorkOrders(data);
+          await loadWorkOrders();
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Oturum bilgisi yüklenemedi.");
+          setError("Kayıtlı oturum okunamadı. Lütfen tekrar giriş yapın.");
         }
       } finally {
         if (isMounted) {
@@ -231,6 +245,11 @@ export default function App() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+      {user && error ? (
+        <Pressable style={styles.inlineButton} onPress={loadWorkOrders} disabled={isSubmitting}>
+          <Text style={styles.inlineButtonText}>Tekrar Dene</Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Atanmış İş Emirleri</Text>
@@ -587,6 +606,21 @@ const styles = StyleSheet.create({
   },
   success: {
     color: "#157347",
+    fontWeight: "800"
+  },
+  inlineButton: {
+    alignSelf: "flex-start",
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    backgroundColor: "#ffffff",
+    borderColor: "#c8d3dd",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  inlineButtonText: {
+    color: "#17202a",
     fontWeight: "800"
   },
   muted: {
