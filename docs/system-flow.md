@@ -147,6 +147,7 @@ Mobilde operatör şu bilgileri girer:
 - Üretilen adet
 - Fire adedi
 - Not
+- Görsel kanıt
 
 Backend şu kontrolleri yapar:
 
@@ -159,6 +160,7 @@ Backend şu kontrolleri yapar:
 Kontroller geçerse:
 
 - `production_logs` kaydı oluşturulur.
+- Görsel varsa üretim kaydına bağlı attachment olarak saklanır.
 - İş emrinin `producedQuantity` ve `scrapQuantity` değerleri güncellenir.
 - Dashboard için `production:logged` ve `workOrder:updated` eventleri yayınlanır.
 
@@ -176,6 +178,7 @@ Yönetici web panelinde:
 kolonunda bu notu görür.
 
 Operatör Notları paneli, son 24 saatte girilen kritik saha notlarının tablo içinde kaybolmadan yönetici tarafından fark edilmesi için kullanılır.
+Operatör görsel eklediyse, bu panelde ve Son Üretim Kayıtları tablosunda önizleme olarak görünür.
 
 Bu, operatör ile yönetici arasındaki ilk iletişim kanalıdır. Faz 2'de bu yapı daha gelişmiş yorum, bildirim veya aksiyon takibi sistemine dönüşebilir.
 

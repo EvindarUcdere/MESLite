@@ -343,6 +343,14 @@ body {
   font-weight: 700;
 }
 
+.operator-note-image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
 .operator-note-header,
 .operator-note-meta {
   display: flex;
@@ -360,6 +368,14 @@ body {
 .operator-note-meta {
   flex-wrap: wrap;
   justify-content: flex-start;
+}
+
+.table-thumb {
+  width: 56px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
 }
 
 .work-order-form {

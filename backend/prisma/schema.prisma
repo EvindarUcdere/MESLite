@@ -124,21 +124,33 @@ model WorkOrder {
 }
 
 model ProductionLog {
-  id               String     @id @default(uuid())
+  id               String                    @id @default(uuid())
   workOrderId      String
   operatorId       String
   machineId        String
   shiftId          String?
   producedQuantity Int
-  scrapQuantity    Int        @default(0)
+  scrapQuantity    Int                       @default(0)
   startedAt        DateTime?
   endedAt          DateTime?
   note             String?
-  createdAt        DateTime   @default(now())
-  workOrder        WorkOrder  @relation(fields: [workOrderId], references: [id])
-  operator         User       @relation(fields: [operatorId], references: [id])
-  machine          Machine    @relation(fields: [machineId], references: [id])
-  shift            Shift?     @relation(fields: [shiftId], references: [id])
+  createdAt        DateTime                  @default(now())
+  workOrder        WorkOrder                 @relation(fields: [workOrderId], references: [id])
+  operator         User                      @relation(fields: [operatorId], references: [id])
+  machine          Machine                   @relation(fields: [machineId], references: [id])
+  shift            Shift?                    @relation(fields: [shiftId], references: [id])
+  attachments      ProductionLogAttachment[]
+}
+
+model ProductionLogAttachment {
+  id              String        @id @default(uuid())
+  productionLogId String
+  fileName        String
+  fileUrl         String
+  mimeType        String
+  size            Int
+  createdAt       DateTime      @default(now())
+  productionLog   ProductionLog @relation(fields: [productionLogId], references: [id])
 }
 
 model QualityCheck {

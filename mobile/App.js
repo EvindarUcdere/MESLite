@@ -1,7 +1,8 @@
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
-import { createProductionLog } from "./src/api/productionLogs.api";
+import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { completeWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "./src/api/workOrders.api";
 
 const STATUS_LABELS = {
@@ -52,6 +53,7 @@ export default function App() {
   const [producedQuantity, setProducedQuantity] = useState("10");
   const [scrapQuantity, setScrapQuantity] = useState("0");
   const [note, setNote] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -178,18 +180,24 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
-      await createProductionLog({
+      const productionLog = await createProductionLog({
         workOrderId: selectedProductionWorkOrder.id,
         machineId: selectedProductionWorkOrder.machineId,
         producedQuantity: produced,
         scrapQuantity: scrap,
         ...(note ? { note } : {})
       });
+
+      if (selectedImage) {
+        await uploadProductionLogImage(productionLog.id, selectedImage);
+      }
+
       await loadWorkOrders();
-      setSuccessMessage(`${produced} üretim ve ${scrap} fire kaydı alındı.`);
+      setSuccessMessage(`${produced} üretim ve ${scrap} fire kaydı alındı${selectedImage ? ", görsel eklendi." : "."}`);
       setProducedQuantity("10");
       setScrapQuantity("0");
       setNote("");
+      setSelectedImage(null);
     } catch (productionError) {
       setError(getErrorMessage(productionError, "Üretim girişi kaydedilemedi."));
     } finally {
@@ -203,6 +211,27 @@ export default function App() {
     }
 
     setProducedQuantity(String(Math.min(quantity, selectedProductionRemaining)));
+  }
+
+  async function pickImage() {
+    setError("");
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setError("Görsel seçmek için galeri izni gerekli.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0]);
+    }
   }
 
   if (isLoading) {
@@ -432,6 +461,18 @@ export default function App() {
         <TextInput style={styles.input} keyboardType="numeric" value={scrapQuantity} onChangeText={setScrapQuantity} />
         <Text style={styles.label}>Not</Text>
         <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="İsteğe bağlı not" />
+        <Text style={styles.label}>Görsel Kanıt</Text>
+        <View style={styles.imagePickerRow}>
+          <Pressable style={styles.secondaryButton} onPress={pickImage} disabled={!selectedProductionWorkOrder || isSubmitting}>
+            <Text style={styles.secondaryButtonText}>{selectedImage ? "Görseli Değiştir" : "Görsel Seç"}</Text>
+          </Pressable>
+          {selectedImage ? (
+            <Pressable style={styles.inlineButton} onPress={() => setSelectedImage(null)} disabled={isSubmitting}>
+              <Text style={styles.inlineButtonText}>Kaldır</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {selectedImage ? <Text style={styles.muted}>{selectedImage.fileName ?? "Görsel seçildi"}</Text> : null}
         <Pressable
           style={[styles.primaryButton, !selectedProductionWorkOrder ? styles.disabledButton : null]}
           onPress={handleProductionEntry}
@@ -713,6 +754,11 @@ const styles = StyleSheet.create({
   quickButtonText: {
     color: "#17202a",
     fontWeight: "800"
+  },
+  imagePickerRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
   },
   orderCard: {
     gap: 12,

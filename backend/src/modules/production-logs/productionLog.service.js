@@ -6,7 +6,8 @@ const includeRelations = {
   workOrder: { include: { product: true } },
   operator: { select: { id: true, name: true, email: true, role: true } },
   machine: true,
-  shift: true
+  shift: true,
+  attachments: true
 };
 
 export function findProductionLogs() {
@@ -88,6 +89,42 @@ export async function createProductionLog(actor, data) {
   emitEvent("production:logged", result.log);
   emitEvent("workOrder:updated", result.workOrder);
   return result.log;
+}
+
+export async function addProductionLogAttachment(actor, productionLogId, file) {
+  if (!file) {
+    throw new ApiError(400, "Image file is required");
+  }
+
+  const productionLog = await prisma.productionLog.findUnique({
+    where: { id: productionLogId },
+    include: {
+      workOrder: true
+    }
+  });
+
+  if (!productionLog) {
+    throw new ApiError(404, "Production log not found");
+  }
+
+  if (actor.role === "OPERATOR" && productionLog.operatorId !== actor.id) {
+    throw new ApiError(403, "Operator can only attach images to own production logs");
+  }
+
+  const attachment = await prisma.productionLogAttachment.create({
+    data: {
+      productionLogId,
+      fileName: file.filename,
+      fileUrl: `/uploads/production-logs/${file.filename}`,
+      mimeType: file.mimetype,
+      size: file.size
+    }
+  });
+
+  const updatedLog = await findProductionLogById(productionLogId);
+
+  emitEvent("production:logged", updatedLog);
+  return attachment;
 }
 
 export async function updateProductionLog(id, data) {

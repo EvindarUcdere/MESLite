@@ -5,6 +5,7 @@ build/
 .turbo/
 .cache/
 coverage/
+uploads/
 
 .env
 .env.local

@@ -34,12 +34,22 @@ const STATUS_LABELS = {
   FAILED: "Kaldı"
 };
 
+const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
+
 function mapCountsToChartData(counts = {}) {
   return Object.entries(counts).map(([status, value]) => ({
     status,
     name: STATUS_LABELS[status] ?? status,
     value
   }));
+}
+
+function getAttachmentUrl(attachment) {
+  if (!attachment?.fileUrl) {
+    return "";
+  }
+
+  return `${API_ORIGIN}${attachment.fileUrl}`;
 }
 
 function formatTime(value) {
@@ -177,6 +187,7 @@ export default function Dashboard() {
                 <span>{formatTime(log.createdAt)}</span>
               </div>
               <p>{log.note}</p>
+              {log.attachments?.[0] ? <img className="operator-note-image" src={getAttachmentUrl(log.attachments[0])} alt="Operatör görsel notu" /> : null}
               <div className="operator-note-meta">
                 <span>{log.operator.name}</span>
                 <span>{log.machine.code}</span>
@@ -300,6 +311,7 @@ export default function Dashboard() {
                 <th>Operatör</th>
                 <th>Üretim</th>
                 <th>Fire</th>
+                <th>Görsel</th>
                 <th>Not</th>
               </tr>
             </thead>
@@ -312,12 +324,21 @@ export default function Dashboard() {
                   <td>{log.operator.name}</td>
                   <td>{log.producedQuantity}</td>
                   <td>{log.scrapQuantity}</td>
+                  <td>
+                    {log.attachments?.[0] ? (
+                      <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
+                        <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td>{log.note ? <span className="note-chip">{log.note}</span> : "-"}</td>
                 </tr>
               ))}
               {!isLoading && (live?.recentProductionLogs ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan="7">Henüz üretim kaydı yok.</td>
+                  <td colSpan="8">Henüz üretim kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>

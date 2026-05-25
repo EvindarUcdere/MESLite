@@ -143,7 +143,8 @@ export async function getLiveOverview() {
           }
         },
         machine: true,
-        shift: true
+        shift: true,
+        attachments: true
       },
       orderBy: { createdAt: "desc" },
       take: 10
@@ -168,7 +169,8 @@ export async function getLiveOverview() {
           }
         },
         machine: true,
-        shift: true
+        shift: true,
+        attachments: true
       },
       orderBy: { createdAt: "desc" },
       take: 20

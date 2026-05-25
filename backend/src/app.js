@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "node:path";
 import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { mountSwagger } from "./config/swagger.js";
@@ -14,6 +15,7 @@ export function createApp() {
   app.use(helmet());
   app.use(cors(corsOptions));
   app.use(express.json());
+  app.use("/uploads", express.static(path.resolve("uploads")));
   app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
   app.get("/", (_req, res) => {
