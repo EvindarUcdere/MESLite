@@ -169,10 +169,13 @@ Operatör mobilde not girdiğinde bu not üretim kaydının içinde saklanır.
 Yönetici web panelinde:
 
 ```text
+Üretim Paneli -> Operatör Notları
 Üretim Paneli -> Son Üretim Kayıtları -> Not
 ```
 
 kolonunda bu notu görür.
+
+Operatör Notları paneli, kritik saha notlarının tablo içinde kaybolmadan yönetici tarafından fark edilmesi için kullanılır.
 
 Bu, operatör ile yönetici arasındaki ilk iletişim kanalıdır. Faz 2'de bu yapı daha gelişmiş yorum, bildirim veya aksiyon takibi sistemine dönüşebilir.
 
@@ -226,6 +229,7 @@ Bu MVP şunları kapsamaz:
 
 - Fire nedeni için ayrı tablo ve seçim ekranı
 - Operatör notlarına yönetici yanıtı
+- İş emri veya makine bazlı kontrollü operatör iletişimi
 - Mobil kalite kontrol ekranı
 - Barkod veya QR ile iş emri/makine seçimi
 - Makine duruş nedeni takibi

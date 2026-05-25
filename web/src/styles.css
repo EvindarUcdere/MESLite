@@ -306,6 +306,62 @@ body {
   white-space: normal;
 }
 
+.operator-notes-panel {
+  border-color: #f6c86f;
+  background: #fffbeb;
+}
+
+.note-counter {
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #78350f;
+  background: #fef0c7;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.operator-note-list {
+  display: grid;
+  gap: 10px;
+}
+
+.operator-note-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #f6c86f;
+  border-radius: 8px;
+}
+
+.operator-note-card p {
+  margin: 0;
+  color: #17202a;
+  font-weight: 700;
+}
+
+.operator-note-header,
+.operator-note-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operator-note-header span,
+.operator-note-meta span {
+  color: #60707d;
+  font-size: 13px;
+}
+
+.operator-note-meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
 .work-order-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

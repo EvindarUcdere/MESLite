@@ -42,6 +42,17 @@ function mapCountsToChartData(counts = {}) {
   }));
 }
 
+function formatTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
 export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const [summary, setSummary] = useState(null);
@@ -127,6 +138,7 @@ export default function Dashboard() {
   const machineStatusData = mapCountsToChartData(summary?.machineStatusCounts);
   const workOrderStatusData = mapCountsToChartData(summary?.workOrderStatusCounts);
   const qualityStatusData = mapCountsToChartData(summary?.qualityStatusCounts);
+  const operatorNotes = (live?.recentProductionLogs ?? []).filter((log) => Boolean(log.note?.trim())).slice(0, 5);
 
   return (
     <div className="page-stack">
@@ -148,6 +160,34 @@ export default function Dashboard() {
             <strong>{isLoading ? "..." : value}</strong>
           </article>
         ))}
+      </section>
+      <section className="panel operator-notes-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>Operatör Notları</h2>
+            <p className="muted-text">Mobil uygulamadan girilen son saha notları.</p>
+          </div>
+          <span className="note-counter">{operatorNotes.length}</span>
+        </div>
+        <div className="operator-note-list">
+          {operatorNotes.map((log) => (
+            <article key={log.id} className="operator-note-card">
+              <div className="operator-note-header">
+                <strong>{log.workOrder.orderNo}</strong>
+                <span>{formatTime(log.createdAt)}</span>
+              </div>
+              <p>{log.note}</p>
+              <div className="operator-note-meta">
+                <span>{log.operator.name}</span>
+                <span>{log.machine.code}</span>
+                <span>
+                  Üretim {log.producedQuantity} / Fire {log.scrapQuantity}
+                </span>
+              </div>
+            </article>
+          ))}
+          {!isLoading && operatorNotes.length === 0 ? <p className="empty-state">Henüz operatör notu yok.</p> : null}
+        </div>
       </section>
       <section className="operations-grid">
         <article className="panel chart-panel">
