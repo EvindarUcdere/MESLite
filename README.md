@@ -31,6 +31,28 @@ mobile/   Expo operator app
 docs/     Architecture and implementation notes
 ```
 
+## Local Development
+
+Start backend, web dashboard, and mobile web together:
+
+```powershell
+npm.cmd run dev
+```
+
+URLs:
+
+- Backend API: `http://localhost:4000`
+- Web dashboard: `http://localhost:5173`
+- Mobile operator web: `http://localhost:8081`
+
+If only one service is needed:
+
+```powershell
+npm.cmd run dev:backend
+npm.cmd run dev:web
+npm.cmd run dev:mobile:web
+```
+
 ## Development Order
 
 1. Backend foundation and Prisma schema

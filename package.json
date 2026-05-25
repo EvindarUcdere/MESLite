@@ -8,9 +8,11 @@
     "mobile"
   ],
   "scripts": {
+    "dev": "powershell -ExecutionPolicy Bypass -File ./scripts/start-dev.ps1",
     "dev:backend": "npm --workspace backend run dev",
     "dev:web": "npm --workspace web run dev",
     "dev:mobile": "npm --workspace mobile run start",
+    "dev:mobile:web": "npm --workspace mobile run web:clear",
     "build:web": "npm --workspace web run build"
   }
 }
