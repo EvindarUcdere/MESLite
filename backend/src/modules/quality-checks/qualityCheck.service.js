@@ -1,5 +1,6 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { ApiError } from "../../utils/ApiError.js";
 
 const includeRelations = {
   workOrder: { include: { product: true } },
@@ -21,6 +22,24 @@ export function findQualityCheckById(id) {
 }
 
 export async function createQualityCheck(checkedById, data) {
+  const workOrder = await prisma.workOrder.findUnique({ where: { id: data.workOrderId } });
+
+  if (!workOrder) {
+    throw new ApiError(404, "Work order not found");
+  }
+
+  if (workOrder.producedQuantity <= 0) {
+    throw new ApiError(400, "Quality check requires production quantity");
+  }
+
+  if (data.defectQuantity > workOrder.producedQuantity) {
+    throw new ApiError(400, "Defect quantity cannot exceed produced quantity");
+  }
+
+  if (["FAILED", "PARTIAL"].includes(data.status) && !data.defectReason?.trim()) {
+    throw new ApiError(400, "Defect reason is required for failed or partial quality checks");
+  }
+
   const qualityCheck = await prisma.qualityCheck.create({
     data: {
       workOrderId: data.workOrderId,
