@@ -66,6 +66,8 @@ export default function App() {
   const selectedProductionWorkOrder = productionCandidates.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
+  const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
+  const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
 
   async function loadWorkOrders() {
     setError("");
@@ -215,8 +217,8 @@ export default function App() {
   if (!user) {
     return (
       <View style={styles.authPage}>
-        <Text style={styles.title}>MES Lite</Text>
-        <Text style={styles.subtitle}>Operatör üretim girişi</Text>
+        <Text style={styles.authTitle}>MES Lite</Text>
+        <Text style={styles.authSubtitle}>Operatör üretim girişi</Text>
         <View style={styles.card}>
           <Text style={styles.label}>E-posta</Text>
           <TextInput style={styles.input} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
@@ -233,14 +235,30 @@ export default function App() {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-      <View style={styles.header}>
+      <View style={styles.hero}>
         <View>
+          <Text style={styles.eyebrow}>MES Lite Operatör</Text>
           <Text style={styles.title}>İş Emirlerim</Text>
           <Text style={styles.subtitle}>{user.name}</Text>
         </View>
         <Pressable style={styles.secondaryButton} onPress={handleLogout}>
           <Text style={styles.secondaryButtonText}>Çıkış</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.mobileSummary}>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{assignedWorkOrders.length}</Text>
+          <Text style={styles.detailLabel}>Atanan</Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{runningWorkOrderCount}</Text>
+          <Text style={styles.detailLabel}>Üretimde</Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryValue}>{totalRemainingQuantity}</Text>
+          <Text style={styles.detailLabel}>Kalan</Text>
+        </View>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -256,19 +274,22 @@ export default function App() {
         {assignedWorkOrders.map((workOrder) => (
           <Pressable
             key={workOrder.id}
-            style={[styles.orderRow, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
+            style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
             onPress={() => setSelectedWorkOrderId(workOrder.id)}
           >
-            <View>
-              <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
-              <Text style={styles.muted}>
-                {workOrder.product.code} - {workOrder.product.name}
-              </Text>
-              <Text style={styles.muted}>
-                {getRemainingQuantity(workOrder)} adet kaldı
-              </Text>
+            <View style={styles.orderCardHeader}>
+              <View>
+                <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
+                <Text style={styles.muted}>
+                  {workOrder.product.code} - {workOrder.product.name}
+                </Text>
+              </View>
+              <Text style={styles.statusBadge}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</Text>
             </View>
-            <Text style={styles.statusText}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</Text>
+            <View style={styles.orderCardFooter}>
+              <Text style={styles.detailValue}>{getRemainingQuantity(workOrder)} adet kaldı</Text>
+              <Text style={styles.muted}>{getMachineName(workOrder)}</Text>
+            </View>
           </Pressable>
         ))}
         {!assignedWorkOrders.length ? <Text style={styles.muted}>Size atanmış iş emri yok.</Text> : null}
@@ -451,20 +472,59 @@ const styles = StyleSheet.create({
     minHeight: fullScreenHeight,
     backgroundColor: "#f4f7f9"
   },
-  header: {
+  hero: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16
+    gap: 16,
+    padding: 18,
+    backgroundColor: "#17202a",
+    borderRadius: 8
+  },
+  eyebrow: {
+    marginBottom: 4,
+    color: "#9ee2d0",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase"
   },
   title: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#ffffff"
+  },
+  authTitle: {
     fontSize: 28,
     fontWeight: "800",
     color: "#17202a"
   },
   subtitle: {
     marginTop: 4,
+    color: "#dbe3ea"
+  },
+  authSubtitle: {
+    marginTop: 4,
     color: "#60707d"
+  },
+  mobileSummary: {
+    flexDirection: "row",
+    gap: 10
+  },
+  summaryItem: {
+    flex: 1,
+    minHeight: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  summaryValue: {
+    color: "#17202a",
+    fontSize: 22,
+    fontWeight: "900"
   },
   card: {
     gap: 12,
@@ -654,12 +714,26 @@ const styles = StyleSheet.create({
     color: "#17202a",
     fontWeight: "800"
   },
-  orderRow: {
+  orderCard: {
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#ffffff",
+    borderColor: "#edf1f5",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  orderCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  orderCardFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 12,
+    gap: 10,
+    paddingTop: 10,
     borderTopColor: "#edf1f5",
     borderTopWidth: 1
   },
@@ -668,10 +742,6 @@ const styles = StyleSheet.create({
   },
   orderNo: {
     color: "#17202a",
-    fontWeight: "800"
-  },
-  statusText: {
-    color: "#256f6c",
     fontWeight: "800"
   },
   actionRow: {

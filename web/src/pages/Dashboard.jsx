@@ -260,6 +260,7 @@ export default function Dashboard() {
                 <th>Operatör</th>
                 <th>Üretim</th>
                 <th>Fire</th>
+                <th>Not</th>
               </tr>
             </thead>
             <tbody>
@@ -271,11 +272,12 @@ export default function Dashboard() {
                   <td>{log.operator.name}</td>
                   <td>{log.producedQuantity}</td>
                   <td>{log.scrapQuantity}</td>
+                  <td>{log.note ? <span className="note-chip">{log.note}</span> : "-"}</td>
                 </tr>
               ))}
               {!isLoading && (live?.recentProductionLogs ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan="6">Henüz üretim kaydı yok.</td>
+                  <td colSpan="7">Henüz üretim kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>

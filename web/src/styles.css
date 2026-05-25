@@ -290,6 +290,17 @@ body {
   font-size: 14px;
 }
 
+.note-chip {
+  display: inline-block;
+  max-width: 280px;
+  padding: 6px 8px;
+  color: #33424d;
+  background: #f7fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  white-space: normal;
+}
+
 .work-order-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
