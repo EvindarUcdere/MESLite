@@ -1,5 +1,7 @@
 # MES Lite Architecture
 
+For the role-based business workflow, see `docs/system-flow.md`.
+
 ## Design Principles
 
 - Keep the MVP focused on production tracking, not full ERP.
