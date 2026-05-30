@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import Alerts from "../pages/Alerts.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
+import FieldNotes from "../pages/FieldNotes.jsx";
 import Login from "../pages/Login.jsx";
 import Machines from "../pages/Machines.jsx";
 import Products from "../pages/Products.jsx";
@@ -22,6 +23,7 @@ export function AppRoutes() {
           <Route path="/" element={<Dashboard />} />
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.managementPlusQuality} />}>
             <Route path="/alerts" element={<Alerts />} />
+            <Route path="/field-notes" element={<FieldNotes />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/work-orders" element={<WorkOrders />} />

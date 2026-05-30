@@ -202,6 +202,9 @@ export default function Dashboard() {
           <Link className="text-link" to="/alerts">
             Uyarılara git
           </Link>
+          <Link className="text-link" to="/field-notes">
+            Tüm notlar
+          </Link>
         </div>
         <div className="dashboard-signal-grid">
           <article className="signal-summary-card">
