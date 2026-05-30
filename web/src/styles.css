@@ -543,6 +543,157 @@ body {
   object-fit: cover;
 }
 
+.route-form {
+  display: grid;
+  gap: 18px;
+}
+
+.route-operation-builder {
+  display: grid;
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.route-operation-builder h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.route-operation-row {
+  display: grid;
+  grid-template-columns: 42px minmax(180px, 1.2fr) minmax(180px, 1fr) 120px 140px 42px;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.route-operation-row label {
+  display: grid;
+  gap: 6px;
+  color: #33424d;
+  font-size: 13px;
+}
+
+.route-operation-row input,
+.route-operation-row select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.operation-sequence {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+  color: #ffffff;
+  background: #256f6c;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.checkbox-label {
+  min-height: 40px;
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px !important;
+  padding-bottom: 8px;
+  font-weight: 700;
+}
+
+.checkbox-label input {
+  min-height: auto;
+}
+
+.secondary-button,
+.icon-danger-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17202a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.icon-danger-button {
+  color: #b42318;
+}
+
+.icon-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.route-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.route-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.route-card > p {
+  margin: 0;
+  color: #52606d;
+}
+
+.route-steps {
+  display: grid;
+  gap: 8px;
+}
+
+.route-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid #edf1f5;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.route-step > span {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #256f6c;
+  background: #d9f2e8;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.route-step strong,
+.route-step small {
+  display: block;
+}
+
+.route-step small {
+  margin-top: 2px;
+  color: #66788a;
+}
+
 .operator-note-card {
   display: grid;
   gap: 8px;
@@ -928,7 +1079,8 @@ th {
   }
 
   .note-filter-grid,
-  .field-note-card {
+  .field-note-card,
+  .route-operation-row {
     grid-template-columns: 1fr;
   }
 

@@ -66,35 +66,36 @@ enum ScrapReason {
 }
 
 model User {
-  id                 String             @id @default(uuid())
+  id                 String                 @id @default(uuid())
   name               String
-  email              String             @unique
+  email              String                 @unique
   passwordHash       String
-  role               UserRole           @default(OPERATOR)
-  isActive           Boolean            @default(true)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  createdWorkOrders  WorkOrder[]        @relation("CreatedWorkOrders")
-  assignedWorkOrders WorkOrder[]        @relation("AssignedWorkOrders")
+  role               UserRole               @default(OPERATOR)
+  isActive           Boolean                @default(true)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  createdWorkOrders  WorkOrder[]            @relation("CreatedWorkOrders")
+  assignedWorkOrders WorkOrder[]            @relation("AssignedWorkOrders")
   productionLogs     ProductionLog[]
-  createdAlerts      ProductionAlert[] @relation("CreatedAlerts")
-  assignedAlerts     ProductionAlert[] @relation("AssignedAlerts")
-  resolvedAlerts     ProductionAlert[] @relation("ResolvedAlerts")
+  createdAlerts      ProductionAlert[]      @relation("CreatedAlerts")
+  assignedAlerts     ProductionAlert[]      @relation("AssignedAlerts")
+  resolvedAlerts     ProductionAlert[]      @relation("ResolvedAlerts")
   alertEvents        ProductionAlertEvent[]
   qualityChecks      QualityCheck[]
   machineStatusLogs  MachineStatusLog[]
 }
 
 model Product {
-  id              String      @id @default(uuid())
-  code            String      @unique
+  id              String         @id @default(uuid())
+  code            String         @unique
   name            String
-  unit            String      @default("pcs")
+  unit            String         @default("pcs")
   targetCycleTime Int?
-  isActive        Boolean     @default(true)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   workOrders      WorkOrder[]
+  routes          ProductRoute[]
 }
 
 model ProductionLine {
@@ -108,18 +109,51 @@ model ProductionLine {
 }
 
 model Machine {
-  id                 String             @id @default(uuid())
-  code               String             @unique
-  name               String
-  productionLineId   String
-  status             MachineStatus      @default(IDLE)
-  isActive           Boolean            @default(true)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  productionLine     ProductionLine     @relation(fields: [productionLineId], references: [id])
-  workOrders         WorkOrder[]
-  productionLogs     ProductionLog[]
-  machineStatusLogs  MachineStatusLog[]
+  id                     String             @id @default(uuid())
+  code                   String             @unique
+  name                   String
+  productionLineId       String
+  status                 MachineStatus      @default(IDLE)
+  isActive               Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  productionLine         ProductionLine     @relation(fields: [productionLineId], references: [id])
+  workOrders             WorkOrder[]
+  productionLogs         ProductionLog[]
+  machineStatusLogs      MachineStatusLog[]
+  defaultRouteOperations RouteOperation[]
+}
+
+model ProductRoute {
+  id          String           @id @default(uuid())
+  productId   String
+  name        String
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  product     Product          @relation(fields: [productId], references: [id])
+  operations  RouteOperation[]
+
+  @@unique([productId, name])
+  @@map("routes")
+}
+
+model RouteOperation {
+  id                   String       @id @default(uuid())
+  routeId              String
+  operationName        String
+  sequenceNo           Int
+  defaultMachineId     String?
+  estimatedMinutes     Int?
+  requiresQualityCheck Boolean      @default(false)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  route                ProductRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  defaultMachine       Machine?     @relation(fields: [defaultMachineId], references: [id])
+
+  @@unique([routeId, sequenceNo])
+  @@map("route_operations")
 }
 
 model Shift {
@@ -132,26 +166,26 @@ model Shift {
 }
 
 model WorkOrder {
-  id                 String             @id @default(uuid())
-  orderNo            String             @unique
+  id                 String            @id @default(uuid())
+  orderNo            String            @unique
   productId          String
   machineId          String?
   assignedOperatorId String?
   plannedQuantity    Int
-  producedQuantity   Int                @default(0)
-  scrapQuantity      Int                @default(0)
-  status             WorkOrderStatus    @default(PLANNED)
+  producedQuantity   Int               @default(0)
+  scrapQuantity      Int               @default(0)
+  status             WorkOrderStatus   @default(PLANNED)
   plannedStartDate   DateTime?
   plannedEndDate     DateTime?
   actualStartDate    DateTime?
   actualEndDate      DateTime?
   createdById        String
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  product            Product            @relation(fields: [productId], references: [id])
-  machine            Machine?           @relation(fields: [machineId], references: [id])
-  assignedOperator   User?              @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
-  createdBy          User               @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  product            Product           @relation(fields: [productId], references: [id])
+  machine            Machine?          @relation(fields: [machineId], references: [id])
+  assignedOperator   User?             @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
+  createdBy          User              @relation("CreatedWorkOrders", fields: [createdById], references: [id])
   productionLogs     ProductionLog[]
   productionAlerts   ProductionAlert[]
   qualityChecks      QualityCheck[]
@@ -190,7 +224,7 @@ model ProductionLogAttachment {
 }
 
 model ProductionAlert {
-  id              String        @id @default(uuid())
+  id              String                 @id @default(uuid())
   productionLogId String
   workOrderId     String
   createdById     String
@@ -198,31 +232,31 @@ model ProductionAlert {
   resolvedById    String?
   title           String
   message         String
-  severity        AlertSeverity @default(WARNING)
-  status          AlertStatus   @default(OPEN)
+  severity        AlertSeverity          @default(WARNING)
+  status          AlertStatus            @default(OPEN)
   resolutionNote  String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
   resolvedAt      DateTime?
-  productionLog   ProductionLog @relation(fields: [productionLogId], references: [id])
-  workOrder       WorkOrder     @relation(fields: [workOrderId], references: [id])
-  createdBy       User          @relation("CreatedAlerts", fields: [createdById], references: [id])
-  assignedTo      User?         @relation("AssignedAlerts", fields: [assignedToId], references: [id])
-  resolvedBy      User?         @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
+  productionLog   ProductionLog          @relation(fields: [productionLogId], references: [id])
+  workOrder       WorkOrder              @relation(fields: [workOrderId], references: [id])
+  createdBy       User                   @relation("CreatedAlerts", fields: [createdById], references: [id])
+  assignedTo      User?                  @relation("AssignedAlerts", fields: [assignedToId], references: [id])
+  resolvedBy      User?                  @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
   events          ProductionAlertEvent[]
 }
 
 model ProductionAlertEvent {
-  id        String         @id @default(uuid())
-  alertId   String
-  actorId   String
-  type      AlertEventType
+  id         String          @id @default(uuid())
+  alertId    String
+  actorId    String
+  type       AlertEventType
   fromStatus AlertStatus?
   toStatus   AlertStatus?
-  note      String?
-  createdAt DateTime       @default(now())
-  alert     ProductionAlert @relation(fields: [alertId], references: [id])
-  actor     User            @relation(fields: [actorId], references: [id])
+  note       String?
+  createdAt  DateTime        @default(now())
+  alert      ProductionAlert @relation(fields: [alertId], references: [id])
+  actor      User            @relation(fields: [actorId], references: [id])
 }
 
 model QualityCheck {

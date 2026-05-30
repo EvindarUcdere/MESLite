@@ -8,6 +8,7 @@ import Machines from "../pages/Machines.jsx";
 import Products from "../pages/Products.jsx";
 import Quality from "../pages/Quality.jsx";
 import Reports from "../pages/Reports.jsx";
+import RouteManagement from "../pages/Routes.jsx";
 import Users from "../pages/Users.jsx";
 import WorkOrders from "../pages/WorkOrders.jsx";
 import { ProtectedRoute } from "./ProtectedRoute.jsx";
@@ -27,6 +28,7 @@ export function AppRoutes() {
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/work-orders" element={<WorkOrders />} />
+            <Route path="/routes" element={<RouteManagement />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/products" element={<Products />} />

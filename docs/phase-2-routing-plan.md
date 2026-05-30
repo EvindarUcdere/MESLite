@@ -194,6 +194,20 @@ STOPPAGE
 7. Operasyon mesajlari ve kritik uyarilari ekle.
 8. Kalite kontrolu operasyon adimina bagla.
 
+## Uygulama Durumu
+
+### Tamamlanan - Adim 1
+
+Rota ve operasyon sablonu temeli eklendi.
+
+- `routes` tablosu urune bagli uretim rotasini tutar.
+- `route_operations` tablosu rota icindeki sirali operasyonlari tutar.
+- `GET /api/product-routes` ile rotalar listelenir.
+- `POST /api/product-routes` ile urun icin yeni rota ve operasyon adimlari olusturulur.
+- Web tarafinda `Rotalar` ekrani eklendi.
+
+Bu adim henuz is emirlerini otomatik operasyonlara bolmez. Bu bilerek ayrildi; once rota sablonu saglam olsun, sonra is emri operasyonlari bu sablondan uretilecek.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.
