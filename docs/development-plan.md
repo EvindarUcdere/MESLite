@@ -67,3 +67,9 @@ The production log transaction is important because dashboard totals should neve
 ## Extension Rule
 
 Every new feature should be added as a module with its own route, controller, service, validation, and tests. Shared behavior belongs in `middlewares`, `config`, or `utils` only when at least two modules need it.
+
+## Phase 5: Operation Routing and Traceability
+
+Detailed plan: `docs/phase-2-routing-plan.md`.
+
+This phase should start after the MVP flow is stable. It adds route definitions, work order operation steps, operation-level operator communication, timeline tracking, and quality traceability across multiple machines.
