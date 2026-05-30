@@ -57,6 +57,14 @@ const ALERT_SEVERITY_LABELS = {
   CRITICAL: "Kritik"
 };
 
+const ALERT_EVENT_LABELS = {
+  CREATED: "Oluşturuldu",
+  STATUS_CHANGED: "Durum değişti",
+  ASSIGNED: "Atandı",
+  RESOLVED: "Çözüldü",
+  COMMENT: "Yorum"
+};
+
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function mapCountsToChartData(counts = {}) {
@@ -93,6 +101,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+  const [alertResolutionNotes, setAlertResolutionNotes] = useState({});
 
   async function loadDashboard({ showLoading = false } = {}) {
     if (showLoading) {
@@ -152,9 +161,26 @@ export default function Dashboard() {
     "quality:checked": () => loadDashboard()
   });
 
+  function updateAlertResolutionNote(alertId, value) {
+    setAlertResolutionNotes((current) => ({ ...current, [alertId]: value }));
+  }
+
   async function handleAlertStatus(alertId, status) {
     try {
-      await updateProductionAlert(alertId, { status });
+      const resolutionNote = alertResolutionNotes[alertId]?.trim();
+
+      if (status === "RESOLVED" && !resolutionNote) {
+        setError("Uyarıyı çözmek için çözüm notu girin.");
+        return;
+      }
+
+      await updateProductionAlert(alertId, {
+        status,
+        ...(status === "RESOLVED" ? { resolutionNote } : {})
+      });
+      if (status === "RESOLVED") {
+        setAlertResolutionNotes((current) => ({ ...current, [alertId]: "" }));
+      }
       await loadDashboard();
     } catch (_error) {
       setError("Uyarı durumu güncellenemedi.");
@@ -250,6 +276,26 @@ export default function Dashboard() {
               {alert.productionLog.attachments?.[0] ? (
                 <img className="operator-note-image" src={getAttachmentUrl(alert.productionLog.attachments[0])} alt="Uyarı görseli" />
               ) : null}
+              <div className="alert-history">
+                <strong>Aksiyon Geçmişi</strong>
+                {(alert.events ?? []).map((event) => (
+                  <div key={event.id} className="alert-history-row">
+                    <span>{formatTime(event.createdAt)}</span>
+                    <p>
+                      {ALERT_EVENT_LABELS[event.type] ?? event.type} - {event.actor.name}
+                      {event.note ? `: ${event.note}` : ""}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <label className="alert-resolution-field">
+                Çözüm Notu
+                <input
+                  value={alertResolutionNotes[alert.id] ?? ""}
+                  onChange={(event) => updateAlertResolutionNote(alert.id, event.target.value)}
+                  placeholder="Örn. Makine bağlantıları sıkıldı, test üretimi uygun."
+                />
+              </label>
               <div className="action-row">
                 <button type="button" onClick={() => handleAlertStatus(alert.id, "IN_REVIEW")} disabled={alert.status === "IN_REVIEW"}>
                   İnceleniyor

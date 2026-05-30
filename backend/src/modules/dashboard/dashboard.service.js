@@ -208,6 +208,19 @@ export async function getLiveOverview() {
             email: true,
             role: true
           }
+        },
+        events: {
+          include: {
+            actor: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true
+              }
+            }
+          },
+          orderBy: { createdAt: "asc" }
         }
       },
       orderBy: [{ severity: "desc" }, { createdAt: "desc" }],

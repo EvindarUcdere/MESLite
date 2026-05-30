@@ -48,6 +48,14 @@ enum AlertSeverity {
   CRITICAL
 }
 
+enum AlertEventType {
+  CREATED
+  STATUS_CHANGED
+  ASSIGNED
+  RESOLVED
+  COMMENT
+}
+
 enum ScrapReason {
   MATERIAL_DEFECT
   MACHINE_SETUP
@@ -72,6 +80,7 @@ model User {
   createdAlerts      ProductionAlert[] @relation("CreatedAlerts")
   assignedAlerts     ProductionAlert[] @relation("AssignedAlerts")
   resolvedAlerts     ProductionAlert[] @relation("ResolvedAlerts")
+  alertEvents        ProductionAlertEvent[]
   qualityChecks      QualityCheck[]
   machineStatusLogs  MachineStatusLog[]
 }
@@ -200,6 +209,20 @@ model ProductionAlert {
   createdBy       User          @relation("CreatedAlerts", fields: [createdById], references: [id])
   assignedTo      User?         @relation("AssignedAlerts", fields: [assignedToId], references: [id])
   resolvedBy      User?         @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
+  events          ProductionAlertEvent[]
+}
+
+model ProductionAlertEvent {
+  id        String         @id @default(uuid())
+  alertId   String
+  actorId   String
+  type      AlertEventType
+  fromStatus AlertStatus?
+  toStatus   AlertStatus?
+  note      String?
+  createdAt DateTime       @default(now())
+  alert     ProductionAlert @relation(fields: [alertId], references: [id])
+  actor     User            @relation(fields: [actorId], references: [id])
 }
 
 model QualityCheck {

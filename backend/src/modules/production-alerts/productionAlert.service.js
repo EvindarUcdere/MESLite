@@ -22,7 +22,13 @@ export const includeRelations = {
   },
   createdBy: { select: userSelect },
   assignedTo: { select: userSelect },
-  resolvedBy: { select: userSelect }
+  resolvedBy: { select: userSelect },
+  events: {
+    include: {
+      actor: { select: userSelect }
+    },
+    orderBy: { createdAt: "asc" }
+  }
 };
 
 export function findProductionAlerts({ status } = {}) {
@@ -34,7 +40,7 @@ export function findProductionAlerts({ status } = {}) {
 }
 
 export async function createProductionAlert(tx, { productionLog, actor, title, message, severity = "WARNING" }) {
-  return tx.productionAlert.create({
+  const alert = await tx.productionAlert.create({
     data: {
       productionLogId: productionLog.id,
       workOrderId: productionLog.workOrderId,
@@ -43,6 +49,20 @@ export async function createProductionAlert(tx, { productionLog, actor, title, m
       message,
       severity
     },
+  });
+
+  await tx.productionAlertEvent.create({
+    data: {
+      alertId: alert.id,
+      actorId: actor.id,
+      type: "CREATED",
+      toStatus: "OPEN",
+      note: message
+    }
+  });
+
+  return tx.productionAlert.findUnique({
+    where: { id: alert.id },
     include: includeRelations
   });
 }
@@ -57,16 +77,38 @@ export async function updateProductionAlert(actor, id, data) {
   const status = data.status ?? current.status;
   const isResolved = status === "RESOLVED";
 
-  const alert = await prisma.productionAlert.update({
-    where: { id },
-    data: {
-      status,
-      assignedToId: data.assignedToId,
-      resolutionNote: data.resolutionNote,
-      resolvedById: isResolved ? actor.id : null,
-      resolvedAt: isResolved ? new Date() : null
-    },
-    include: includeRelations
+  const alert = await prisma.$transaction(async (tx) => {
+    const updated = await tx.productionAlert.update({
+      where: { id },
+      data: {
+        status,
+        assignedToId: data.assignedToId,
+        resolutionNote: data.resolutionNote,
+        resolvedById: isResolved ? actor.id : null,
+        resolvedAt: isResolved ? new Date() : null
+      }
+    });
+
+    const statusChanged = status !== current.status;
+    const assignmentChanged = data.assignedToId !== undefined && data.assignedToId !== current.assignedToId;
+
+    if (statusChanged || data.resolutionNote || assignmentChanged) {
+      await tx.productionAlertEvent.create({
+        data: {
+          alertId: id,
+          actorId: actor.id,
+          type: isResolved ? "RESOLVED" : assignmentChanged ? "ASSIGNED" : "STATUS_CHANGED",
+          fromStatus: current.status,
+          toStatus: status,
+          note: data.resolutionNote
+        }
+      });
+    }
+
+    return tx.productionAlert.findUnique({
+      where: { id: updated.id },
+      include: includeRelations
+    });
   });
 
   emitEvent("productionAlert:updated", alert);
