@@ -12,6 +12,7 @@
     "dev:backend": "npm --workspace backend run dev",
     "dev:web": "npm --workspace web run dev",
     "dev:mobile": "npm --workspace mobile run start",
+    "dev:mobile:phone": "npm --workspace mobile run phone",
     "dev:mobile:web": "npm --workspace mobile run web:clear",
     "build:web": "npm --workspace web run build"
   }

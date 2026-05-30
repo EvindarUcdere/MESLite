@@ -7,6 +7,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "phone": "expo start --lan --clear",
     "web": "expo start --web",
     "web:clear": "expo start --web --clear"
   },
