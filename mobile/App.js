@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { completeWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "./src/api/workOrders.api";
@@ -241,7 +241,13 @@ export default function App() {
     setProducedQuantity(String(Math.min(quantity, selectedProductionRemaining)));
   }
 
-  async function pickImage() {
+  function setPickedImage(result) {
+    if (!result.canceled && result.assets?.[0]) {
+      setSelectedImage(result.assets[0]);
+    }
+  }
+
+  async function pickImageFromGallery() {
     setError("");
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -257,9 +263,26 @@ export default function App() {
       allowsEditing: false
     });
 
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0]);
+    setPickedImage(result);
+  }
+
+  async function takePhoto() {
+    setError("");
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      setError("Fotoğraf çekmek için kamera izni gerekli.");
+      return;
     }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: false
+    });
+
+    setPickedImage(result);
   }
 
   if (isLoading) {
@@ -491,8 +514,11 @@ export default function App() {
         <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="İsteğe bağlı not" />
         <Text style={styles.label}>Görsel Kanıt</Text>
         <View style={styles.imagePickerRow}>
-          <Pressable style={styles.secondaryButton} onPress={pickImage} disabled={!selectedProductionWorkOrder || isSubmitting}>
-            <Text style={styles.secondaryButtonText}>{selectedImage ? "Görseli Değiştir" : "Görsel Seç"}</Text>
+          <Pressable style={styles.secondaryButton} onPress={takePhoto} disabled={!selectedProductionWorkOrder || isSubmitting}>
+            <Text style={styles.secondaryButtonText}>Kamera</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={pickImageFromGallery} disabled={!selectedProductionWorkOrder || isSubmitting}>
+            <Text style={styles.secondaryButtonText}>{selectedImage ? "Galeriden Değiştir" : "Galeriden Seç"}</Text>
           </Pressable>
           {selectedImage ? (
             <Pressable style={styles.inlineButton} onPress={() => setSelectedImage(null)} disabled={isSubmitting}>
@@ -501,6 +527,7 @@ export default function App() {
           ) : null}
         </View>
         {selectedImage ? <Text style={styles.muted}>{selectedImage.fileName ?? "Görsel seçildi"}</Text> : null}
+        {selectedImage?.uri ? <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} resizeMode="cover" /> : null}
         <Pressable
           style={[styles.primaryButton, !selectedProductionWorkOrder ? styles.disabledButton : null]}
           onPress={handleProductionEntry}
@@ -787,6 +814,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  imagePreview: {
+    width: "100%",
+    height: 180,
+    backgroundColor: "#edf1f5",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
   },
   orderCard: {
     gap: 12,
