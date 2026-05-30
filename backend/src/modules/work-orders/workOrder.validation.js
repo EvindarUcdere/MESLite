@@ -4,6 +4,7 @@ export const createWorkOrderSchema = z.object({
   body: z.object({
     orderNo: z.string().min(2),
     productId: z.string().uuid(),
+    routeId: z.string().uuid().optional(),
     machineId: z.string().uuid().optional(),
     assignedOperatorId: z.string().uuid().optional(),
     plannedQuantity: z.number().int().positive(),

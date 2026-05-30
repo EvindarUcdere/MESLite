@@ -208,6 +208,18 @@ Rota ve operasyon sablonu temeli eklendi.
 
 Bu adim henuz is emirlerini otomatik operasyonlara bolmez. Bu bilerek ayrildi; once rota sablonu saglam olsun, sonra is emri operasyonlari bu sablondan uretilecek.
 
+### Tamamlanan - Adim 2
+
+Is emri olusturulurken rota secimi ve otomatik operasyon uretimi eklendi.
+
+- `work_order_operations` tablosu is emrine bagli gercek operasyon adimlarini tutar.
+- Is emri formunda urune ait aktif rota secilebilir.
+- Rota secildiginde backend, rota operasyonlarini is emri operasyonlarina kopyalar.
+- Ilk operasyon `READY`, sonraki operasyonlar `WAITING` baslar.
+- Is emri listesinde operasyon timeline'i gorunur.
+
+Bu adim hala uretim/fire kaydini operasyon seviyesine baglamaz. Siradaki adim, mobil operator akisini bu operasyonlara baglamak olacak.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

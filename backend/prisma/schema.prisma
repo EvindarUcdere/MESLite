@@ -30,6 +30,14 @@ enum WorkOrderStatus {
   CANCELLED
 }
 
+enum WorkOrderOperationStatus {
+  WAITING
+  READY
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+}
+
 enum QualityStatus {
   PASSED
   FAILED
@@ -76,6 +84,7 @@ model User {
   updatedAt          DateTime               @updatedAt
   createdWorkOrders  WorkOrder[]            @relation("CreatedWorkOrders")
   assignedWorkOrders WorkOrder[]            @relation("AssignedWorkOrders")
+  assignedOperations WorkOrderOperation[]   @relation("AssignedWorkOrderOperations")
   productionLogs     ProductionLog[]
   createdAlerts      ProductionAlert[]      @relation("CreatedAlerts")
   assignedAlerts     ProductionAlert[]      @relation("AssignedAlerts")
@@ -109,16 +118,17 @@ model ProductionLine {
 }
 
 model Machine {
-  id                     String             @id @default(uuid())
-  code                   String             @unique
+  id                     String               @id @default(uuid())
+  code                   String               @unique
   name                   String
   productionLineId       String
-  status                 MachineStatus      @default(IDLE)
-  isActive               Boolean            @default(true)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  productionLine         ProductionLine     @relation(fields: [productionLineId], references: [id])
+  status                 MachineStatus        @default(IDLE)
+  isActive               Boolean              @default(true)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  productionLine         ProductionLine       @relation(fields: [productionLineId], references: [id])
   workOrders             WorkOrder[]
+  workOrderOperations    WorkOrderOperation[]
   productionLogs         ProductionLog[]
   machineStatusLogs      MachineStatusLog[]
   defaultRouteOperations RouteOperation[]
@@ -134,23 +144,25 @@ model ProductRoute {
   updatedAt   DateTime         @updatedAt
   product     Product          @relation(fields: [productId], references: [id])
   operations  RouteOperation[]
+  workOrders  WorkOrder[]
 
   @@unique([productId, name])
   @@map("routes")
 }
 
 model RouteOperation {
-  id                   String       @id @default(uuid())
+  id                   String               @id @default(uuid())
   routeId              String
   operationName        String
   sequenceNo           Int
   defaultMachineId     String?
   estimatedMinutes     Int?
-  requiresQualityCheck Boolean      @default(false)
-  createdAt            DateTime     @default(now())
-  updatedAt            DateTime     @updatedAt
-  route                ProductRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  defaultMachine       Machine?     @relation(fields: [defaultMachineId], references: [id])
+  requiresQualityCheck Boolean              @default(false)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  route                ProductRoute         @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  defaultMachine       Machine?             @relation(fields: [defaultMachineId], references: [id])
+  workOrderOperations  WorkOrderOperation[]
 
   @@unique([routeId, sequenceNo])
   @@map("route_operations")
@@ -166,29 +178,56 @@ model Shift {
 }
 
 model WorkOrder {
-  id                 String            @id @default(uuid())
-  orderNo            String            @unique
+  id                 String               @id @default(uuid())
+  orderNo            String               @unique
   productId          String
+  routeId            String?
   machineId          String?
   assignedOperatorId String?
   plannedQuantity    Int
-  producedQuantity   Int               @default(0)
-  scrapQuantity      Int               @default(0)
-  status             WorkOrderStatus   @default(PLANNED)
+  producedQuantity   Int                  @default(0)
+  scrapQuantity      Int                  @default(0)
+  status             WorkOrderStatus      @default(PLANNED)
   plannedStartDate   DateTime?
   plannedEndDate     DateTime?
   actualStartDate    DateTime?
   actualEndDate      DateTime?
   createdById        String
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  product            Product           @relation(fields: [productId], references: [id])
-  machine            Machine?          @relation(fields: [machineId], references: [id])
-  assignedOperator   User?             @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
-  createdBy          User              @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  product            Product              @relation(fields: [productId], references: [id])
+  route              ProductRoute?        @relation(fields: [routeId], references: [id])
+  machine            Machine?             @relation(fields: [machineId], references: [id])
+  assignedOperator   User?                @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
+  createdBy          User                 @relation("CreatedWorkOrders", fields: [createdById], references: [id])
   productionLogs     ProductionLog[]
   productionAlerts   ProductionAlert[]
   qualityChecks      QualityCheck[]
+  operations         WorkOrderOperation[]
+}
+
+model WorkOrderOperation {
+  id                 String                   @id @default(uuid())
+  workOrderId        String
+  routeOperationId   String
+  machineId          String?
+  assignedOperatorId String?
+  sequenceNo         Int
+  operationName      String
+  status             WorkOrderOperationStatus @default(WAITING)
+  producedQuantity   Int                      @default(0)
+  scrapQuantity      Int                      @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  workOrder          WorkOrder                @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  routeOperation     RouteOperation           @relation(fields: [routeOperationId], references: [id])
+  machine            Machine?                 @relation(fields: [machineId], references: [id])
+  assignedOperator   User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
+
+  @@unique([workOrderId, sequenceNo])
+  @@map("work_order_operations")
 }
 
 model ProductionLog {

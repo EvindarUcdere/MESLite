@@ -1,7 +1,8 @@
 import { Play, Plus, Square, TimerReset } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
+import { getProductRoutes } from "../api/productRoutes.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -12,6 +13,14 @@ const STATUS_LABELS = {
   PAUSED: "Duraklatıldı",
   COMPLETED: "Tamamlandı",
   CANCELLED: "İptal"
+};
+
+const OPERATION_STATUS_LABELS = {
+  WAITING: "Bekliyor",
+  READY: "Hazır",
+  IN_PROGRESS: "Üretimde",
+  PAUSED: "Durakladı",
+  COMPLETED: "Tamamlandı"
 };
 
 const SCRAP_REASONS = [
@@ -68,6 +77,7 @@ export default function WorkOrders() {
   const user = useAuthStore((state) => state.user);
   const [workOrders, setWorkOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [machines, setMachines] = useState([]);
   const [operators, setOperators] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,6 +86,7 @@ export default function WorkOrders() {
   const [form, setForm] = useState({
     orderNo: "",
     productId: "",
+    routeId: "",
     machineId: "",
     assignedOperatorId: "",
     plannedQuantity: 100
@@ -89,6 +100,7 @@ export default function WorkOrders() {
   });
 
   const activeMachines = useMemo(() => machines.filter((machine) => machine.isActive), [machines]);
+  const availableRoutes = useMemo(() => routes.filter((route) => route.productId === form.productId && route.isActive), [form.productId, routes]);
   const productionCandidates = useMemo(
     () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
@@ -97,9 +109,10 @@ export default function WorkOrders() {
 
   async function loadData() {
     setError("");
-    const [workOrderData, productData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getMachines(), getUsers()]);
+    const [workOrderData, productData, routeData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers()]);
     setWorkOrders(workOrderData);
     setProducts(productData);
+    setRoutes(routeData);
     setMachines(machineData);
     setOperators(userData.filter((user) => user.role === "OPERATOR" && user.isActive));
   }
@@ -109,11 +122,12 @@ export default function WorkOrders() {
 
     async function loadInitialData() {
       try {
-        const [workOrderData, productData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getMachines(), getUsers()]);
+        const [workOrderData, productData, routeData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers()]);
 
         if (isMounted) {
           setWorkOrders(workOrderData);
           setProducts(productData);
+          setRoutes(routeData);
           setMachines(machineData);
           setOperators(userData.filter((user) => user.role === "OPERATOR" && user.isActive));
         }
@@ -136,7 +150,11 @@ export default function WorkOrders() {
   }, []);
 
   function updateForm(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "productId" ? { routeId: "" } : {})
+    }));
   }
 
   function updateProductionForm(field, value) {
@@ -153,6 +171,7 @@ export default function WorkOrders() {
         orderNo: form.orderNo,
         productId: form.productId,
         plannedQuantity: Number(form.plannedQuantity),
+        ...(form.routeId ? { routeId: form.routeId } : {}),
         ...(form.machineId ? { machineId: form.machineId } : {}),
         ...(form.assignedOperatorId ? { assignedOperatorId: form.assignedOperatorId } : {})
       };
@@ -161,6 +180,7 @@ export default function WorkOrders() {
       setForm((current) => ({
         ...current,
         orderNo: "",
+        routeId: "",
         plannedQuantity: 100
       }));
       await loadData();
@@ -259,6 +279,17 @@ export default function WorkOrders() {
             </select>
           </label>
           <label>
+            Rota
+            <select value={form.routeId} onChange={(event) => updateForm("routeId", event.target.value)} disabled={!form.productId}>
+              <option value="">Rota olmadan oluştur</option>
+              {availableRoutes.map((route) => (
+                <option key={route.id} value={route.id}>
+                  {route.name} ({route.operations.length} adım)
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Makine
             <select value={form.machineId} onChange={(event) => updateForm("machineId", event.target.value)}>
               <option value="">Sonra ata</option>
@@ -304,6 +335,7 @@ export default function WorkOrders() {
               <tr>
                 <th>İş Emri</th>
                 <th>Ürün</th>
+                <th>Rota</th>
                 <th>Durum</th>
                 <th>İlerleme</th>
                 <th>Makine</th>
@@ -321,52 +353,75 @@ export default function WorkOrders() {
                 const completeDisabled = !canComplete(workOrder);
 
                 return (
-                  <tr key={workOrder.id}>
-                    <td>{workOrder.orderNo}</td>
-                    <td>{workOrder.product.name}</td>
-                    <td>
-                      <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</span>
-                    </td>
-                    <td>
-                      {workOrder.producedQuantity}/{workOrder.plannedQuantity} ({progress}%)
-                    </td>
-                    <td>{workOrder.machine?.code ?? "-"}</td>
-                    <td>{workOrder.assignedOperator?.name ?? "-"}</td>
-                    <td>{formatDate(workOrder.updatedAt)}</td>
-                    <td>
-                      <div className="action-row">
-                        <button
-                          type="button"
-                          onClick={() => runAction(() => startWorkOrder(workOrder.id), "İş emri başlatılamadı.")}
-                          disabled={startDisabled}
-                          title={startBlockReason || "Başlat"}
-                        >
-                          <Play size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runAction(() => pauseWorkOrder(workOrder.id), "İş emri duraklatılamadı.")}
-                          disabled={pauseDisabled}
-                          title={pauseDisabled ? "Sadece üretimdeki iş emirleri duraklatılabilir." : "Duraklat"}
-                        >
-                          <TimerReset size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => runAction(() => completeWorkOrder(workOrder.id), "İş emri tamamlanamadı.")}
-                          disabled={completeDisabled}
-                          title={completeDisabled ? "Tamamlamak için iş emri başlamış ve üretim girişi yapılmış olmalı." : "Tamamla"}
-                        >
-                          <Square size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  <Fragment key={workOrder.id}>
+                    <tr>
+                      <td>{workOrder.orderNo}</td>
+                      <td>{workOrder.product.name}</td>
+                      <td>{workOrder.route?.name ?? "-"}</td>
+                      <td>
+                        <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</span>
+                      </td>
+                      <td>
+                        {workOrder.producedQuantity}/{workOrder.plannedQuantity} ({progress}%)
+                      </td>
+                      <td>{workOrder.machine?.code ?? "-"}</td>
+                      <td>{workOrder.assignedOperator?.name ?? "-"}</td>
+                      <td>{formatDate(workOrder.updatedAt)}</td>
+                      <td>
+                        <div className="action-row">
+                          <button
+                            type="button"
+                            onClick={() => runAction(() => startWorkOrder(workOrder.id), "İş emri başlatılamadı.")}
+                            disabled={startDisabled}
+                            title={startBlockReason || "Başlat"}
+                          >
+                            <Play size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => runAction(() => pauseWorkOrder(workOrder.id), "İş emri duraklatılamadı.")}
+                            disabled={pauseDisabled}
+                            title={pauseDisabled ? "Sadece üretimdeki iş emirleri duraklatılabilir." : "Duraklat"}
+                          >
+                            <TimerReset size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => runAction(() => completeWorkOrder(workOrder.id), "İş emri tamamlanamadı.")}
+                            disabled={completeDisabled}
+                            title={completeDisabled ? "Tamamlamak için iş emri başlamış ve üretim girişi yapılmış olmalı." : "Tamamla"}
+                          >
+                            <Square size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {workOrder.operations?.length ? (
+                      <tr className="operation-timeline-row">
+                        <td colSpan="9">
+                          <div className="work-order-operation-timeline">
+                            {workOrder.operations.map((operation) => (
+                              <div key={operation.id} className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")}`}>
+                                <span>{operation.sequenceNo}</span>
+                                <div>
+                                  <strong>{operation.operationName}</strong>
+                                  <small>
+                                    {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
+                                    {operation.machine ? ` • ${operation.machine.code}` : ""}
+                                  </small>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 );
               })}
               {!isLoading && workOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="8">Henüz iş emri yok.</td>
+                  <td colSpan="9">Henüz iş emri yok.</td>
                 </tr>
               ) : null}
             </tbody>

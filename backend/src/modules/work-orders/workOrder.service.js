@@ -4,6 +4,16 @@ import { ApiError } from "../../utils/ApiError.js";
 
 const workOrderInclude = {
   product: true,
+  route: {
+    include: {
+      operations: {
+        include: {
+          defaultMachine: true
+        },
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
+  },
   machine: true,
   assignedOperator: {
     select: {
@@ -36,6 +46,21 @@ const workOrderInclude = {
     },
     orderBy: { createdAt: "desc" },
     take: 5
+  },
+  operations: {
+    include: {
+      routeOperation: true,
+      machine: true,
+      assignedOperator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      }
+    },
+    orderBy: { sequenceNo: "asc" }
   }
 };
 
@@ -57,18 +82,68 @@ export function findWorkOrderById(id) {
 }
 
 export async function createWorkOrder(userId, data) {
-  const workOrder = await prisma.workOrder.create({
-    data: {
-      ...data,
-      plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : undefined,
-      plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : undefined,
-      createdById: userId
-    },
-    include: workOrderInclude
+  const result = await prisma.$transaction(async (tx) => {
+    let route = null;
+
+    if (data.routeId) {
+      route = await tx.productRoute.findUnique({
+        where: { id: data.routeId },
+        include: {
+          operations: {
+            orderBy: { sequenceNo: "asc" }
+          }
+        }
+      });
+
+      if (!route || !route.isActive) {
+        throw new ApiError(400, "Active product route is required");
+      }
+
+      if (route.productId !== data.productId) {
+        throw new ApiError(400, "Selected route must belong to the selected product");
+      }
+
+      if (!route.operations.length) {
+        throw new ApiError(400, "Selected route must have at least one operation");
+      }
+    }
+
+    const workOrder = await tx.workOrder.create({
+      data: {
+        orderNo: data.orderNo,
+        productId: data.productId,
+        routeId: data.routeId,
+        machineId: data.machineId,
+        assignedOperatorId: data.assignedOperatorId,
+        plannedQuantity: data.plannedQuantity,
+        plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : undefined,
+        plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : undefined,
+        createdById: userId
+      }
+    });
+
+    if (route) {
+      await tx.workOrderOperation.createMany({
+        data: route.operations.map((operation, index) => ({
+          workOrderId: workOrder.id,
+          routeOperationId: operation.id,
+          machineId: operation.defaultMachineId ?? data.machineId,
+          assignedOperatorId: data.assignedOperatorId,
+          sequenceNo: operation.sequenceNo,
+          operationName: operation.operationName,
+          status: index === 0 ? "READY" : "WAITING"
+        }))
+      });
+    }
+
+    return tx.workOrder.findUnique({
+      where: { id: workOrder.id },
+      include: workOrderInclude
+    });
   });
 
-  emitEvent("workOrder:updated", workOrder);
-  return workOrder;
+  emitEvent("workOrder:updated", result);
+  return result;
 }
 
 export async function updateWorkOrderStatus(id, status) {
