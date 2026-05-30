@@ -182,6 +182,25 @@ export default function Quality() {
               ))}
             </select>
           </label>
+          <div className="field-span-all">
+            <span className="form-field-title">Hızlı İş Emri Seçimi</span>
+            <div className="choice-list">
+              {checkCandidates.map((workOrder) => (
+                <button
+                  key={workOrder.id}
+                  className={`choice-button ${form.workOrderId === workOrder.id ? "choice-button-active" : ""}`}
+                  type="button"
+                  onClick={() => updateForm("workOrderId", workOrder.id)}
+                >
+                  <strong>{workOrder.orderNo}</strong>
+                  <span>{workOrder.product.name}</span>
+                  <small>
+                    Üretim {workOrder.producedQuantity} / Fire {workOrder.scrapQuantity}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
           <label>
             Sonuç
             <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} required>

@@ -392,6 +392,49 @@ body {
   font-size: 14px;
 }
 
+.field-span-all {
+  grid-column: 1 / -1;
+}
+
+.form-field-title {
+  display: block;
+  margin-bottom: 8px;
+  color: #33424d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.choice-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.choice-button {
+  min-height: 82px;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17202a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-button span,
+.choice-button small {
+  color: #60707d;
+}
+
+.choice-button-active {
+  border-color: #256f6c;
+  background: #eefaf7;
+  box-shadow: inset 0 0 0 1px #256f6c;
+}
+
 .work-order-form input,
 .work-order-form select,
 .stack-form input,
