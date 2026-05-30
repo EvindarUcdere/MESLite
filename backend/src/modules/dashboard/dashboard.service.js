@@ -109,7 +109,7 @@ export async function getSummary() {
 export async function getLiveOverview() {
   const { start: operatorNotesStart } = getLast24HoursRange();
 
-  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, recentQualityChecks] = await Promise.all([
+  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks] = await Promise.all([
     prisma.workOrder.findMany({
       where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
       include: {
@@ -175,6 +175,44 @@ export async function getLiveOverview() {
       orderBy: { createdAt: "desc" },
       take: 20
     }),
+    prisma.productionAlert.findMany({
+      where: { status: { in: ["OPEN", "IN_REVIEW"] } },
+      include: {
+        workOrder: { include: { product: true } },
+        productionLog: {
+          include: {
+            machine: true,
+            attachments: true,
+            operator: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true
+              }
+            }
+          }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      },
+      orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+      take: 20
+    }),
     prisma.qualityCheck.findMany({
       include: {
         workOrder: { include: { product: true } },
@@ -200,6 +238,7 @@ export async function getLiveOverview() {
     machines,
     recentProductionLogs,
     operatorNotes: operatorNotes.filter((log) => log.note?.trim()),
+    openAlerts,
     recentQualityChecks
   };
 }

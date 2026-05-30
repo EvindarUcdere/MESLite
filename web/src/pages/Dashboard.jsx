@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
+import { updateProductionAlert } from "../api/productionAlerts.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 
@@ -42,6 +43,18 @@ const SCRAP_REASON_LABELS = {
   QUALITY_REJECT: "Kalite Reddi",
   OTHER: "Diğer",
   UNKNOWN: "Belirtilmemiş"
+};
+
+const ALERT_STATUS_LABELS = {
+  OPEN: "Yeni",
+  IN_REVIEW: "İnceleniyor",
+  RESOLVED: "Çözüldü"
+};
+
+const ALERT_SEVERITY_LABELS = {
+  INFO: "Bilgi",
+  WARNING: "Uyarı",
+  CRITICAL: "Kritik"
 };
 
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
@@ -134,8 +147,19 @@ export default function Dashboard() {
     "machine:statusChanged": () => loadDashboard(),
     "workOrder:updated": () => loadDashboard(),
     "production:logged": () => loadDashboard(),
+    "productionAlert:created": () => loadDashboard(),
+    "productionAlert:updated": () => loadDashboard(),
     "quality:checked": () => loadDashboard()
   });
+
+  async function handleAlertStatus(alertId, status) {
+    try {
+      await updateProductionAlert(alertId, { status });
+      await loadDashboard();
+    } catch (_error) {
+      setError("Uyarı durumu güncellenemedi.");
+    }
+  }
 
   const cards = [
     ["Aktif İş Emirleri", summary?.activeWorkOrders ?? 0],
@@ -159,6 +183,7 @@ export default function Dashboard() {
   const workOrderStatusData = mapCountsToChartData(summary?.workOrderStatusCounts);
   const qualityStatusData = mapCountsToChartData(summary?.qualityStatusCounts);
   const operatorNotes = live?.operatorNotes ?? [];
+  const openAlerts = live?.openAlerts ?? [];
 
   return (
     <div className="page-stack">
@@ -180,6 +205,44 @@ export default function Dashboard() {
             <strong>{isLoading ? "..." : value}</strong>
           </article>
         ))}
+      </section>
+      <section className="panel alert-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>Açık Uyarılar</h2>
+            <p className="muted-text">Operatörden gelen kritik saha uyarıları ve aksiyon durumu.</p>
+          </div>
+          <span className="note-counter">{openAlerts.length}</span>
+        </div>
+        <div className="alert-list">
+          {openAlerts.map((alert) => (
+            <article key={alert.id} className={`alert-card alert-${alert.severity.toLowerCase()}`}>
+              <div className="operator-note-header">
+                <strong>{alert.title}</strong>
+                <span>{formatTime(alert.createdAt)}</span>
+              </div>
+              <p>{alert.message}</p>
+              <div className="operator-note-meta">
+                <span>{ALERT_SEVERITY_LABELS[alert.severity] ?? alert.severity}</span>
+                <span>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</span>
+                <span>{alert.productionLog.machine.code}</span>
+                <span>{alert.createdBy.name}</span>
+              </div>
+              {alert.productionLog.attachments?.[0] ? (
+                <img className="operator-note-image" src={getAttachmentUrl(alert.productionLog.attachments[0])} alt="Uyarı görseli" />
+              ) : null}
+              <div className="action-row">
+                <button type="button" onClick={() => handleAlertStatus(alert.id, "IN_REVIEW")} disabled={alert.status === "IN_REVIEW"}>
+                  İnceleniyor
+                </button>
+                <button type="button" onClick={() => handleAlertStatus(alert.id, "RESOLVED")}>
+                  Çözüldü
+                </button>
+              </div>
+            </article>
+          ))}
+          {!isLoading && openAlerts.length === 0 ? <p className="empty-state">Açık uyarı yok.</p> : null}
+        </div>
       </section>
       <section className="panel operator-notes-panel">
         <div className="section-title-row">

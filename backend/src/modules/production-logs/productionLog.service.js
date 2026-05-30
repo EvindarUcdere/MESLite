@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
 
 const includeRelations = {
   workOrder: { include: { product: true } },
@@ -76,6 +77,22 @@ export async function createProductionLog(actor, data) {
       include: includeRelations
     });
 
+    let alert = null;
+
+    if (data.isCriticalAlert) {
+      if (!data.note?.trim()) {
+        throw new ApiError(400, "Alert note is required for critical production alerts");
+      }
+
+      alert = await createProductionAlert(tx, {
+        productionLog: log,
+        actor,
+        title: `Operatör uyarısı - ${workOrder.orderNo}`,
+        message: data.note,
+        severity: data.alertSeverity ?? "WARNING"
+      });
+    }
+
     const updatedWorkOrder = await tx.workOrder.update({
       where: { id: data.workOrderId },
       data: {
@@ -84,11 +101,14 @@ export async function createProductionLog(actor, data) {
       }
     });
 
-    return { log, workOrder: updatedWorkOrder };
+    return { log, workOrder: updatedWorkOrder, alert };
   });
 
   emitEvent("production:logged", result.log);
   emitEvent("workOrder:updated", result.workOrder);
+  if (result.alert) {
+    emitEvent("productionAlert:created", result.alert);
+  }
   return result.log;
 }
 

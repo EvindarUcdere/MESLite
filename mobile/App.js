@@ -66,6 +66,8 @@ export default function App() {
   const [scrapQuantity, setScrapQuantity] = useState("0");
   const [scrapReason, setScrapReason] = useState("");
   const [note, setNote] = useState("");
+  const [isCriticalAlert, setIsCriticalAlert] = useState(false);
+  const [alertSeverity, setAlertSeverity] = useState("WARNING");
   const [selectedImage, setSelectedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -209,6 +211,11 @@ export default function App() {
       return;
     }
 
+    if (isCriticalAlert && !note.trim()) {
+      setError("Kritik uyarı için not girilmelidir.");
+      return;
+    }
+
     if (produced > selectedProductionRemaining) {
       setError(`Üretilen adet kalan miktarı aşamaz. Kalan: ${selectedProductionRemaining} adet.`);
       return;
@@ -223,6 +230,7 @@ export default function App() {
         producedQuantity: produced,
         scrapQuantity: scrap,
         ...(scrap > 0 ? { scrapReason } : {}),
+        ...(isCriticalAlert ? { isCriticalAlert, alertSeverity } : {}),
         ...(note ? { note } : {})
       });
 
@@ -236,6 +244,8 @@ export default function App() {
       setScrapQuantity("0");
       setScrapReason("");
       setNote("");
+      setIsCriticalAlert(false);
+      setAlertSeverity("WARNING");
       setSelectedImage(null);
     } catch (productionError) {
       if (isUnauthorizedError(productionError)) {
@@ -544,6 +554,29 @@ export default function App() {
         ) : null}
         <Text style={styles.label}>Not</Text>
         <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="İsteğe bağlı not" />
+        <Pressable
+          style={[styles.alertToggle, isCriticalAlert ? styles.alertToggleActive : null]}
+          onPress={() => setIsCriticalAlert((current) => !current)}
+          disabled={!selectedProductionWorkOrder || isSubmitting}
+        >
+          <Text style={styles.alertToggleText}>{isCriticalAlert ? "Kritik uyarı olarak işaretlendi" : "Kritik uyarı olarak işaretle"}</Text>
+        </Pressable>
+        {isCriticalAlert ? (
+          <View style={styles.choiceList}>
+            {[
+              { value: "WARNING", label: "Uyarı" },
+              { value: "CRITICAL", label: "Kritik" }
+            ].map((severity) => (
+              <Pressable
+                key={severity.value}
+                style={[styles.choiceButton, alertSeverity === severity.value ? styles.choiceButtonActive : null]}
+                onPress={() => setAlertSeverity(severity.value)}
+              >
+                <Text style={styles.choiceText}>{severity.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
         <Text style={styles.label}>Görsel Kanıt</Text>
         <View style={styles.imagePickerRow}>
           <Pressable style={styles.secondaryButton} onPress={takePhoto} disabled={!selectedProductionWorkOrder || isSubmitting}>
@@ -846,6 +879,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  alertToggle: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  alertToggleActive: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#dc2626"
+  },
+  alertToggleText: {
+    color: "#9a3412",
+    fontWeight: "800"
   },
   imagePreview: {
     width: "100%",

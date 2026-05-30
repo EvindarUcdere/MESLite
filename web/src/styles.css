@@ -328,6 +328,11 @@ body {
   gap: 10px;
 }
 
+.alert-list {
+  display: grid;
+  gap: 10px;
+}
+
 .operator-note-card {
   display: grid;
   gap: 8px;
@@ -335,6 +340,36 @@ body {
   background: #ffffff;
   border: 1px solid #f6c86f;
   border-radius: 8px;
+}
+
+.alert-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+}
+
+.alert-card p {
+  margin: 0;
+  color: #17202a;
+  font-weight: 700;
+}
+
+.alert-critical {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.alert-warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.alert-info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .operator-note-card p {

@@ -8,6 +8,8 @@ export const createProductionLogSchema = z.object({
     producedQuantity: z.number().int().min(0),
     scrapQuantity: z.number().int().min(0).default(0),
     scrapReason: z.enum(["MATERIAL_DEFECT", "MACHINE_SETUP", "OPERATOR_ERROR", "PROCESS_DEVIATION", "QUALITY_REJECT", "OTHER"]).optional(),
+    isCriticalAlert: z.boolean().default(false),
+    alertSeverity: z.enum(["INFO", "WARNING", "CRITICAL"]).optional(),
     startedAt: z.string().datetime().optional(),
     endedAt: z.string().datetime().optional(),
     note: z.string().optional()
