@@ -333,6 +333,33 @@ body {
   gap: 10px;
 }
 
+.alert-page-list {
+  display: grid;
+  gap: 14px;
+}
+
+.alert-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.alert-filter-row label {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  color: #33424d;
+  font-size: 14px;
+}
+
+.alert-filter-row select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 .operator-note-card {
   display: grid;
   gap: 8px;
