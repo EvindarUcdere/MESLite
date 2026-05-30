@@ -306,6 +306,124 @@ body {
   white-space: normal;
 }
 
+.dashboard-signal-panel {
+  border-color: #c8d3dd;
+  background: #ffffff;
+}
+
+.dashboard-signal-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) repeat(2, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.signal-summary-card {
+  display: grid;
+  gap: 6px;
+  min-height: 128px;
+  padding: 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.signal-summary-card span,
+.signal-summary-card small {
+  color: #52606d;
+}
+
+.signal-summary-card strong {
+  color: #0f1f2e;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.compact-feed {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.compact-feed h3 {
+  margin: 0;
+  color: #0f1f2e;
+  font-size: 15px;
+}
+
+.compact-feed-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding-top: 8px;
+  border-top: 1px solid #edf1f5;
+}
+
+.compact-feed-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.compact-feed-row strong {
+  display: block;
+  color: #0f1f2e;
+  font-size: 13px;
+}
+
+.compact-feed-row p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: #52606d;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-feed-row small {
+  color: #66788a;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.severity-dot,
+.note-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #64748b;
+}
+
+.severity-critical {
+  background: #dc2626;
+}
+
+.severity-warning {
+  background: #d97706;
+}
+
+.severity-info,
+.note-dot {
+  background: #256f6c;
+}
+
+.text-link {
+  color: #256f6c;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
 .operator-notes-panel {
   border-color: #f6c86f;
   background: #fffbeb;
@@ -737,6 +855,10 @@ th {
 
 @media (max-width: 760px) {
   .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-signal-grid {
     grid-template-columns: 1fr;
   }
 

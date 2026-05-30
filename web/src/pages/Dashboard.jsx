@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
-import { updateProductionAlert } from "../api/productionAlerts.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 
@@ -51,20 +51,6 @@ const ALERT_STATUS_LABELS = {
   RESOLVED: "Çözüldü"
 };
 
-const ALERT_SEVERITY_LABELS = {
-  INFO: "Bilgi",
-  WARNING: "Uyarı",
-  CRITICAL: "Kritik"
-};
-
-const ALERT_EVENT_LABELS = {
-  CREATED: "Oluşturuldu",
-  STATUS_CHANGED: "Durum değişti",
-  ASSIGNED: "Atandı",
-  RESOLVED: "Çözüldü",
-  COMMENT: "Yorum"
-};
-
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function mapCountsToChartData(counts = {}) {
@@ -101,7 +87,6 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
-  const [alertResolutionNotes, setAlertResolutionNotes] = useState({});
 
   async function loadDashboard({ showLoading = false } = {}) {
     if (showLoading) {
@@ -161,32 +146,6 @@ export default function Dashboard() {
     "quality:checked": () => loadDashboard()
   });
 
-  function updateAlertResolutionNote(alertId, value) {
-    setAlertResolutionNotes((current) => ({ ...current, [alertId]: value }));
-  }
-
-  async function handleAlertStatus(alertId, status) {
-    try {
-      const resolutionNote = alertResolutionNotes[alertId]?.trim();
-
-      if (status === "RESOLVED" && !resolutionNote) {
-        setError("Uyarıyı çözmek için çözüm notu girin.");
-        return;
-      }
-
-      await updateProductionAlert(alertId, {
-        status,
-        ...(status === "RESOLVED" ? { resolutionNote } : {})
-      });
-      if (status === "RESOLVED") {
-        setAlertResolutionNotes((current) => ({ ...current, [alertId]: "" }));
-      }
-      await loadDashboard();
-    } catch (_error) {
-      setError("Uyarı durumu güncellenemedi.");
-    }
-  }
-
   const cards = [
     ["Aktif İş Emirleri", summary?.activeWorkOrders ?? 0],
     ["Bugünkü Üretim", summary?.todayProducedQuantity ?? 0],
@@ -210,6 +169,8 @@ export default function Dashboard() {
   const qualityStatusData = mapCountsToChartData(summary?.qualityStatusCounts);
   const operatorNotes = live?.operatorNotes ?? [];
   const openAlerts = live?.openAlerts ?? [];
+  const latestOperatorNotes = operatorNotes.slice(0, 3);
+  const latestOpenAlerts = openAlerts.slice(0, 3);
 
   return (
     <div className="page-stack">
@@ -232,110 +193,54 @@ export default function Dashboard() {
           </article>
         ))}
       </section>
-      <section className="panel alert-panel">
+      <section className="panel dashboard-signal-panel">
         <div className="section-title-row">
           <div>
-            <h2>Açık Uyarılar</h2>
-            <p className="muted-text">Operatörden gelen kritik saha uyarıları ve aksiyon durumu.</p>
+            <h2>Saha Sinyalleri</h2>
+            <p className="muted-text">Detaylı aksiyon takibi için Uyarılar sayfasını kullanın.</p>
           </div>
-          <span className="note-counter">{openAlerts.length}</span>
+          <Link className="text-link" to="/alerts">
+            Uyarılara git
+          </Link>
         </div>
-        <div className="alert-list">
-          {openAlerts.map((alert) => (
-            <article key={alert.id} className={`alert-card alert-${alert.severity.toLowerCase()}`}>
-              <div className="operator-note-header">
-                <strong>{alert.title}</strong>
-                <span>{formatTime(alert.createdAt)}</span>
-              </div>
-              <p>{alert.message}</p>
-              <div className="alert-context-grid">
+        <div className="dashboard-signal-grid">
+          <article className="signal-summary-card">
+            <span>Açık uyarı</span>
+            <strong>{isLoading ? "..." : openAlerts.length}</strong>
+            <small>{openAlerts.filter((alert) => alert.severity === "CRITICAL").length} kritik</small>
+          </article>
+          <div className="compact-feed">
+            <h3>Son Uyarılar</h3>
+            {latestOpenAlerts.map((alert) => (
+              <div key={alert.id} className="compact-feed-row">
+                <span className={`severity-dot severity-${alert.severity.toLowerCase()}`} />
                 <div>
-                  <span>İş Emri</span>
                   <strong>{alert.workOrder.orderNo}</strong>
+                  <p>
+                    {alert.productionLog.machine.code} - {alert.message}
+                  </p>
                 </div>
-                <div>
-                  <span>Ürün</span>
-                  <strong>{alert.workOrder.product.name}</strong>
-                </div>
-                <div>
-                  <span>Makine</span>
-                  <strong>
-                    {alert.productionLog.machine.code} - {alert.productionLog.machine.name}
-                  </strong>
-                </div>
-                <div>
-                  <span>Operatör</span>
-                  <strong>{alert.productionLog.operator.name}</strong>
-                </div>
+                <small>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</small>
               </div>
-              <div className="operator-note-meta">
-                <span>{ALERT_SEVERITY_LABELS[alert.severity] ?? alert.severity}</span>
-                <span>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</span>
-                <span>{alert.createdBy.name}</span>
-              </div>
-              {alert.productionLog.attachments?.[0] ? (
-                <img className="operator-note-image" src={getAttachmentUrl(alert.productionLog.attachments[0])} alt="Uyarı görseli" />
-              ) : null}
-              <div className="alert-history">
-                <strong>Aksiyon Geçmişi</strong>
-                {(alert.events ?? []).map((event) => (
-                  <div key={event.id} className="alert-history-row">
-                    <span>{formatTime(event.createdAt)}</span>
-                    <p>
-                      {ALERT_EVENT_LABELS[event.type] ?? event.type} - {event.actor.name}
-                      {event.note ? `: ${event.note}` : ""}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <label className="alert-resolution-field">
-                Çözüm Notu
-                <input
-                  value={alertResolutionNotes[alert.id] ?? ""}
-                  onChange={(event) => updateAlertResolutionNote(alert.id, event.target.value)}
-                  placeholder="Örn. Makine bağlantıları sıkıldı, test üretimi uygun."
-                />
-              </label>
-              <div className="action-row">
-                <button type="button" onClick={() => handleAlertStatus(alert.id, "IN_REVIEW")} disabled={alert.status === "IN_REVIEW"}>
-                  İnceleniyor
-                </button>
-                <button type="button" onClick={() => handleAlertStatus(alert.id, "RESOLVED")}>
-                  Çözüldü
-                </button>
-              </div>
-            </article>
-          ))}
-          {!isLoading && openAlerts.length === 0 ? <p className="empty-state">Açık uyarı yok.</p> : null}
-        </div>
-      </section>
-      <section className="panel operator-notes-panel">
-        <div className="section-title-row">
-          <div>
-            <h2>Operatör Notları</h2>
-            <p className="muted-text">Son 24 saatte mobil uygulamadan girilen saha notları.</p>
+            ))}
+            {!isLoading && latestOpenAlerts.length === 0 ? <p className="empty-state">Açık uyarı yok.</p> : null}
           </div>
-          <span className="note-counter">{operatorNotes.length}</span>
-        </div>
-        <div className="operator-note-list">
-          {operatorNotes.map((log) => (
-            <article key={log.id} className="operator-note-card">
-              <div className="operator-note-header">
-                <strong>{log.workOrder.orderNo}</strong>
-                <span>{formatTime(log.createdAt)}</span>
+          <div className="compact-feed">
+            <h3>Son Operatör Notları</h3>
+            {latestOperatorNotes.map((log) => (
+              <div key={log.id} className="compact-feed-row">
+                <span className="note-dot" />
+                <div>
+                  <strong>{log.workOrder.orderNo}</strong>
+                  <p>
+                    {log.machine.code} - {log.note}
+                  </p>
+                </div>
+                <small>{formatTime(log.createdAt)}</small>
               </div>
-              <p>{log.note}</p>
-              {log.attachments?.[0] ? <img className="operator-note-image" src={getAttachmentUrl(log.attachments[0])} alt="Operatör görsel notu" /> : null}
-              <div className="operator-note-meta">
-                <span>{log.operator.name}</span>
-                <span>{log.machine.code}</span>
-                <span>
-                  Üretim {log.producedQuantity} / Fire {log.scrapQuantity}
-                </span>
-              </div>
-            </article>
-          ))}
-          {!isLoading && operatorNotes.length === 0 ? <p className="empty-state">Henüz operatör notu yok.</p> : null}
+            ))}
+            {!isLoading && latestOperatorNotes.length === 0 ? <p className="empty-state">Henüz operatör notu yok.</p> : null}
+          </div>
         </div>
       </section>
       <section className="operations-grid">
