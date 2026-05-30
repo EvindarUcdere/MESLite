@@ -14,6 +14,15 @@ const STATUS_LABELS = {
   CANCELLED: "İptal"
 };
 
+const SCRAP_REASONS = [
+  { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
+  { value: "MACHINE_SETUP", label: "Makine Ayarı" },
+  { value: "OPERATOR_ERROR", label: "Operatör Hatası" },
+  { value: "PROCESS_DEVIATION", label: "Proses Sapması" },
+  { value: "QUALITY_REJECT", label: "Kalite Reddi" },
+  { value: "OTHER", label: "Diğer" }
+];
+
 function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
@@ -75,6 +84,7 @@ export default function WorkOrders() {
     workOrderId: "",
     producedQuantity: 10,
     scrapQuantity: 0,
+    scrapReason: "",
     note: ""
   });
 
@@ -190,11 +200,17 @@ export default function WorkOrders() {
         return;
       }
 
+      if (Number(productionForm.scrapQuantity) > 0 && !productionForm.scrapReason) {
+        setError("Fire girildiğinde fire nedeni seçilmelidir.");
+        return;
+      }
+
       await createProductionLog({
         workOrderId: selectedWorkOrder.id,
         machineId: selectedWorkOrder.machineId,
         producedQuantity: Number(productionForm.producedQuantity),
         scrapQuantity: Number(productionForm.scrapQuantity),
+        ...(Number(productionForm.scrapQuantity) > 0 ? { scrapReason: productionForm.scrapReason } : {}),
         ...(productionForm.note ? { note: productionForm.note } : {})
       });
 
@@ -202,6 +218,7 @@ export default function WorkOrders() {
         ...current,
         producedQuantity: 10,
         scrapQuantity: 0,
+        scrapReason: "",
         note: ""
       }));
       await loadData();
@@ -391,6 +408,19 @@ export default function WorkOrders() {
               Fire Adedi
               <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
             </label>
+            {Number(productionForm.scrapQuantity) > 0 ? (
+              <label>
+                Fire Nedeni
+                <select value={productionForm.scrapReason} onChange={(event) => updateProductionForm("scrapReason", event.target.value)} required>
+                  <option value="">Neden seçin</option>
+                  {SCRAP_REASONS.map((reason) => (
+                    <option key={reason.value} value={reason.value}>
+                      {reason.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label>
               Not
               <input value={productionForm.note} onChange={(event) => updateProductionForm("note", event.target.value)} placeholder="İsteğe bağlı not" />

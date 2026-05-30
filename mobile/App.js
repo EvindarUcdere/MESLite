@@ -14,6 +14,14 @@ const STATUS_LABELS = {
 };
 
 const QUICK_QUANTITIES = [1, 5, 10, 25];
+const SCRAP_REASONS = [
+  { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
+  { value: "MACHINE_SETUP", label: "Makine Ayarı" },
+  { value: "OPERATOR_ERROR", label: "Operatör Hatası" },
+  { value: "PROCESS_DEVIATION", label: "Proses Sapması" },
+  { value: "QUALITY_REJECT", label: "Kalite Reddi" },
+  { value: "OTHER", label: "Diğer" }
+];
 const fullScreenHeight = Platform.OS === "web" ? "100vh" : "100%";
 
 function getErrorMessage(error, fallback) {
@@ -56,6 +64,7 @@ export default function App() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState("");
   const [producedQuantity, setProducedQuantity] = useState("10");
   const [scrapQuantity, setScrapQuantity] = useState("0");
+  const [scrapReason, setScrapReason] = useState("");
   const [note, setNote] = useState("");
   const [selectedImage, setSelectedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,6 +204,11 @@ export default function App() {
       return;
     }
 
+    if (scrap > 0 && !scrapReason) {
+      setError("Fire girildiğinde fire nedeni seçilmelidir.");
+      return;
+    }
+
     if (produced > selectedProductionRemaining) {
       setError(`Üretilen adet kalan miktarı aşamaz. Kalan: ${selectedProductionRemaining} adet.`);
       return;
@@ -208,6 +222,7 @@ export default function App() {
         machineId: selectedProductionWorkOrder.machineId,
         producedQuantity: produced,
         scrapQuantity: scrap,
+        ...(scrap > 0 ? { scrapReason } : {}),
         ...(note ? { note } : {})
       });
 
@@ -219,6 +234,7 @@ export default function App() {
       setSuccessMessage(`${produced} üretim ve ${scrap} fire kaydı alındı${selectedImage ? ", görsel eklendi." : "."}`);
       setProducedQuantity("10");
       setScrapQuantity("0");
+      setScrapReason("");
       setNote("");
       setSelectedImage(null);
     } catch (productionError) {
@@ -510,6 +526,22 @@ export default function App() {
         </View>
         <Text style={styles.label}>Fire Adedi</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={scrapQuantity} onChangeText={setScrapQuantity} />
+        {Number(scrapQuantity) > 0 ? (
+          <>
+            <Text style={styles.label}>Fire Nedeni</Text>
+            <View style={styles.choiceList}>
+              {SCRAP_REASONS.map((reason) => (
+                <Pressable
+                  key={reason.value}
+                  style={[styles.choiceButton, scrapReason === reason.value ? styles.choiceButtonActive : null]}
+                  onPress={() => setScrapReason(reason.value)}
+                >
+                  <Text style={styles.choiceText}>{reason.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
         <Text style={styles.label}>Not</Text>
         <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="İsteğe bağlı not" />
         <Text style={styles.label}>Görsel Kanıt</Text>

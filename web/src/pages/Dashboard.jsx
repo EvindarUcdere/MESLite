@@ -34,6 +34,16 @@ const STATUS_LABELS = {
   FAILED: "Kaldı"
 };
 
+const SCRAP_REASON_LABELS = {
+  MATERIAL_DEFECT: "Malzeme Hatası",
+  MACHINE_SETUP: "Makine Ayarı",
+  OPERATOR_ERROR: "Operatör Hatası",
+  PROCESS_DEVIATION: "Proses Sapması",
+  QUALITY_REJECT: "Kalite Reddi",
+  OTHER: "Diğer",
+  UNKNOWN: "Belirtilmemiş"
+};
+
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function mapCountsToChartData(counts = {}) {
@@ -311,6 +321,7 @@ export default function Dashboard() {
                 <th>Operatör</th>
                 <th>Üretim</th>
                 <th>Fire</th>
+                <th>Fire Nedeni</th>
                 <th>Görsel</th>
                 <th>Not</th>
               </tr>
@@ -324,6 +335,7 @@ export default function Dashboard() {
                   <td>{log.operator.name}</td>
                   <td>{log.producedQuantity}</td>
                   <td>{log.scrapQuantity}</td>
+                  <td>{log.scrapQuantity > 0 ? SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason : "-"}</td>
                   <td>
                     {log.attachments?.[0] ? (
                       <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
@@ -338,7 +350,7 @@ export default function Dashboard() {
               ))}
               {!isLoading && (live?.recentProductionLogs ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan="8">Henüz üretim kaydı yok.</td>
+                  <td colSpan="9">Henüz üretim kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>

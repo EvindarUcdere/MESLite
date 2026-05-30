@@ -15,5 +15,13 @@ export const updateMachineStatusSchema = z.object({
   body: z.object({
     status: z.enum(["IDLE", "RUNNING", "STOPPED", "MAINTENANCE"]),
     reason: z.string().optional()
+  }).superRefine((body, ctx) => {
+    if (["STOPPED", "MAINTENANCE"].includes(body.status) && !body.reason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Reason is required for stopped or maintenance machine statuses",
+        path: ["reason"]
+      });
+    }
   })
 });

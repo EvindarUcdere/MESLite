@@ -9,6 +9,16 @@ const STATUS_LABELS = {
   MAINTENANCE: "Bakımda"
 };
 
+const DOWNTIME_REASONS = [
+  "Arıza",
+  "Planlı Bakım",
+  "Kalıp/Ayar Değişimi",
+  "Malzeme Bekleme",
+  "Kalite Kontrol Bekleme",
+  "Operatör Bekleme",
+  "Diğer"
+];
+
 export default function Machines() {
   const [machines, setMachines] = useState([]);
   const [productionLines, setProductionLines] = useState([]);
@@ -25,6 +35,7 @@ export default function Machines() {
     name: "",
     description: ""
   });
+  const [statusReasons, setStatusReasons] = useState({});
 
   async function loadData() {
     setError("");
@@ -105,11 +116,22 @@ export default function Machines() {
     }
   }
 
+  function updateStatusReason(machineId, reason) {
+    setStatusReasons((current) => ({ ...current, [machineId]: reason }));
+  }
+
   async function handleStatusChange(machineId, status) {
     setError("");
 
     try {
-      await updateMachineStatus(machineId, { status, reason: "Web panelinden güncellendi" });
+      const reason = ["STOPPED", "MAINTENANCE"].includes(status) ? statusReasons[machineId] : "Web panelinden güncellendi";
+
+      if (["STOPPED", "MAINTENANCE"].includes(status) && !reason) {
+        setError("Duruşta veya bakımda durumuna geçmeden önce duruş nedeni seçin.");
+        return;
+      }
+
+      await updateMachineStatus(machineId, { status, reason });
       await loadData();
     } catch (_error) {
       setError("Makine durumu güncellenemedi.");
@@ -195,6 +217,7 @@ export default function Machines() {
                 <th>Ad</th>
                 <th>Hat</th>
                 <th>Durum</th>
+                <th>Duruş Nedeni</th>
                 <th>Durum Güncelle</th>
               </tr>
             </thead>
@@ -208,6 +231,20 @@ export default function Machines() {
                     <span className={`status-pill status-${machine.status.toLowerCase()}`}>{STATUS_LABELS[machine.status] ?? machine.status}</span>
                   </td>
                   <td>
+                    <select
+                      className="compact-select"
+                      value={statusReasons[machine.id] ?? ""}
+                      onChange={(event) => updateStatusReason(machine.id, event.target.value)}
+                    >
+                      <option value="">Neden seçin</option>
+                      {DOWNTIME_REASONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
                     <select className="compact-select" value={machine.status} onChange={(event) => handleStatusChange(machine.id, event.target.value)}>
                       <option value="IDLE">Boşta</option>
                       <option value="RUNNING">Çalışıyor</option>
@@ -219,7 +256,7 @@ export default function Machines() {
               ))}
               {!isLoading && machines.length === 0 ? (
                 <tr>
-                  <td colSpan="5">Henüz makine yok.</td>
+                  <td colSpan="6">Henüz makine yok.</td>
                 </tr>
               ) : null}
             </tbody>

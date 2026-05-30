@@ -32,10 +32,32 @@ const STATUS_LABELS = {
   FAILED: "Kaldı"
 };
 
+const SCRAP_REASON_COLORS = {
+  MATERIAL_DEFECT: "#dc2626",
+  MACHINE_SETUP: "#d97706",
+  OPERATOR_ERROR: "#7c3aed",
+  PROCESS_DEVIATION: "#2563eb",
+  QUALITY_REJECT: "#be123c",
+  OTHER: "#64748b",
+  UNKNOWN: "#94a3b8"
+};
+
+const SCRAP_REASON_LABELS = {
+  MATERIAL_DEFECT: "Malzeme Hatası",
+  MACHINE_SETUP: "Makine Ayarı",
+  OPERATOR_ERROR: "Operatör Hatası",
+  PROCESS_DEVIATION: "Proses Sapması",
+  QUALITY_REJECT: "Kalite Reddi",
+  OTHER: "Diğer",
+  UNKNOWN: "Belirtilmemiş"
+};
+
+const DOWNTIME_REASON_COLORS = ["#dc2626", "#d97706", "#2563eb", "#7c3aed", "#be123c", "#64748b", "#94a3b8"];
+
 function mapCountsToChartData(counts = {}) {
   return Object.entries(counts).map(([status, value]) => ({
     status,
-    name: STATUS_LABELS[status] ?? status,
+    name: STATUS_LABELS[status] ?? SCRAP_REASON_LABELS[status] ?? status,
     value
   }));
 }
@@ -87,6 +109,12 @@ export default function Reports() {
   const qualityStatusData = mapCountsToChartData(report?.qualityStatusCounts);
   const machinePerformanceData = report?.machinePerformance ?? [];
   const productPerformanceData = report?.productPerformance ?? [];
+  const scrapReasonData = mapCountsToChartData(report?.scrapReasonCounts);
+  const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
+    status: reason,
+    name: reason === "UNKNOWN" ? "Belirtilmemiş" : reason,
+    value
+  }));
 
   return (
     <div className="page-stack">
@@ -174,6 +202,44 @@ export default function Reports() {
             </ResponsiveContainer>
           ) : (
             <p className="empty-state">Kalite verisi yok.</p>
+          )}
+        </article>
+
+        <article className="panel chart-panel">
+          <h2>Fire Nedenleri</h2>
+          {scrapReasonData.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={scrapReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                  {scrapReasonData.map((entry) => (
+                    <Cell key={entry.status} fill={SCRAP_REASON_COLORS[entry.status] ?? "#64748b"} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Fire nedeni verisi yok.</p>
+          )}
+        </article>
+
+        <article className="panel chart-panel">
+          <h2>Makine Duruş Nedenleri</h2>
+          {machineDowntimeReasonData.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={machineDowntimeReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                  {machineDowntimeReasonData.map((entry, index) => (
+                    <Cell key={entry.status} fill={DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Makine duruş nedeni verisi yok.</p>
           )}
         </article>
 

@@ -12,8 +12,20 @@ function countBy(items, key) {
   }, {});
 }
 
+function sumScrapByReason(productionLogs) {
+  return productionLogs.reduce((acc, log) => {
+    if (log.scrapQuantity <= 0) {
+      return acc;
+    }
+
+    const reason = log.scrapReason ?? "UNKNOWN";
+    acc[reason] = (acc[reason] ?? 0) + log.scrapQuantity;
+    return acc;
+  }, {});
+}
+
 export async function getOverviewReport() {
-  const [workOrders, productionLogs, qualityChecks, machines] = await Promise.all([
+  const [workOrders, productionLogs, qualityChecks, machines, machineStatusLogs] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         product: true,
@@ -43,7 +55,12 @@ export async function getOverviewReport() {
       },
       orderBy: { checkedAt: "desc" }
     }),
-    prisma.machine.findMany({ include: { productionLine: true } })
+    prisma.machine.findMany({ include: { productionLine: true } }),
+    prisma.machineStatusLog.findMany({
+      where: { status: { in: ["STOPPED", "MAINTENANCE"] } },
+      orderBy: { createdAt: "desc" },
+      take: 100
+    })
   ]);
 
   const producedQuantity = productionLogs.reduce((sum, log) => sum + log.producedQuantity, 0);
@@ -111,9 +128,11 @@ export async function getOverviewReport() {
     },
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
+    machineDowntimeReasonCounts: countBy(machineStatusLogs, "reason"),
     qualityStatusCounts: countBy(qualityChecks, "status"),
     machinePerformance,
     productPerformance,
+    scrapReasonCounts: sumScrapByReason(productionLogs),
     recentProductionLogs: productionLogs.slice(0, 10),
     recentQualityChecks: qualityChecks.slice(0, 10)
   };

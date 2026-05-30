@@ -36,6 +36,15 @@ enum QualityStatus {
   PARTIAL
 }
 
+enum ScrapReason {
+  MATERIAL_DEFECT
+  MACHINE_SETUP
+  OPERATOR_ERROR
+  PROCESS_DEVIATION
+  QUALITY_REJECT
+  OTHER
+}
+
 model User {
   id                 String             @id @default(uuid())
   name               String
@@ -131,6 +140,7 @@ model ProductionLog {
   shiftId          String?
   producedQuantity Int
   scrapQuantity    Int                       @default(0)
+  scrapReason      ScrapReason?
   startedAt        DateTime?
   endedAt          DateTime?
   note             String?

@@ -68,6 +68,7 @@ export async function createProductionLog(actor, data) {
         shiftId: data.shiftId,
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
+        scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
         endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
         note: data.note
@@ -160,6 +161,7 @@ export async function updateProductionLog(id, data) {
         shiftId: data.shiftId,
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
+        scrapReason: data.scrapQuantity === 0 ? null : data.scrapReason,
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
         endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
         note: data.note
