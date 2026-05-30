@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth.api.js";
 import { useAuthStore } from "../store/authStore.js";
 
+function getLoginErrorMessage(error) {
+  if (error?.message === "Network Error" || error?.code === "ERR_NETWORK") {
+    return "Backend bağlantısı kurulamadı. API server açık mı kontrol edin.";
+  }
+
+  return "E-posta veya şifre hatalı.";
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
@@ -20,8 +28,8 @@ export default function Login() {
       const session = await login({ email, password });
       setSession(session);
       navigate("/");
-    } catch (_error) {
-      setError("E-posta veya şifre hatalı.");
+    } catch (loginError) {
+      setError(getLoginErrorMessage(loginError));
     } finally {
       setIsSubmitting(false);
     }

@@ -20,6 +20,10 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
+function isUnauthorizedError(error) {
+  return error?.response?.status === 401;
+}
+
 function getConnectionMessage(error) {
   if (error?.message === "Network Error" || error?.code === "ERR_NETWORK") {
     return "Backend bağlantısı kurulamadı. API server açık mı kontrol edin.";
@@ -71,6 +75,15 @@ export default function App() {
   const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
 
+  async function clearExpiredSession() {
+    await logout();
+    setUser(null);
+    setWorkOrders([]);
+    setSelectedWorkOrderId("");
+    setSuccessMessage("");
+    setError("Oturum süresi doldu. Lütfen tekrar giriş yapın.");
+  }
+
   async function loadWorkOrders() {
     setError("");
     setSuccessMessage("");
@@ -79,6 +92,11 @@ export default function App() {
       const data = await getWorkOrders();
       setWorkOrders(data);
     } catch (loadError) {
+      if (isUnauthorizedError(loadError)) {
+        await clearExpiredSession();
+        return;
+      }
+
       setError(getConnectionMessage(loadError));
     }
   }
@@ -144,6 +162,11 @@ export default function App() {
       await action();
       await loadWorkOrders();
     } catch (actionError) {
+      if (isUnauthorizedError(actionError)) {
+        await clearExpiredSession();
+        return;
+      }
+
       setError(getErrorMessage(actionError, fallbackMessage));
     } finally {
       setIsSubmitting(false);
@@ -199,6 +222,11 @@ export default function App() {
       setNote("");
       setSelectedImage(null);
     } catch (productionError) {
+      if (isUnauthorizedError(productionError)) {
+        await clearExpiredSession();
+        return;
+      }
+
       setError(getErrorMessage(productionError, "Üretim girişi kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
