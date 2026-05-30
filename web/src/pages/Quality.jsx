@@ -9,6 +9,26 @@ const QUALITY_LABELS = {
   FAILED: "Kaldı"
 };
 
+const SCRAP_REASON_LABELS = {
+  MATERIAL_DEFECT: "Malzeme Hatası",
+  MACHINE_SETUP: "Makine Ayarı",
+  OPERATOR_ERROR: "Operatör Hatası",
+  PROCESS_DEVIATION: "Proses Sapması",
+  QUALITY_REJECT: "Kalite Reddi",
+  OTHER: "Diğer",
+  UNKNOWN: "Belirtilmemiş"
+};
+
+const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
+
+function getAttachmentUrl(attachment) {
+  if (!attachment?.fileUrl) {
+    return "";
+  }
+
+  return `${API_ORIGIN}${attachment.fileUrl}`;
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -45,6 +65,7 @@ export default function Quality() {
     [workOrders]
   );
   const selectedWorkOrder = checkCandidates.find((workOrder) => workOrder.id === form.workOrderId);
+  const selectedProductionLogs = selectedWorkOrder?.productionLogs ?? [];
 
   async function loadData() {
     setError("");
@@ -187,6 +208,7 @@ export default function Quality() {
           </button>
         </form>
         {selectedWorkOrder ? (
+          <>
           <div className="quality-context">
             <div>
               <span>İş Emri</span>
@@ -205,6 +227,58 @@ export default function Quality() {
               <strong>{selectedWorkOrder.product.code}</strong>
             </div>
           </div>
+          <div className="quality-history">
+            <div className="section-title-row">
+              <div>
+                <h3>Üretim Geçmişi</h3>
+                <p className="muted-text">Kalite kararı için son saha kayıtları, fire nedenleri, notlar ve görseller.</p>
+              </div>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zaman</th>
+                    <th>Makine</th>
+                    <th>Operatör</th>
+                    <th>Üretim</th>
+                    <th>Fire</th>
+                    <th>Fire Nedeni</th>
+                    <th>Görsel</th>
+                    <th>Not</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedProductionLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{formatDate(log.createdAt)}</td>
+                      <td>{log.machine?.code ?? "-"}</td>
+                      <td>{log.operator?.name ?? "-"}</td>
+                      <td>{log.producedQuantity}</td>
+                      <td>{log.scrapQuantity}</td>
+                      <td>{log.scrapQuantity > 0 ? SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason : "-"}</td>
+                      <td>
+                        {log.attachments?.[0] ? (
+                          <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
+                            <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>{log.note ? <span className="note-chip">{log.note}</span> : "-"}</td>
+                    </tr>
+                  ))}
+                  {selectedProductionLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="8">Bu iş emri için üretim kaydı bulunamadı.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          </>
         ) : null}
         {!isLoading && checkCandidates.length === 0 ? <p className="empty-state">Kalite girişi için önce üretim kaydı girin.</p> : null}
       </section>

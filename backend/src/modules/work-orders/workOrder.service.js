@@ -20,6 +20,22 @@ const workOrderInclude = {
       email: true,
       role: true
     }
+  },
+  productionLogs: {
+    include: {
+      operator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      },
+      machine: true,
+      attachments: true
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5
   }
 };
 
@@ -35,7 +51,6 @@ export function findWorkOrderById(id) {
     where: { id },
     include: {
       ...workOrderInclude,
-      productionLogs: true,
       qualityChecks: true
     }
   });
