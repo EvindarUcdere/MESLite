@@ -222,10 +222,29 @@ export default function Dashboard() {
                 <span>{formatTime(alert.createdAt)}</span>
               </div>
               <p>{alert.message}</p>
+              <div className="alert-context-grid">
+                <div>
+                  <span>İş Emri</span>
+                  <strong>{alert.workOrder.orderNo}</strong>
+                </div>
+                <div>
+                  <span>Ürün</span>
+                  <strong>{alert.workOrder.product.name}</strong>
+                </div>
+                <div>
+                  <span>Makine</span>
+                  <strong>
+                    {alert.productionLog.machine.code} - {alert.productionLog.machine.name}
+                  </strong>
+                </div>
+                <div>
+                  <span>Operatör</span>
+                  <strong>{alert.productionLog.operator.name}</strong>
+                </div>
+              </div>
               <div className="operator-note-meta">
                 <span>{ALERT_SEVERITY_LABELS[alert.severity] ?? alert.severity}</span>
                 <span>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</span>
-                <span>{alert.productionLog.machine.code}</span>
                 <span>{alert.createdBy.name}</span>
               </div>
               {alert.productionLog.attachments?.[0] ? (
