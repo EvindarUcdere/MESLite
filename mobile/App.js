@@ -13,6 +13,22 @@ const STATUS_LABELS = {
   CANCELLED: "İptal"
 };
 
+const OPERATION_STATUS_LABELS = {
+  WAITING: "Bekliyor",
+  READY: "Hazır",
+  IN_PROGRESS: "Üretimde",
+  PAUSED: "Durakladı",
+  COMPLETED: "Tamamlandı"
+};
+
+const OPERATION_STAGE_LABELS = {
+  WAITING: "Sırada",
+  READY: "Şu Anki Adım",
+  IN_PROGRESS: "Şu Anki Adım",
+  PAUSED: "Durakladı",
+  COMPLETED: "Bitti"
+};
+
 const QUICK_QUANTITIES = [1, 5, 10, 25];
 const SCRAP_REASONS = [
   { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
@@ -56,6 +72,24 @@ function getMachineName(workOrder) {
   return workOrder.machine?.name ?? "Makine atanmamış";
 }
 
+function operatorHasOperation(workOrder, userId) {
+  return Boolean(userId && workOrder.operations?.some((operation) => operation.assignedOperatorId === userId));
+}
+
+function getOperationProgress(operations = []) {
+  const completed = operations.filter((operation) => operation.status === "COMPLETED").length;
+  const activeOperation =
+    operations.find((operation) => ["IN_PROGRESS", "READY", "PAUSED"].includes(operation.status)) ??
+    operations.find((operation) => operation.status === "WAITING");
+
+  return {
+    activeOperation,
+    completed,
+    remaining: Math.max(operations.length - completed, 0),
+    total: operations.length
+  };
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -75,10 +109,12 @@ export default function App() {
   const [successMessage, setSuccessMessage] = useState("");
 
   const assignedWorkOrders = useMemo(
-    () => workOrders.filter((workOrder) => !user?.id || workOrder.assignedOperatorId === user.id),
+    () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
     [user, workOrders]
   );
   const selectedWorkOrder = assignedWorkOrders.find((workOrder) => workOrder.id === selectedWorkOrderId);
+  const selectedOperationProgress = selectedWorkOrder ? getOperationProgress(selectedWorkOrder.operations) : null;
+  const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
   const productionCandidates = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId);
   const selectedProductionWorkOrder = productionCandidates.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
@@ -355,7 +391,7 @@ export default function App() {
       <View style={styles.mobileSummary}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{assignedWorkOrders.length}</Text>
-          <Text style={styles.detailLabel}>Atanan</Text>
+          <Text style={styles.detailLabel}>İş Emri</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{runningWorkOrderCount}</Text>
@@ -376,7 +412,7 @@ export default function App() {
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Atanmış İş Emirleri</Text>
+        <Text style={styles.sectionTitle}>Operasyonum Olan İş Emirleri</Text>
         {assignedWorkOrders.map((workOrder) => (
           <Pressable
             key={workOrder.id}
@@ -393,12 +429,12 @@ export default function App() {
               <Text style={styles.statusBadge}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</Text>
             </View>
             <View style={styles.orderCardFooter}>
-              <Text style={styles.detailValue}>{getRemainingQuantity(workOrder)} adet kaldı</Text>
-              <Text style={styles.muted}>{getMachineName(workOrder)}</Text>
+              <Text style={styles.detailValue}>{workOrder.operations?.filter((operation) => operation.assignedOperatorId === user.id).length ?? 0} adım bende</Text>
+              <Text style={styles.muted}>{getOperationProgress(workOrder.operations).activeOperation?.operationName ?? "Operasyon yok"}</Text>
             </View>
           </Pressable>
         ))}
-        {!assignedWorkOrders.length ? <Text style={styles.muted}>Size atanmış iş emri yok.</Text> : null}
+        {!assignedWorkOrders.length ? <Text style={styles.muted}>Size atanmış operasyonu olan iş emri yok.</Text> : null}
       </View>
 
       {selectedWorkOrder ? (
@@ -457,6 +493,62 @@ export default function App() {
               <View style={[styles.progressFill, { width: `${selectedProgressPercent}%` }]} />
             </View>
           </View>
+
+          {selectedWorkOrder.operations?.length ? (
+            <View style={styles.operationSection}>
+              <Text style={styles.sectionTitle}>Operasyon Akışı</Text>
+              <View style={styles.operationSummary}>
+                <View style={styles.detailBox}>
+                  <Text style={styles.detailLabel}>Ürün Şu Anda</Text>
+                  <Text style={styles.detailValue}>{selectedOperationProgress?.activeOperation?.operationName ?? "-"}</Text>
+                </View>
+                <View style={styles.detailBox}>
+                  <Text style={styles.detailLabel}>Biten</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedOperationProgress?.completed}/{selectedOperationProgress?.total}
+                  </Text>
+                </View>
+                <View style={styles.detailBox}>
+                  <Text style={styles.detailLabel}>Bendeki Adım</Text>
+                  <Text style={styles.detailValue}>{mySelectedOperations.length}</Text>
+                </View>
+              </View>
+              {selectedWorkOrder.operations.map((operation, index) => {
+                const isMine = operation.assignedOperatorId === user.id;
+                const previousOperation = selectedWorkOrder.operations[index - 1];
+                const nextOperation = selectedWorkOrder.operations[index + 1];
+
+                return (
+                  <View key={operation.id} style={[styles.operationCard, styles[`operation${operation.status}`], isMine ? styles.myOperationCard : null]}>
+                    <View style={styles.operationHeader}>
+                      <Text style={styles.operationSequence}>{operation.sequenceNo}</Text>
+                      <View style={styles.operationHeaderText}>
+                        <Text style={styles.operationName}>{operation.operationName}</Text>
+                        <Text style={styles.muted}>{operation.machine?.code ?? "Makine yok"}</Text>
+                      </View>
+                      <Text style={styles.operationStage}>{OPERATION_STAGE_LABELS[operation.status] ?? operation.status}</Text>
+                    </View>
+                    <Text style={styles.detailValue}>{OPERATION_STATUS_LABELS[operation.status] ?? operation.status}</Text>
+                    <Text style={styles.muted}>Operatör: {operation.assignedOperator?.name ?? "-"}</Text>
+                    <Text style={styles.muted}>
+                      Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
+                    </Text>
+                    {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
+                    {(operation.messages ?? []).slice(0, 2).map((message) => (
+                      <View key={message.id} style={styles.operationMessage}>
+                        <Text style={styles.detailLabel}>{message.severity}</Text>
+                        <Text style={styles.muted}>
+                          {message.message} - {message.sender.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <Text style={styles.muted}>Bu iş emri için operasyon akışı tanımlı değil.</Text>
+          )}
 
           <Text style={styles.sectionTitle}>İş Emri Aksiyonları</Text>
           <View style={styles.actionRow}>
@@ -958,5 +1050,90 @@ const styles = StyleSheet.create({
   choiceText: {
     color: "#17202a",
     fontWeight: "700"
+  },
+  operationSection: {
+    gap: 10
+  },
+  operationSummary: {
+    flexDirection: "row",
+    gap: 8
+  },
+  operationCard: {
+    gap: 7,
+    padding: 12,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 2
+  },
+  myOperationCard: {
+    borderColor: "#256f6c"
+  },
+  operationWAITING: {
+    opacity: 0.72,
+    backgroundColor: "#f8fafc"
+  },
+  operationREADY: {
+    backgroundColor: "#ecfdf8",
+    borderColor: "#256f6c"
+  },
+  operationIN_PROGRESS: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#2563eb"
+  },
+  operationPAUSED: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#d97706"
+  },
+  operationCOMPLETED: {
+    backgroundColor: "#f0fdf4",
+    borderColor: "#16a34a"
+  },
+  operationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10
+  },
+  operationSequence: {
+    minWidth: 28,
+    height: 28,
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: "#ffffff",
+    backgroundColor: "#256f6c",
+    borderRadius: 999,
+    fontWeight: "900",
+    lineHeight: 28
+  },
+  operationHeaderText: {
+    flex: 1,
+    gap: 2
+  },
+  operationName: {
+    color: "#17202a",
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  operationStage: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    color: "#ffffff",
+    backgroundColor: "#256f6c",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden"
+  },
+  myOperationText: {
+    color: "#256f6c",
+    fontWeight: "900"
+  },
+  operationMessage: {
+    gap: 2,
+    padding: 8,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 6,
+    borderWidth: 1
   }
 });
