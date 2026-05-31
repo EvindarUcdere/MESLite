@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
-import { completeWorkOrderOperation, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
+import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -30,6 +30,13 @@ const OPERATION_STAGE_LABELS = {
   IN_PROGRESS: "Şu Anki Adım",
   PAUSED: "Durakladı",
   COMPLETED: "Bitti"
+};
+
+const MESSAGE_SEVERITY_LABELS = {
+  INFO: "Bilgi",
+  WARNING: "Uyarı",
+  QUALITY_ALERT: "Kalite",
+  STOPPAGE: "Duruş"
 };
 
 const SCRAP_REASONS = [
@@ -119,6 +126,7 @@ export default function WorkOrders() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [operationMessages, setOperationMessages] = useState({});
   const [form, setForm] = useState({
     orderNo: "",
     productId: "",
@@ -236,6 +244,45 @@ export default function WorkOrders() {
     } catch (error) {
       setError(getApiErrorMessage(error, fallbackMessage));
     }
+  }
+
+  function updateOperationMessage(operationId, field, value) {
+    setOperationMessages((current) => ({
+      ...current,
+      [operationId]: {
+        message: "",
+        severity: "INFO",
+        ...(current[operationId] ?? {}),
+        [field]: value
+      }
+    }));
+  }
+
+  async function handleOperationMessage(operationId) {
+    const draft = operationMessages[operationId] ?? { message: "", severity: "INFO" };
+    const message = draft.message.trim();
+
+    if (!message) {
+      setError("Operasyon mesajı boş olamaz.");
+      return;
+    }
+
+    await runAction(
+      () =>
+        createOperationMessage(operationId, {
+          message,
+          severity: draft.severity
+        }),
+      "Operasyon mesajı gönderilemedi."
+    );
+
+    setOperationMessages((current) => ({
+      ...current,
+      [operationId]: {
+        ...draft,
+        message: ""
+      }
+    }));
   }
 
   async function handleProductionEntry(event) {
@@ -498,6 +545,37 @@ export default function WorkOrders() {
                                       >
                                         <Square size={14} />
                                       </button>
+                                    </div>
+                                    <div className="operation-message-box">
+                                      <strong>Operasyon Mesajları</strong>
+                                      {(operation.messages ?? []).slice(0, 3).map((message) => (
+                                        <div key={message.id} className={`operation-message-row message-${message.severity.toLowerCase().replace("_", "-")}`}>
+                                          <span>{MESSAGE_SEVERITY_LABELS[message.severity] ?? message.severity}</span>
+                                          <p>
+                                            {message.message} - {message.sender.name}
+                                          </p>
+                                        </div>
+                                      ))}
+                                      {(operation.messages ?? []).length === 0 ? <p className="operation-message-empty">Henüz mesaj yok.</p> : null}
+                                      <div className="operation-message-form">
+                                        <select
+                                          value={operationMessages[operation.id]?.severity ?? "INFO"}
+                                          onChange={(event) => updateOperationMessage(operation.id, "severity", event.target.value)}
+                                        >
+                                          <option value="INFO">Bilgi</option>
+                                          <option value="WARNING">Uyarı</option>
+                                          <option value="QUALITY_ALERT">Kalite</option>
+                                          <option value="STOPPAGE">Duruş</option>
+                                        </select>
+                                        <input
+                                          value={operationMessages[operation.id]?.message ?? ""}
+                                          onChange={(event) => updateOperationMessage(operation.id, "message", event.target.value)}
+                                          placeholder="Bu adım için mesaj bırak"
+                                        />
+                                        <button type="button" onClick={() => handleOperationMessage(operation.id)}>
+                                          Gönder
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>

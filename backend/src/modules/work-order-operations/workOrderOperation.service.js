@@ -18,6 +18,20 @@ const operationInclude = {
       email: true,
       role: true
     }
+  },
+  messages: {
+    include: {
+      sender: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5
   }
 };
 
@@ -66,7 +80,21 @@ async function getWorkOrderForEmit(workOrderId, tx = prisma) {
               role: true
             }
           },
-          routeOperation: true
+          routeOperation: true,
+          messages: {
+            include: {
+              sender: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true
+                }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5
+          }
         },
         orderBy: { sequenceNo: "asc" }
       }
@@ -234,4 +262,51 @@ export async function completeOperation(actor, id) {
   }
 
   return result.operation;
+}
+
+export async function createOperationMessage(actor, id, data) {
+  const operation = await getOperationOrThrow(id);
+
+  if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
+    throw new ApiError(403, "Operator can only message assigned operations");
+  }
+
+  const message = await prisma.operationMessage.create({
+    data: {
+      workOrderOperationId: id,
+      senderId: actor.id,
+      message: data.message,
+      severity: data.severity ?? "INFO"
+    },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      },
+      workOrderOperation: {
+        include: {
+          workOrder: {
+            include: {
+              product: true,
+              route: true
+            }
+          },
+          machine: true
+        }
+      }
+    }
+  });
+
+  const updatedOperation = await getOperationOrThrow(id);
+  const workOrder = await getWorkOrderForEmit(operation.workOrderId);
+
+  emitEvent("operationMessage:created", message);
+  emitEvent("workOrderOperation:updated", updatedOperation);
+  emitEvent("workOrder:updated", workOrder);
+
+  return message;
 }

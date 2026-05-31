@@ -141,6 +141,7 @@ export default function Dashboard() {
     "machine:statusChanged": () => loadDashboard(),
     "workOrder:updated": () => loadDashboard(),
     "workOrderOperation:updated": () => loadDashboard(),
+    "operationMessage:created": () => loadDashboard(),
     "production:logged": () => loadDashboard(),
     "productionAlert:created": () => loadDashboard(),
     "productionAlert:updated": () => loadDashboard(),

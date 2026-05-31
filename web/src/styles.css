@@ -1119,6 +1119,89 @@ th {
   opacity: 0.42;
 }
 
+.operation-message-box {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #dbe3ea;
+}
+
+.operation-message-box > strong {
+  color: #33424d;
+  font-size: 12px;
+}
+
+.operation-message-row {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+  border: 1px solid #dbe3ea;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.operation-message-row span {
+  width: fit-content;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #344054;
+  background: #edf1f5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.operation-message-row p,
+.operation-message-empty {
+  margin: 0;
+  color: #52606d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.message-warning span {
+  color: #78350f;
+  background: #fef0c7;
+}
+
+.message-quality-alert span {
+  color: #175cd3;
+  background: #d1e9ff;
+}
+
+.message-stoppage span {
+  color: #912018;
+  background: #fee4e2;
+}
+
+.operation-message-form {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 76px;
+  gap: 6px;
+}
+
+.operation-message-form select,
+.operation-message-form input,
+.operation-message-form button {
+  min-height: 34px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.operation-message-form select,
+.operation-message-form input {
+  padding: 0 8px;
+}
+
+.operation-message-form button {
+  color: #ffffff;
+  background: #256f6c;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .operation-waiting {
   opacity: 0.72;
 }
@@ -1262,6 +1345,10 @@ th {
   }
 
   .operation-flow-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-message-form {
     grid-template-columns: 1fr;
   }
 

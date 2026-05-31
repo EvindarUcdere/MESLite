@@ -233,6 +233,18 @@ Operasyon durum API'leri ve web uzerinden renkli operasyon takibi eklendi.
 
 Bir sonraki adim, mobil operator ekranini bu operasyon API'lerine baglamak ve operasyon bazli uretim/fire/not/gorsel kaydina gecmektir.
 
+### Tamamlanan - Adim 4
+
+Operasyon bazli mesajlasma eklendi.
+
+- `operation_messages` tablosu operasyon uzerindeki iletisim gecmisini tutar.
+- `POST /api/work-order-operations/:id/messages` ile operasyon mesajı eklenir.
+- Mesajlar `INFO`, `WARNING`, `QUALITY_ALERT`, `STOPPAGE` seviyelerine ayrilir.
+- Is emri timeline'inda operasyon mesajlari ve mesaj gonderme alani gorunur.
+- Yeni mesaj geldiginde `operationMessage:created` ve `workOrder:updated` eventleri yayinlanir.
+
+Bu adim onceki/sonraki operator, uretim yoneticisi ve kalite arasinda operasyon baglamli iletisimin temelini kurar.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

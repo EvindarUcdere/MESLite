@@ -58,6 +58,20 @@ const workOrderInclude = {
           email: true,
           role: true
         }
+      },
+      messages: {
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5
       }
     },
     orderBy: { sequenceNo: "asc" }

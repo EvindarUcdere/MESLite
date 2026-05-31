@@ -38,6 +38,13 @@ enum WorkOrderOperationStatus {
   COMPLETED
 }
 
+enum OperationMessageSeverity {
+  INFO
+  WARNING
+  QUALITY_ALERT
+  STOPPAGE
+}
+
 enum QualityStatus {
   PASSED
   FAILED
@@ -85,6 +92,7 @@ model User {
   createdWorkOrders  WorkOrder[]            @relation("CreatedWorkOrders")
   assignedWorkOrders WorkOrder[]            @relation("AssignedWorkOrders")
   assignedOperations WorkOrderOperation[]   @relation("AssignedWorkOrderOperations")
+  operationMessages  OperationMessage[]
   productionLogs     ProductionLog[]
   createdAlerts      ProductionAlert[]      @relation("CreatedAlerts")
   assignedAlerts     ProductionAlert[]      @relation("AssignedAlerts")
@@ -225,9 +233,23 @@ model WorkOrderOperation {
   routeOperation     RouteOperation           @relation(fields: [routeOperationId], references: [id])
   machine            Machine?                 @relation(fields: [machineId], references: [id])
   assignedOperator   User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
+  messages           OperationMessage[]
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
+}
+
+model OperationMessage {
+  id                   String                   @id @default(uuid())
+  workOrderOperationId String
+  senderId             String
+  message              String
+  severity             OperationMessageSeverity @default(INFO)
+  createdAt            DateTime                 @default(now())
+  workOrderOperation   WorkOrderOperation       @relation(fields: [workOrderOperationId], references: [id], onDelete: Cascade)
+  sender               User                     @relation(fields: [senderId], references: [id])
+
+  @@map("operation_messages")
 }
 
 model ProductionLog {

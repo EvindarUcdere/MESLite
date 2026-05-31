@@ -24,3 +24,8 @@ export async function complete(req, res) {
   const operation = await workOrderOperationService.completeOperation(req.user, req.params.id);
   res.json({ data: operation });
 }
+
+export async function createMessage(req, res) {
+  const message = await workOrderOperationService.createOperationMessage(req.user, req.params.id, req.validated.body);
+  res.status(201).json({ data: message });
+}
