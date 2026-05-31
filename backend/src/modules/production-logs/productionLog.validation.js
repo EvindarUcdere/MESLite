@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createProductionLogSchema = z.object({
   body: z.object({
     workOrderId: z.string().uuid(),
+    workOrderOperationId: z.string().uuid().optional(),
     machineId: z.string().uuid(),
     shiftId: z.string().uuid().optional(),
     producedQuantity: z.number().int().min(0),

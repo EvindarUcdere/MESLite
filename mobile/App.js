@@ -96,6 +96,7 @@ export default function App() {
   const [password, setPassword] = useState("Admin123!");
   const [workOrders, setWorkOrders] = useState([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState("");
+  const [selectedOperationId, setSelectedOperationId] = useState("");
   const [producedQuantity, setProducedQuantity] = useState("10");
   const [scrapQuantity, setScrapQuantity] = useState("0");
   const [scrapReason, setScrapReason] = useState("");
@@ -115,8 +116,13 @@ export default function App() {
   const selectedWorkOrder = assignedWorkOrders.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedOperationProgress = selectedWorkOrder ? getOperationProgress(selectedWorkOrder.operations) : null;
   const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
-  const productionCandidates = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId);
-  const selectedProductionWorkOrder = productionCandidates.find((workOrder) => workOrder.id === selectedWorkOrderId);
+  const productionCandidates = assignedWorkOrders.flatMap((workOrder) =>
+    (workOrder.operations ?? [])
+      .filter((operation) => operation.assignedOperatorId === user?.id && ["READY", "IN_PROGRESS"].includes(operation.status) && operation.machineId)
+      .map((operation) => ({ ...operation, workOrder }))
+  );
+  const selectedProductionOperation = productionCandidates.find((operation) => operation.id === selectedOperationId);
+  const selectedProductionWorkOrder = selectedProductionOperation?.workOrder;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
   const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
@@ -127,6 +133,7 @@ export default function App() {
     setUser(null);
     setWorkOrders([]);
     setSelectedWorkOrderId("");
+    setSelectedOperationId("");
     setSuccessMessage("");
     setError("Oturum süresi doldu. Lütfen tekrar giriş yapın.");
   }
@@ -198,6 +205,7 @@ export default function App() {
     setUser(null);
     setWorkOrders([]);
     setSelectedWorkOrderId("");
+    setSelectedOperationId("");
   }
 
   async function runAction(action, fallbackMessage) {
@@ -227,8 +235,8 @@ export default function App() {
     setError("");
     setSuccessMessage("");
 
-    if (!selectedProductionWorkOrder?.machineId) {
-      setError("Üretim girişi için makinesi atanmış ve üretimde olan iş emri seçin.");
+    if (!selectedProductionOperation?.machineId || !selectedProductionWorkOrder) {
+      setError("Üretim girişi için size atanmış hazır veya üretimde olan operasyon seçin.");
       return;
     }
 
@@ -262,7 +270,8 @@ export default function App() {
     try {
       const productionLog = await createProductionLog({
         workOrderId: selectedProductionWorkOrder.id,
-        machineId: selectedProductionWorkOrder.machineId,
+        workOrderOperationId: selectedProductionOperation.id,
+        machineId: selectedProductionOperation.machineId,
         producedQuantity: produced,
         scrapQuantity: scrap,
         ...(scrap > 0 ? { scrapReason } : {}),
@@ -296,7 +305,7 @@ export default function App() {
   }
 
   function fillQuickQuantity(quantity) {
-    if (!selectedProductionWorkOrder) {
+    if (!selectedProductionOperation) {
       return;
     }
 
@@ -590,25 +599,34 @@ export default function App() {
         <Text style={styles.sectionTitle}>Üretim Girişi</Text>
         <Text style={styles.label}>İş Emri</Text>
         <View style={styles.choiceList}>
-          {productionCandidates.map((workOrder) => (
+          {productionCandidates.map((operation) => (
             <Pressable
-              key={workOrder.id}
-              style={[styles.choiceButton, selectedWorkOrderId === workOrder.id ? styles.choiceButtonActive : null]}
-              onPress={() => setSelectedWorkOrderId(workOrder.id)}
+              key={operation.id}
+              style={[styles.operationChoiceButton, selectedOperationId === operation.id ? styles.choiceButtonActive : null]}
+              onPress={() => {
+                setSelectedOperationId(operation.id);
+                setSelectedWorkOrderId(operation.workOrder.id);
+              }}
             >
-              <Text style={styles.choiceText}>{workOrder.orderNo}</Text>
+              <Text style={styles.choiceText}>{operation.workOrder.orderNo}</Text>
+              <Text style={styles.muted}>
+                {operation.sequenceNo}. {operation.operationName} - {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
+              </Text>
             </Pressable>
           ))}
         </View>
-        {!productionCandidates.length ? <Text style={styles.muted}>Üretim girişi için üretimde olan iş emri yok.</Text> : null}
-        {selectedProductionWorkOrder ? (
+        {!productionCandidates.length ? <Text style={styles.muted}>Üretim girişi için size atanmış hazır veya üretimde operasyon yok.</Text> : null}
+        {selectedProductionOperation && selectedProductionWorkOrder ? (
           <View style={styles.productionNotice}>
-            <Text style={styles.detailLabel}>Seçili iş emri</Text>
+            <Text style={styles.detailLabel}>Seçili operasyon</Text>
             <Text style={styles.detailValue}>
-              {selectedProductionWorkOrder.orderNo} - {selectedProductionWorkOrder.product.code}
+              {selectedProductionWorkOrder.orderNo} - {selectedProductionOperation.operationName}
             </Text>
             <Text style={styles.muted}>
-              {selectedProductionRemaining} adet kaldı, makine: {getMachineName(selectedProductionWorkOrder)}
+              {selectedProductionRemaining} adet kaldı, makine: {selectedProductionOperation.machine?.name ?? selectedProductionOperation.machine?.code}
+            </Text>
+            <Text style={styles.muted}>
+              Operasyon üretim/fire: {selectedProductionOperation.producedQuantity}/{selectedProductionOperation.scrapQuantity}
             </Text>
           </View>
         ) : null}
@@ -618,9 +636,9 @@ export default function App() {
           {QUICK_QUANTITIES.map((quantity) => (
             <Pressable
               key={quantity}
-              style={[styles.quickButton, !selectedProductionWorkOrder ? styles.disabledButton : null]}
+              style={[styles.quickButton, !selectedProductionOperation ? styles.disabledButton : null]}
               onPress={() => fillQuickQuantity(quantity)}
-              disabled={!selectedProductionWorkOrder}
+              disabled={!selectedProductionOperation}
             >
               <Text style={styles.quickButtonText}>{quantity}</Text>
             </Pressable>
@@ -649,7 +667,7 @@ export default function App() {
         <Pressable
           style={[styles.alertToggle, isCriticalAlert ? styles.alertToggleActive : null]}
           onPress={() => setIsCriticalAlert((current) => !current)}
-          disabled={!selectedProductionWorkOrder || isSubmitting}
+          disabled={!selectedProductionOperation || isSubmitting}
         >
           <Text style={styles.alertToggleText}>{isCriticalAlert ? "Kritik uyarı olarak işaretlendi" : "Kritik uyarı olarak işaretle"}</Text>
         </Pressable>
@@ -671,10 +689,10 @@ export default function App() {
         ) : null}
         <Text style={styles.label}>Görsel Kanıt</Text>
         <View style={styles.imagePickerRow}>
-          <Pressable style={styles.secondaryButton} onPress={takePhoto} disabled={!selectedProductionWorkOrder || isSubmitting}>
+          <Pressable style={styles.secondaryButton} onPress={takePhoto} disabled={!selectedProductionOperation || isSubmitting}>
             <Text style={styles.secondaryButtonText}>Kamera</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={pickImageFromGallery} disabled={!selectedProductionWorkOrder || isSubmitting}>
+          <Pressable style={styles.secondaryButton} onPress={pickImageFromGallery} disabled={!selectedProductionOperation || isSubmitting}>
             <Text style={styles.secondaryButtonText}>{selectedImage ? "Galeriden Değiştir" : "Galeriden Seç"}</Text>
           </Pressable>
           {selectedImage ? (
@@ -686,9 +704,9 @@ export default function App() {
         {selectedImage ? <Text style={styles.muted}>{selectedImage.fileName ?? "Görsel seçildi"}</Text> : null}
         {selectedImage?.uri ? <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} resizeMode="cover" /> : null}
         <Pressable
-          style={[styles.primaryButton, !selectedProductionWorkOrder ? styles.disabledButton : null]}
+          style={[styles.primaryButton, !selectedProductionOperation ? styles.disabledButton : null]}
           onPress={handleProductionEntry}
-          disabled={!selectedProductionWorkOrder || isSubmitting}
+          disabled={!selectedProductionOperation || isSubmitting}
         >
           <Text style={styles.primaryButtonText}>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</Text>
         </Pressable>
@@ -1043,6 +1061,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: "#edf1f5",
     borderRadius: 999
+  },
+  operationChoiceButton: {
+    minWidth: 180,
+    gap: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "#edf1f5",
+    borderRadius: 8
   },
   choiceButtonActive: {
     backgroundColor: "#d9f2e8"

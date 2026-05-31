@@ -516,6 +516,9 @@ export default function WorkOrders() {
                                       {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
                                       {operation.machine ? ` • ${operation.machine.code}` : ""}
                                     </small>
+                                    <small>
+                                      Üretim / Fire: {operation.producedQuantity} / {operation.scrapQuantity}
+                                    </small>
                                     <small>Operatör: {operation.assignedOperator?.name ?? "-"}</small>
                                     <small>
                                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}

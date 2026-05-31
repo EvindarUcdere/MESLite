@@ -5,6 +5,7 @@ import { createProductionAlert } from "../production-alerts/productionAlert.serv
 
 const includeRelations = {
   workOrder: { include: { product: true } },
+  workOrderOperation: true,
   operator: { select: { id: true, name: true, email: true, role: true } },
   machine: true,
   shift: true,
@@ -31,21 +32,50 @@ export async function createProductionLog(actor, data) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const workOrder = await tx.workOrder.findUnique({ where: { id: data.workOrderId } });
+    const operation = data.workOrderOperationId
+      ? await tx.workOrderOperation.findUnique({
+          where: { id: data.workOrderOperationId },
+          include: { workOrder: true }
+        })
+      : null;
+
+    if (data.workOrderOperationId && !operation) {
+      throw new ApiError(404, "Work order operation not found");
+    }
+
+    if (operation && operation.workOrderId !== data.workOrderId) {
+      throw new ApiError(400, "Production log operation must belong to the selected work order");
+    }
+
+    const workOrder = operation?.workOrder ?? (await tx.workOrder.findUnique({ where: { id: data.workOrderId } }));
 
     if (!workOrder) {
       throw new ApiError(404, "Work order not found");
     }
 
-    if (workOrder.status !== "IN_PROGRESS") {
+    const allowedWorkOrderStatuses = operation ? ["PLANNED", "IN_PROGRESS", "PAUSED"] : ["IN_PROGRESS"];
+
+    if (!allowedWorkOrderStatuses.includes(workOrder.status)) {
       throw new ApiError(400, "Production can only be logged for in-progress work orders");
     }
 
-    if (!workOrder.machineId || workOrder.machineId !== data.machineId) {
+    if (operation) {
+      if (!["READY", "IN_PROGRESS"].includes(operation.status)) {
+        throw new ApiError(400, "Production can only be logged for ready or in-progress operations");
+      }
+
+      if (!operation.machineId || operation.machineId !== data.machineId) {
+        throw new ApiError(400, "Production log machine must match the operation machine");
+      }
+
+      if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
+        throw new ApiError(403, "Operator can only log production for assigned operations");
+      }
+    } else if (!workOrder.machineId || workOrder.machineId !== data.machineId) {
       throw new ApiError(400, "Production log machine must match the work order machine");
     }
 
-    if (actor.role === "OPERATOR" && workOrder.assignedOperatorId !== actor.id) {
+    if (!operation && actor.role === "OPERATOR" && workOrder.assignedOperatorId !== actor.id) {
       throw new ApiError(403, "Operator can only log production for assigned work orders");
     }
 
@@ -55,7 +85,7 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(400, `Produced quantity exceeds remaining planned quantity (${remainingQuantity})`);
     }
 
-    const operatorId = actor.role === "OPERATOR" ? actor.id : workOrder.assignedOperatorId;
+    const operatorId = actor.role === "OPERATOR" ? actor.id : operation?.assignedOperatorId ?? workOrder.assignedOperatorId;
 
     if (!operatorId) {
       throw new ApiError(400, "Assigned operator is required before logging production");
@@ -64,6 +94,7 @@ export async function createProductionLog(actor, data) {
     const log = await tx.productionLog.create({
       data: {
         workOrderId: data.workOrderId,
+        workOrderOperationId: data.workOrderOperationId,
         operatorId,
         machineId: data.machineId,
         shiftId: data.shiftId,
@@ -93,19 +124,55 @@ export async function createProductionLog(actor, data) {
       });
     }
 
+    let updatedOperation = null;
+
+    if (operation) {
+      updatedOperation = await tx.workOrderOperation.update({
+        where: { id: operation.id },
+        data: {
+          status: operation.status === "READY" ? "IN_PROGRESS" : operation.status,
+          startedAt: operation.startedAt ?? new Date(),
+          producedQuantity: { increment: data.producedQuantity },
+          scrapQuantity: { increment: data.scrapQuantity }
+        },
+        include: {
+          workOrder: { include: { product: true, route: true } },
+          routeOperation: true,
+          machine: true,
+          assignedOperator: {
+            select: { id: true, name: true, email: true, role: true }
+          },
+          messages: {
+            include: {
+              sender: {
+                select: { id: true, name: true, email: true, role: true }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5
+          }
+        }
+      });
+    }
+
     const updatedWorkOrder = await tx.workOrder.update({
       where: { id: data.workOrderId },
       data: {
+        status: operation ? "IN_PROGRESS" : workOrder.status,
+        actualStartDate: workOrder.actualStartDate ?? (operation ? new Date() : undefined),
         producedQuantity: { increment: data.producedQuantity },
         scrapQuantity: { increment: data.scrapQuantity }
       }
     });
 
-    return { log, workOrder: updatedWorkOrder, alert };
+    return { log, workOrder: updatedWorkOrder, operation: updatedOperation, alert };
   });
 
   emitEvent("production:logged", result.log);
   emitEvent("workOrder:updated", result.workOrder);
+  if (result.operation) {
+    emitEvent("workOrderOperation:updated", result.operation);
+  }
   if (result.alert) {
     emitEvent("productionAlert:created", result.alert);
   }

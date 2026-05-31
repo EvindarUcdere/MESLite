@@ -234,6 +234,7 @@ model WorkOrderOperation {
   machine            Machine?                 @relation(fields: [machineId], references: [id])
   assignedOperator   User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
   messages           OperationMessage[]
+  productionLogs     ProductionLog[]
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
@@ -253,24 +254,26 @@ model OperationMessage {
 }
 
 model ProductionLog {
-  id               String                    @id @default(uuid())
-  workOrderId      String
-  operatorId       String
-  machineId        String
-  shiftId          String?
-  producedQuantity Int
-  scrapQuantity    Int                       @default(0)
-  scrapReason      ScrapReason?
-  startedAt        DateTime?
-  endedAt          DateTime?
-  note             String?
-  createdAt        DateTime                  @default(now())
-  workOrder        WorkOrder                 @relation(fields: [workOrderId], references: [id])
-  operator         User                      @relation(fields: [operatorId], references: [id])
-  machine          Machine                   @relation(fields: [machineId], references: [id])
-  shift            Shift?                    @relation(fields: [shiftId], references: [id])
-  attachments      ProductionLogAttachment[]
-  alerts           ProductionAlert[]
+  id                   String                    @id @default(uuid())
+  workOrderId          String
+  workOrderOperationId String?
+  operatorId           String
+  machineId            String
+  shiftId              String?
+  producedQuantity     Int
+  scrapQuantity        Int                       @default(0)
+  scrapReason          ScrapReason?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  note                 String?
+  createdAt            DateTime                  @default(now())
+  workOrder            WorkOrder                 @relation(fields: [workOrderId], references: [id])
+  workOrderOperation   WorkOrderOperation?       @relation(fields: [workOrderOperationId], references: [id])
+  operator             User                      @relation(fields: [operatorId], references: [id])
+  machine              Machine                   @relation(fields: [machineId], references: [id])
+  shift                Shift?                    @relation(fields: [shiftId], references: [id])
+  attachments          ProductionLogAttachment[]
+  alerts               ProductionAlert[]
 }
 
 model ProductionLogAttachment {

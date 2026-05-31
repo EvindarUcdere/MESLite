@@ -245,6 +245,18 @@ Operasyon bazli mesajlasma eklendi.
 
 Bu adim onceki/sonraki operator, uretim yoneticisi ve kalite arasinda operasyon baglamli iletisimin temelini kurar.
 
+### Tamamlanan - Adim 5
+
+Uretim/fire/not/gorsel kaydi operasyon seviyesine baglandi.
+
+- `ProductionLog` kaydi istege bagli `workOrderOperationId` tutar.
+- Mobil uretim girisi artik operatorun kendi `READY` veya `IN_PROGRESS` operasyonlari uzerinden yapilir.
+- Operasyona uretim girildiginde operasyonun `producedQuantity` ve `scrapQuantity` alanlari artar.
+- `READY` operasyona uretim girilirse operasyon ve is emri otomatik `IN_PROGRESS` olur.
+- Web is emri timeline'inda her operasyonun uretim/fire toplami gorunur.
+
+Bu adim, sorun ve performans takibini is emri genelinden operasyon adimina indirir.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.
