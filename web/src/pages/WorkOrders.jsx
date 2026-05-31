@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
+import { completeWorkOrderOperation, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -58,6 +59,18 @@ function canPause(workOrder) {
 
 function canComplete(workOrder) {
   return ["IN_PROGRESS", "PAUSED"].includes(workOrder.status) && workOrder.producedQuantity > 0;
+}
+
+function canStartOperation(operation) {
+  return ["READY", "PAUSED"].includes(operation.status);
+}
+
+function canPauseOperation(operation) {
+  return operation.status === "IN_PROGRESS";
+}
+
+function canCompleteOperation(operation) {
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status);
 }
 
 function formatDate(value) {
@@ -400,18 +413,53 @@ export default function WorkOrders() {
                       <tr className="operation-timeline-row">
                         <td colSpan="9">
                           <div className="work-order-operation-timeline">
-                            {workOrder.operations.map((operation) => (
-                              <div key={operation.id} className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")}`}>
-                                <span>{operation.sequenceNo}</span>
-                                <div>
-                                  <strong>{operation.operationName}</strong>
-                                  <small>
-                                    {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
-                                    {operation.machine ? ` • ${operation.machine.code}` : ""}
-                                  </small>
+                            {workOrder.operations.map((operation, index) => {
+                              const previousOperation = workOrder.operations[index - 1];
+                              const nextOperation = workOrder.operations[index + 1];
+
+                              return (
+                                <div key={operation.id} className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")}`}>
+                                  <span>{operation.sequenceNo}</span>
+                                  <div>
+                                    <strong>{operation.operationName}</strong>
+                                    <small>
+                                      {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
+                                      {operation.machine ? ` • ${operation.machine.code}` : ""}
+                                    </small>
+                                    <small>Operatör: {operation.assignedOperator?.name ?? "-"}</small>
+                                    <small>
+                                      Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
+                                    </small>
+                                    <div className="operation-action-row">
+                                      <button
+                                        type="button"
+                                        onClick={() => runAction(() => startWorkOrderOperation(operation.id), "Operasyon başlatılamadı.")}
+                                        disabled={!canStartOperation(operation)}
+                                        title="Operasyonu başlat"
+                                      >
+                                        <Play size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => runAction(() => pauseWorkOrderOperation(operation.id), "Operasyon duraklatılamadı.")}
+                                        disabled={!canPauseOperation(operation)}
+                                        title="Operasyonu duraklat"
+                                      >
+                                        <TimerReset size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => runAction(() => completeWorkOrderOperation(operation.id), "Operasyon tamamlanamadı.")}
+                                        disabled={!canCompleteOperation(operation)}
+                                        title="Operasyonu tamamla"
+                                      >
+                                        <Square size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </td>
                       </tr>

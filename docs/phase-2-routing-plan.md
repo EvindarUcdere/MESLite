@@ -220,6 +220,19 @@ Is emri olusturulurken rota secimi ve otomatik operasyon uretimi eklendi.
 
 Bu adim hala uretim/fire kaydini operasyon seviyesine baglamaz. Siradaki adim, mobil operator akisini bu operasyonlara baglamak olacak.
 
+### Tamamlanan - Adim 3
+
+Operasyon durum API'leri ve web uzerinden renkli operasyon takibi eklendi.
+
+- `GET /api/work-order-operations` ile tum operasyonlar listelenir.
+- `GET /api/work-order-operations/my` ile operator kendi operasyonlarini gorebilir.
+- Operasyon `start`, `pause`, `complete` endpointleri eklendi.
+- Bir operasyon tamamlaninca siradaki operasyon otomatik `READY` olur.
+- Web is emri timeline'inda operasyon durumlari renkli gorunur.
+- Timeline uzerinde onceki ve sonraki operator bilgisi gosterilir.
+
+Bir sonraki adim, mobil operator ekranini bu operasyon API'lerine baglamak ve operasyon bazli uretim/fire/not/gorsel kaydina gecmektir.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

@@ -11,6 +11,7 @@ import { qualityCheckRoutes } from "../modules/quality-checks/qualityCheck.route
 import { reportRoutes } from "../modules/reports/report.routes.js";
 import { shiftRoutes } from "../modules/shifts/shift.routes.js";
 import { userRoutes } from "../modules/users/user.routes.js";
+import { workOrderOperationRoutes } from "../modules/work-order-operations/workOrderOperation.routes.js";
 import { workOrderRoutes } from "../modules/work-orders/workOrder.routes.js";
 
 export const apiRoutes = Router();
@@ -27,4 +28,5 @@ apiRoutes.use("/quality-checks", qualityCheckRoutes);
 apiRoutes.use("/reports", reportRoutes);
 apiRoutes.use("/shifts", shiftRoutes);
 apiRoutes.use("/users", userRoutes);
+apiRoutes.use("/work-order-operations", workOrderOperationRoutes);
 apiRoutes.use("/work-orders", workOrderRoutes);

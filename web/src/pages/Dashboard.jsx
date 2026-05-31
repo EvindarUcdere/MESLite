@@ -140,6 +140,7 @@ export default function Dashboard() {
   useSocket({
     "machine:statusChanged": () => loadDashboard(),
     "workOrder:updated": () => loadDashboard(),
+    "workOrderOperation:updated": () => loadDashboard(),
     "production:logged": () => loadDashboard(),
     "productionAlert:created": () => loadDashboard(),
     "productionAlert:updated": () => loadDashboard(),

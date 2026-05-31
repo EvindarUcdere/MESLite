@@ -1013,8 +1013,8 @@ th {
   display: grid;
   grid-template-columns: 28px minmax(120px, 1fr);
   gap: 8px;
-  align-items: center;
-  min-width: 180px;
+  align-items: start;
+  min-width: 250px;
   padding: 8px;
   border: 1px solid #dbe3ea;
   border-radius: 8px;
@@ -1048,6 +1048,30 @@ th {
   margin-top: 2px;
   color: #66788a;
   font-size: 12px;
+}
+
+.operation-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.operation-action-row button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17202a;
+  cursor: pointer;
+}
+
+.operation-action-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .operation-waiting {
