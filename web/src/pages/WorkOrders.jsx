@@ -24,6 +24,14 @@ const OPERATION_STATUS_LABELS = {
   COMPLETED: "Tamamlandı"
 };
 
+const OPERATION_STAGE_LABELS = {
+  WAITING: "Sırada",
+  READY: "Şu Anki Adım",
+  IN_PROGRESS: "Şu Anki Adım",
+  PAUSED: "Durakladı",
+  COMPLETED: "Bitti"
+};
+
 const SCRAP_REASONS = [
   { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
   { value: "MACHINE_SETUP", label: "Makine Ayarı" },
@@ -71,6 +79,21 @@ function canPauseOperation(operation) {
 
 function canCompleteOperation(operation) {
   return ["IN_PROGRESS", "PAUSED"].includes(operation.status);
+}
+
+function getOperationProgress(operations = []) {
+  const completed = operations.filter((operation) => operation.status === "COMPLETED").length;
+  const activeOperation =
+    operations.find((operation) => ["IN_PROGRESS", "READY", "PAUSED"].includes(operation.status)) ??
+    operations.find((operation) => operation.status === "WAITING");
+  const remaining = Math.max(operations.length - completed, 0);
+
+  return {
+    completed,
+    activeOperation,
+    remaining,
+    total: operations.length
+  };
 }
 
 function formatDate(value) {
@@ -364,6 +387,7 @@ export default function WorkOrders() {
                 const startDisabled = Boolean(startBlockReason);
                 const pauseDisabled = !canPause(workOrder);
                 const completeDisabled = !canComplete(workOrder);
+                const operationProgress = getOperationProgress(workOrder.operations);
 
                 return (
                   <Fragment key={workOrder.id}>
@@ -412,6 +436,22 @@ export default function WorkOrders() {
                     {workOrder.operations?.length ? (
                       <tr className="operation-timeline-row">
                         <td colSpan="9">
+                          <div className="operation-flow-summary">
+                            <div>
+                              <span>Ürün şu anda</span>
+                              <strong>{operationProgress.activeOperation?.operationName ?? "Operasyon yok"}</strong>
+                            </div>
+                            <div>
+                              <span>Biten</span>
+                              <strong>
+                                {operationProgress.completed}/{operationProgress.total}
+                              </strong>
+                            </div>
+                            <div>
+                              <span>Kalan</span>
+                              <strong>{operationProgress.remaining}</strong>
+                            </div>
+                          </div>
                           <div className="work-order-operation-timeline">
                             {workOrder.operations.map((operation, index) => {
                               const previousOperation = workOrder.operations[index - 1];
@@ -421,7 +461,10 @@ export default function WorkOrders() {
                                 <div key={operation.id} className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")}`}>
                                   <span>{operation.sequenceNo}</span>
                                   <div>
-                                    <strong>{operation.operationName}</strong>
+                                    <div className="operation-chip-heading">
+                                      <strong>{operation.operationName}</strong>
+                                      <em>{OPERATION_STAGE_LABELS[operation.status] ?? operation.status}</em>
+                                    </div>
                                     <small>
                                       {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
                                       {operation.machine ? ` • ${operation.machine.code}` : ""}
