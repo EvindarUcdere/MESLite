@@ -114,6 +114,10 @@ function canCompleteOperation(operation) {
   return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation);
 }
 
+function canLogProductionForOperation(operation, userId) {
+  return Boolean(operation?.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId);
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -143,15 +147,30 @@ export default function App() {
   const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
   const productionCandidates = assignedWorkOrders.flatMap((workOrder) =>
     (workOrder.operations ?? [])
-      .filter((operation) => operation.assignedOperatorId === user?.id && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId)
+      .filter((operation) => canLogProductionForOperation(operation, user?.id))
       .map((operation) => ({ ...operation, workOrder }))
   );
-  const selectedProductionOperation = productionCandidates.find((operation) => operation.id === selectedOperationId);
-  const selectedProductionWorkOrder = selectedProductionOperation?.workOrder;
+  const selectedProductionWorkOrder =
+    assignedWorkOrders.find((workOrder) => workOrder.operations?.some((operation) => operation.id === selectedOperationId)) ?? productionCandidates[0]?.workOrder;
+  const rawSelectedProductionOperation =
+    selectedProductionWorkOrder?.operations?.find((operation) => operation.id === selectedOperationId) ?? productionCandidates[0];
+  const selectedProductionOperation =
+    rawSelectedProductionOperation && canLogProductionForOperation(rawSelectedProductionOperation, user?.id)
+      ? { ...rawSelectedProductionOperation, workOrder: selectedProductionWorkOrder ?? rawSelectedProductionOperation.workOrder }
+      : null;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
   const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
+  const productionBlockReason = rawSelectedProductionOperation
+    ? !rawSelectedProductionOperation.machineId
+      ? "Bu operasyon için makine atanmadığı için üretim kaydı girilemez."
+      : !["READY", "IN_PROGRESS", "PAUSED"].includes(rawSelectedProductionOperation.status)
+        ? "Bu operasyon üretim girişi durumunda değil."
+        : rawSelectedProductionOperation.assignedOperatorId !== user?.id
+          ? "Bu operasyon size atanmadığı için üretim kaydı girilemez."
+          : ""
+    : "Üretim girişi için bir operasyon seçin.";
 
   async function clearExpiredSession() {
     await logout();
@@ -312,7 +331,7 @@ export default function App() {
     setSuccessMessage("");
 
     if (!selectedProductionOperation?.machineId || !selectedProductionWorkOrder) {
-      setError("Üretim girişi için size atanmış hazır veya üretimde olan operasyon seçin.");
+      setError(productionBlockReason || "Üretim girişi için size atanmış hazır, üretimde veya duraklatılmış operasyon seçin.");
       return;
     }
 
@@ -397,6 +416,12 @@ export default function App() {
   async function pickImageFromGallery() {
     setError("");
 
+    if (!selectedProductionOperation) {
+      setError(productionBlockReason);
+      return;
+    }
+
+    try {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
@@ -411,11 +436,20 @@ export default function App() {
     });
 
     setPickedImage(result);
+    } catch (_error) {
+      setError("Galeri açılamadı. Web tarayıcıdaysanız dosya seçme iznini kontrol edin veya Expo Go ile deneyin.");
+    }
   }
 
   async function takePhoto() {
     setError("");
 
+    if (!selectedProductionOperation) {
+      setError(productionBlockReason);
+      return;
+    }
+
+    try {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
 
     if (!permission.granted) {
@@ -430,6 +464,9 @@ export default function App() {
     });
 
     setPickedImage(result);
+    } catch (_error) {
+      setError("Kamera açılamadı. Web tarayıcıdaysanız kamera iznini kontrol edin veya Expo Go ile deneyin.");
+    }
   }
 
   if (isLoading) {
@@ -745,6 +782,7 @@ export default function App() {
             </Text>
           </View>
         ) : null}
+        {productionBlockReason && !selectedProductionOperation ? <Text style={styles.error}>{productionBlockReason}</Text> : null}
         <Text style={styles.label}>Üretilen Adet</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={producedQuantity} onChangeText={setProducedQuantity} />
         <View style={styles.quickRow}>
@@ -819,7 +857,7 @@ export default function App() {
         {selectedImage ? <Text style={styles.muted}>{selectedImage.fileName ?? "Görsel seçildi"}</Text> : null}
         {selectedImage?.uri ? <Image source={{ uri: selectedImage.uri }} style={styles.imagePreview} resizeMode="cover" /> : null}
         <Pressable
-          style={[styles.primaryButton, !selectedProductionOperation ? styles.disabledButton : null]}
+          style={[styles.primaryButton, !selectedProductionOperation || isSubmitting ? styles.disabledButton : null]}
           onPress={handleProductionEntry}
           disabled={!selectedProductionOperation || isSubmitting}
         >
