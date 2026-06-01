@@ -1003,6 +1003,124 @@ th {
   background: #f8fafc;
 }
 
+.flow-control-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.flow-control-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.flow-control-summary article {
+  display: grid;
+  gap: 4px;
+  min-height: 86px;
+  padding: 14px 16px;
+  border: 1px solid #dbe3ea;
+  border-left: 4px solid #2b7a78;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.flow-control-summary span {
+  color: #66788a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flow-control-summary strong {
+  color: #0f1f2e;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.flow-control-summary .flow-critical {
+  border-left-color: #dc2626;
+  background: #fff7ed;
+}
+
+.flow-control-summary .flow-warning {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+
+.flow-risk-list {
+  display: grid;
+  gap: 8px;
+}
+
+.flow-risk-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 130px 190px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #dbe3ea;
+  border-left: 4px solid #2b7a78;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.flow-risk-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.flow-risk-row strong {
+  color: #0f1f2e;
+}
+
+.flow-risk-row span,
+.flow-risk-row small {
+  color: #66788a;
+}
+
+.flow-risk-row em {
+  justify-self: end;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #14523f;
+  background: #d9f2e8;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.flow-risk-row.flow-critical {
+  border-left-color: #dc2626;
+  background: #fff7ed;
+}
+
+.flow-risk-row.flow-critical em {
+  color: #912018;
+  background: #fee4e2;
+}
+
+.flow-risk-row.flow-warning {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+
+.flow-risk-row.flow-warning em {
+  color: #78350f;
+  background: #fef0c7;
+}
+
+.flow-risk-row.flow-info {
+  border-left-color: #2563eb;
+  background: #eff6ff;
+}
+
+.flow-risk-row.flow-info em {
+  color: #175cd3;
+  background: #d1e9ff;
+}
+
 .operation-flow-summary {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) repeat(2, 120px);
@@ -1258,6 +1376,21 @@ th {
   background: #d9f2e8;
 }
 
+.operation-short-completed {
+  border-color: #dc2626;
+  background: #fff7ed;
+}
+
+.operation-short-completed > span {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.operation-short-completed em {
+  color: #912018;
+  background: #fee4e2;
+}
+
 .selected-row {
   background: #f0fdfa;
 }
@@ -1346,6 +1479,15 @@ th {
 
   .operation-flow-summary {
     grid-template-columns: 1fr;
+  }
+
+  .flow-control-summary,
+  .flow-risk-row {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-risk-row em {
+    justify-self: start;
   }
 
   .operation-message-form {

@@ -5,6 +5,7 @@ import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
 import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
+import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
 
@@ -96,6 +97,26 @@ function canCompleteOperation(operation, workOrder, user) {
   return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
 }
 
+function isShortCompletedOperation(operation, workOrder) {
+  return Boolean(operation.status === "COMPLETED" && workOrder.plannedQuantity > 0 && operation.producedQuantity < workOrder.plannedQuantity);
+}
+
+function getOperationStageLabel(operation, workOrder) {
+  if (isShortCompletedOperation(operation, workOrder)) {
+    return "Eksik Kapandı";
+  }
+
+  return OPERATION_STAGE_LABELS[operation.status] ?? operation.status;
+}
+
+function getOperationStatusLabel(operation, workOrder) {
+  if (isShortCompletedOperation(operation, workOrder)) {
+    return `Eksik kapandı (${operation.producedQuantity}/${workOrder.plannedQuantity})`;
+  }
+
+  return OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
+}
+
 function getOperationProgress(operations = []) {
   const completed = operations.filter((operation) => operation.status === "COMPLETED").length;
   const activeOperation =
@@ -109,6 +130,40 @@ function getOperationProgress(operations = []) {
     remaining,
     total: operations.length
   };
+}
+
+function getFlowRiskLevel(workOrder) {
+  if (workOrder.operations?.some((operation) => isShortCompletedOperation(operation, workOrder))) {
+    return "critical";
+  }
+
+  if (workOrder.operations?.some((operation) => operation.status === "PAUSED")) {
+    return "warning";
+  }
+
+  if (workOrder.operations?.some((operation) => (operation.messages ?? []).length > 0)) {
+    return "info";
+  }
+
+  return "normal";
+}
+
+function getFlowRiskText(workOrder) {
+  const riskLevel = getFlowRiskLevel(workOrder);
+
+  if (riskLevel === "critical") {
+    return "Eksik kapanan operasyon var";
+  }
+
+  if (riskLevel === "warning") {
+    return "Duruş/ara verme var";
+  }
+
+  if (riskLevel === "info") {
+    return "Operasyon mesajı var";
+  }
+
+  return "Akış normal";
 }
 
 function formatDate(value) {
@@ -157,6 +212,31 @@ export default function WorkOrders() {
     () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
   );
+  const activeWorkOrders = useMemo(() => workOrders.filter((workOrder) => ["IN_PROGRESS", "PAUSED", "PLANNED"].includes(workOrder.status)), [workOrders]);
+  const flowRiskItems = useMemo(
+    () =>
+      workOrders
+        .filter((workOrder) => workOrder.operations?.length && getFlowRiskLevel(workOrder) !== "normal")
+        .map((workOrder) => ({
+          workOrder,
+          riskLevel: getFlowRiskLevel(workOrder),
+          riskText: getFlowRiskText(workOrder),
+          progress: getOperationProgress(workOrder.operations)
+        })),
+    [workOrders]
+  );
+  const shortCompletedOperationCount = useMemo(
+    () => workOrders.reduce((total, workOrder) => total + (workOrder.operations ?? []).filter((operation) => isShortCompletedOperation(operation, workOrder)).length, 0),
+    [workOrders]
+  );
+  const pausedOperationCount = useMemo(
+    () => workOrders.reduce((total, workOrder) => total + (workOrder.operations ?? []).filter((operation) => operation.status === "PAUSED").length, 0),
+    [workOrders]
+  );
+  const operationMessageCount = useMemo(
+    () => workOrders.reduce((total, workOrder) => total + (workOrder.operations ?? []).reduce((sum, operation) => sum + (operation.messages?.length ?? 0), 0), 0),
+    [workOrders]
+  );
   const canCreateManualProductionLog = user?.role === ROLES.ADMIN;
 
   async function loadData() {
@@ -200,6 +280,13 @@ export default function WorkOrders() {
       isMounted = false;
     };
   }, []);
+
+  useSocket({
+    "workOrder:updated": () => loadData(),
+    "workOrderOperation:updated": () => loadData(),
+    "operationMessage:created": () => loadData(),
+    "production:logged": () => loadData()
+  });
 
   function updateForm(field, value) {
     setForm((current) => ({
@@ -350,6 +437,50 @@ export default function WorkOrders() {
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="panel flow-control-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>Üretim Akış Kontrolü</h2>
+            <p className="muted-text">Üretim yöneticisi için operasyon bazlı canlı risk özeti.</p>
+          </div>
+        </div>
+        <div className="flow-control-summary">
+          <article>
+            <span>Aktif iş emri</span>
+            <strong>{activeWorkOrders.length}</strong>
+          </article>
+          <article className={shortCompletedOperationCount ? "flow-critical" : ""}>
+            <span>Eksik kapanan operasyon</span>
+            <strong>{shortCompletedOperationCount}</strong>
+          </article>
+          <article className={pausedOperationCount ? "flow-warning" : ""}>
+            <span>Duraklayan operasyon</span>
+            <strong>{pausedOperationCount}</strong>
+          </article>
+          <article>
+            <span>Operasyon mesajı</span>
+            <strong>{operationMessageCount}</strong>
+          </article>
+        </div>
+        <div className="flow-risk-list">
+          {flowRiskItems.slice(0, 6).map(({ workOrder, riskLevel, riskText, progress }) => (
+            <div key={workOrder.id} className={`flow-risk-row flow-${riskLevel}`}>
+              <div>
+                <strong>{workOrder.orderNo}</strong>
+                <span>
+                  {workOrder.product.name} • {progress.activeOperation?.operationName ?? "Operasyon yok"}
+                </span>
+              </div>
+              <small>
+                {workOrder.producedQuantity}/{workOrder.plannedQuantity} adet
+              </small>
+              <em>{riskText}</em>
+            </div>
+          ))}
+          {!isLoading && flowRiskItems.length === 0 ? <p className="empty-state">Operasyon akışında risk görünmüyor.</p> : null}
+        </div>
+      </section>
 
       <section className="panel">
         <h2>İş Emri Oluştur</h2>
@@ -513,15 +644,20 @@ export default function WorkOrders() {
                               const nextOperation = workOrder.operations[index + 1];
 
                               return (
-                                <div key={operation.id} className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")}`}>
+                                <div
+                                  key={operation.id}
+                                  className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")} ${
+                                    isShortCompletedOperation(operation, workOrder) ? "operation-short-completed" : ""
+                                  }`}
+                                >
                                   <span>{operation.sequenceNo}</span>
                                   <div>
                                     <div className="operation-chip-heading">
                                       <strong>{operation.operationName}</strong>
-                                      <em>{OPERATION_STAGE_LABELS[operation.status] ?? operation.status}</em>
+                                      <em>{getOperationStageLabel(operation, workOrder)}</em>
                                     </div>
                                     <small>
-                                      {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
+                                      {getOperationStatusLabel(operation, workOrder)}
                                       {operation.machine ? ` • ${operation.machine.code}` : ""}
                                     </small>
                                     <small>
