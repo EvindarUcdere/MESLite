@@ -212,14 +212,17 @@ export default function App() {
       .filter((operation) => canLogProductionForOperation(operation, user?.id, workOrder))
       .map((operation) => ({ ...operation, workOrder }))
   );
-  const selectedProductionWorkOrder =
-    assignedWorkOrders.find((workOrder) => workOrder.operations?.some((operation) => operation.id === selectedOperationId)) ?? productionCandidates[0]?.workOrder;
-  const rawSelectedProductionOperation =
-    selectedProductionWorkOrder?.operations?.find((operation) => operation.id === selectedOperationId) ?? productionCandidates[0];
+  const selectedProductionCandidate = productionCandidates.find((operation) => operation.id === selectedOperationId);
+  const selectedProductionWorkOrder = selectedProductionCandidate?.workOrder ?? null;
+  const rawSelectedProductionOperation = selectedProductionCandidate ?? null;
   const selectedProductionOperation =
     rawSelectedProductionOperation && canLogProductionForOperation(rawSelectedProductionOperation, user?.id, selectedProductionWorkOrder)
       ? { ...rawSelectedProductionOperation, workOrder: selectedProductionWorkOrder ?? rawSelectedProductionOperation.workOrder }
       : null;
+  const displayedProductionCandidates =
+    selectedWorkOrder && !isClosedWorkOrder(selectedWorkOrder)
+      ? productionCandidates.filter((operation) => operation.workOrder.id === selectedWorkOrder.id)
+      : productionCandidates;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
   const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
@@ -475,6 +478,13 @@ export default function App() {
     }
   }
 
+  function selectWorkOrder(workOrder) {
+    setSelectedWorkOrderId(workOrder.id);
+
+    const nextProductionOperation = (workOrder.operations ?? []).find((operation) => canLogProductionForOperation(operation, user?.id, workOrder));
+    setSelectedOperationId(nextProductionOperation?.id ?? "");
+  }
+
   async function pickImageFromGallery() {
     setError("");
 
@@ -602,7 +612,7 @@ export default function App() {
           <Pressable
             key={workOrder.id}
             style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
-            onPress={() => setSelectedWorkOrderId(workOrder.id)}
+            onPress={() => selectWorkOrder(workOrder)}
           >
             <View style={styles.orderCardHeader}>
               <View>
@@ -630,7 +640,7 @@ export default function App() {
             <Pressable
               key={workOrder.id}
               style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
-              onPress={() => setSelectedWorkOrderId(workOrder.id)}
+              onPress={() => selectWorkOrder(workOrder)}
             >
               <View style={styles.orderCardHeader}>
                 <View>
@@ -866,7 +876,7 @@ export default function App() {
         <Text style={styles.sectionTitle}>Üretim Girişi</Text>
         <Text style={styles.label}>İş Emri</Text>
         <View style={styles.choiceList}>
-          {productionCandidates.map((operation) => (
+          {displayedProductionCandidates.map((operation) => (
             <Pressable
               key={operation.id}
               style={[styles.operationChoiceButton, selectedOperationId === operation.id ? styles.choiceButtonActive : null]}
@@ -882,8 +892,12 @@ export default function App() {
             </Pressable>
           ))}
         </View>
-        {!productionCandidates.length ? (
-          <Text style={styles.muted}>Üretim girişi için size atanmış hazır, üretimde veya duraklatılmış operasyon yok.</Text>
+        {!displayedProductionCandidates.length ? (
+          <Text style={styles.muted}>
+            {selectedWorkOrder
+              ? "Seçili iş emri için üretim girişi yapılabilecek operasyon yok."
+              : "Üretim girişi için size atanmış hazır, üretimde veya duraklatılmış operasyon yok."}
+          </Text>
         ) : null}
         {selectedProductionOperation && selectedProductionWorkOrder ? (
           <View style={styles.productionNotice}>
