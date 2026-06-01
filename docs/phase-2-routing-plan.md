@@ -295,6 +295,19 @@ Kalite kontrolu operasyon adimina baglandi.
 
 Bu adim, kalite problemlerinin is emri genelinde kaybolmasini engeller ve "hata hangi operasyon/makine/operator baglaminda cikti?" sorusuna daha saglam cevap verir.
 
+### Tamamlanan - Adim 9
+
+Faz 2 icin uctan uca demo senaryosu eklendi.
+
+- `npm run seed:demo` komutu ile tekrar calistirilabilir demo veri uretilir.
+- Demo rota `Kesim -> Montaj -> Kalite Kontrol` akisini kullanir.
+- Devam eden, duraklatilan ve kalite sonucu olan uc ayri is emri olusturulur.
+- Demo veriler operasyon mesajlari, uretim kayitlari, fire ve kalite sonucuyla birlikte gelir.
+- Rotali uretimde ara operasyon uretimleri is emri final uretimini sisirmeyecek sekilde backend kurali netlestirildi.
+- Test akisi `docs/e2e-demo-scenario.md` dosyasinda belgelendi.
+
+Bu adim, Faz 2'nin portfoy sunumunda ve manuel testlerde tek komutla anlatilabilir bir fabrika senaryosu olarak calismasini saglar.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

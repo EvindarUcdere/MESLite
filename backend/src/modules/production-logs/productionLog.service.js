@@ -81,7 +81,7 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(403, "Operator can only log production for assigned work orders");
     }
 
-    const remainingQuantity = workOrder.plannedQuantity - workOrder.producedQuantity;
+    const remainingQuantity = workOrder.plannedQuantity - (operation ? operation.producedQuantity : workOrder.producedQuantity);
 
     if (data.producedQuantity > remainingQuantity) {
       throw new ApiError(400, `Produced quantity exceeds remaining planned quantity (${remainingQuantity})`);
@@ -162,12 +162,23 @@ export async function createProductionLog(actor, data) {
       });
     }
 
+    const nextOperation = operation
+      ? await tx.workOrderOperation.findFirst({
+          where: {
+            workOrderId: operation.workOrderId,
+            sequenceNo: { gt: operation.sequenceNo }
+          },
+          orderBy: { sequenceNo: "asc" }
+        })
+      : null;
+    const shouldIncrementWorkOrderProduction = !operation || !nextOperation;
+
     const updatedWorkOrder = await tx.workOrder.update({
       where: { id: data.workOrderId },
       data: {
         status: operation && operation.status !== "PAUSED" ? "IN_PROGRESS" : workOrder.status,
         actualStartDate: workOrder.actualStartDate ?? (operation ? new Date() : undefined),
-        producedQuantity: { increment: data.producedQuantity },
+        ...(shouldIncrementWorkOrderProduction ? { producedQuantity: { increment: data.producedQuantity } } : {}),
         scrapQuantity: { increment: data.scrapQuantity }
       }
     });
@@ -223,21 +234,37 @@ export async function addProductionLogAttachment(actor, productionLogId, file) {
 }
 
 export async function updateProductionLog(id, data) {
-  const current = await prisma.productionLog.findUnique({ where: { id } });
+  const current = await prisma.productionLog.findUnique({
+    where: { id },
+    include: {
+      workOrderOperation: true
+    }
+  });
 
   if (!current) {
     throw new ApiError(404, "Production log not found");
   }
 
-  const workOrder = await prisma.workOrder.findUnique({ where: { id: current.workOrderId } });
+  const workOrder = await prisma.workOrder.findUnique({
+    where: { id: current.workOrderId },
+    include: {
+      operations: {
+        orderBy: { sequenceNo: "desc" },
+        take: 1
+      }
+    }
+  });
 
   if (!workOrder) {
     throw new ApiError(404, "Work order not found");
   }
 
+  const finalOperationId = workOrder.operations[0]?.id;
+  const logContributesToWorkOrder = !current.workOrderOperationId || current.workOrderOperationId === finalOperationId;
   const producedDelta = data.producedQuantity === undefined ? 0 : data.producedQuantity - current.producedQuantity;
   const scrapDelta = data.scrapQuantity === undefined ? 0 : data.scrapQuantity - current.scrapQuantity;
-  const nextProducedQuantity = workOrder.producedQuantity + producedDelta;
+  const workOrderProducedDelta = logContributesToWorkOrder ? producedDelta : 0;
+  const nextProducedQuantity = workOrder.producedQuantity + workOrderProducedDelta;
   const nextScrapQuantity = workOrder.scrapQuantity + scrapDelta;
 
   if (nextProducedQuantity < 0 || nextScrapQuantity < 0) {
@@ -266,15 +293,29 @@ export async function updateProductionLog(id, data) {
     const workOrder = await tx.workOrder.update({
       where: { id: current.workOrderId },
       data: {
-        producedQuantity: { increment: producedDelta },
+        producedQuantity: { increment: workOrderProducedDelta },
         scrapQuantity: { increment: scrapDelta }
       }
     });
 
-    return { log, workOrder };
+    let operation = null;
+    if (current.workOrderOperationId) {
+      operation = await tx.workOrderOperation.update({
+        where: { id: current.workOrderOperationId },
+        data: {
+          producedQuantity: { increment: producedDelta },
+          scrapQuantity: { increment: scrapDelta }
+        }
+      });
+    }
+
+    return { log, workOrder, operation };
   });
 
   emitEvent("production:logged", result.log);
   emitEvent("workOrder:updated", result.workOrder);
+  if (result.operation) {
+    emitEvent("workOrderOperation:updated", result.operation);
+  }
   return result.log;
 }
