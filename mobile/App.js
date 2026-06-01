@@ -84,6 +84,22 @@ function operatorHasOperation(workOrder, userId) {
   return Boolean(userId && workOrder.operations?.some((operation) => operation.assignedOperatorId === userId));
 }
 
+function isClosedWorkOrder(workOrder) {
+  return ["COMPLETED", "CANCELLED"].includes(workOrder?.status);
+}
+
+function isShortClosedWorkOrder(workOrder) {
+  return Boolean(workOrder?.status === "COMPLETED" && workOrder.producedQuantity < workOrder.plannedQuantity);
+}
+
+function getWorkOrderStatusLabel(workOrder) {
+  if (isShortClosedWorkOrder(workOrder)) {
+    return "Eksik Kapandı";
+  }
+
+  return STATUS_LABELS[workOrder.status] ?? workOrder.status;
+}
+
 function getOperationProgress(operations = []) {
   const completed = operations.filter((operation) => operation.status === "COMPLETED").length;
   const activeOperation =
@@ -98,12 +114,32 @@ function getOperationProgress(operations = []) {
   };
 }
 
-function canStartOperation(operation) {
-  return ["READY", "PAUSED"].includes(operation.status);
+function getWorkOrderFlowText(workOrder) {
+  if (!workOrder.operations?.length) {
+    return "Operasyon yok";
+  }
+
+  if (isShortClosedWorkOrder(workOrder)) {
+    return `Eksik kapandı (${workOrder.producedQuantity}/${workOrder.plannedQuantity})`;
+  }
+
+  if (workOrder.status === "COMPLETED") {
+    return "Akış tamamlandı";
+  }
+
+  if (workOrder.status === "CANCELLED") {
+    return "İptal edildi";
+  }
+
+  return getOperationProgress(workOrder.operations).activeOperation?.operationName ?? "Operasyon bekliyor";
 }
 
-function canPauseOperation(operation) {
-  return operation.status === "IN_PROGRESS";
+function canStartOperation(operation, workOrder) {
+  return !isClosedWorkOrder(workOrder) && ["READY", "PAUSED"].includes(operation.status);
+}
+
+function canPauseOperation(operation, workOrder) {
+  return !isClosedWorkOrder(workOrder) && operation.status === "IN_PROGRESS";
 }
 
 function hasOperationLog(operation) {
@@ -115,11 +151,11 @@ function canCompleteOperation(operation, workOrder, user) {
   const hasPlannedQuantity = workOrder?.plannedQuantity > 0;
   const meetsPlannedQuantity = !hasPlannedQuantity || operation.producedQuantity >= workOrder.plannedQuantity;
 
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
+  return !isClosedWorkOrder(workOrder) && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
 }
 
-function canLogProductionForOperation(operation, userId) {
-  return Boolean(operation?.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId);
+function canLogProductionForOperation(operation, userId, workOrder) {
+  return Boolean(!isClosedWorkOrder(workOrder) && operation?.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId);
 }
 
 export default function App() {
@@ -151,7 +187,7 @@ export default function App() {
   const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
   const productionCandidates = assignedWorkOrders.flatMap((workOrder) =>
     (workOrder.operations ?? [])
-      .filter((operation) => canLogProductionForOperation(operation, user?.id))
+      .filter((operation) => canLogProductionForOperation(operation, user?.id, workOrder))
       .map((operation) => ({ ...operation, workOrder }))
   );
   const selectedProductionWorkOrder =
@@ -159,7 +195,7 @@ export default function App() {
   const rawSelectedProductionOperation =
     selectedProductionWorkOrder?.operations?.find((operation) => operation.id === selectedOperationId) ?? productionCandidates[0];
   const selectedProductionOperation =
-    rawSelectedProductionOperation && canLogProductionForOperation(rawSelectedProductionOperation, user?.id)
+    rawSelectedProductionOperation && canLogProductionForOperation(rawSelectedProductionOperation, user?.id, selectedProductionWorkOrder)
       ? { ...rawSelectedProductionOperation, workOrder: selectedProductionWorkOrder ?? rawSelectedProductionOperation.workOrder }
       : null;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
@@ -552,11 +588,11 @@ export default function App() {
                   {workOrder.product.code} - {workOrder.product.name}
                 </Text>
               </View>
-              <Text style={styles.statusBadge}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</Text>
+              <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
             </View>
             <View style={styles.orderCardFooter}>
               <Text style={styles.detailValue}>{workOrder.operations?.filter((operation) => operation.assignedOperatorId === user.id).length ?? 0} adım bende</Text>
-              <Text style={styles.muted}>{getOperationProgress(workOrder.operations).activeOperation?.operationName ?? "Operasyon yok"}</Text>
+              <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
             </View>
           </Pressable>
         ))}
@@ -570,7 +606,7 @@ export default function App() {
               <Text style={styles.sectionTitle}>İş Emri Detayı</Text>
               <Text style={styles.muted}>{selectedWorkOrder.orderNo}</Text>
             </View>
-            <Text style={styles.statusBadge}>{STATUS_LABELS[selectedWorkOrder.status] ?? selectedWorkOrder.status}</Text>
+            <Text style={[styles.statusBadge, isShortClosedWorkOrder(selectedWorkOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(selectedWorkOrder)}</Text>
           </View>
 
           <View style={styles.detailRow}>
@@ -626,7 +662,7 @@ export default function App() {
               <View style={styles.operationSummary}>
                 <View style={styles.detailBox}>
                   <Text style={styles.detailLabel}>Ürün Şu Anda</Text>
-                  <Text style={styles.detailValue}>{selectedOperationProgress?.activeOperation?.operationName ?? "-"}</Text>
+                  <Text style={styles.detailValue}>{getWorkOrderFlowText(selectedWorkOrder)}</Text>
                 </View>
                 <View style={styles.detailBox}>
                   <Text style={styles.detailLabel}>Biten</Text>
@@ -660,10 +696,13 @@ export default function App() {
                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
                     </Text>
                     {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
-                    {isMine ? (
+                    {isMine && isClosedWorkOrder(selectedWorkOrder) ? (
+                      <Text style={styles.muted}>Bu iş emri kapalı. Operasyon aksiyonu yapılamaz.</Text>
+                    ) : null}
+                    {isMine && !isClosedWorkOrder(selectedWorkOrder) ? (
                       <View style={styles.operationActionRow}>
                         <Pressable
-                          style={[styles.operationActionButton, !canStartOperation(operation) ? styles.disabledButton : null]}
+                          style={[styles.operationActionButton, !canStartOperation(operation, selectedWorkOrder) ? styles.disabledButton : null]}
                           onPress={() =>
                             handleOperationAction(
                               () => startWorkOrderOperation(operation.id),
@@ -671,12 +710,12 @@ export default function App() {
                               "Operasyon başlatılamadı."
                             )
                           }
-                          disabled={!canStartOperation(operation) || isSubmitting}
+                          disabled={!canStartOperation(operation, selectedWorkOrder) || isSubmitting}
                         >
-                          <Text style={styles.operationActionText}>Operasyonu Başlat</Text>
+                          <Text style={styles.operationActionText}>{operation.status === "PAUSED" ? "Devam Et" : "Operasyonu Başlat"}</Text>
                         </Pressable>
                         <Pressable
-                          style={[styles.operationActionButton, !canPauseOperation(operation) ? styles.disabledButton : null]}
+                          style={[styles.operationActionButton, !canPauseOperation(operation, selectedWorkOrder) ? styles.disabledButton : null]}
                           onPress={() =>
                             handleOperationAction(
                               () => pauseWorkOrderOperation(operation.id),
@@ -684,7 +723,7 @@ export default function App() {
                               "Operasyon duraklatılamadı."
                             )
                           }
-                          disabled={!canPauseOperation(operation) || isSubmitting}
+                          disabled={!canPauseOperation(operation, selectedWorkOrder) || isSubmitting}
                         >
                           <Text style={styles.operationActionText}>Operasyonu Duraklat</Text>
                         </Pressable>
@@ -986,6 +1025,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     fontSize: 12,
     fontWeight: "800"
+  },
+  shortClosedBadge: {
+    color: "#9a3412",
+    backgroundColor: "#ffedd5"
   },
   detailRow: {
     flexDirection: "row",

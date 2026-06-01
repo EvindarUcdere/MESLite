@@ -136,6 +136,10 @@ export async function startOperation(actor, id) {
   const current = await getOperationOrThrow(id);
   assertOperatorCanUseOperation(actor, current);
 
+  if (["COMPLETED", "CANCELLED"].includes(current.workOrder.status)) {
+    throw new ApiError(400, "Operations of completed or cancelled work orders cannot be started");
+  }
+
   if (!["READY", "PAUSED"].includes(current.status)) {
     throw new ApiError(400, "Only ready or paused operations can be started");
   }
