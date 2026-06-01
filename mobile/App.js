@@ -182,6 +182,8 @@ export default function App() {
     () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
     [user, workOrders]
   );
+  const activeAssignedWorkOrders = useMemo(() => assignedWorkOrders.filter((workOrder) => !isClosedWorkOrder(workOrder)), [assignedWorkOrders]);
+  const closedAssignedWorkOrders = useMemo(() => assignedWorkOrders.filter((workOrder) => isClosedWorkOrder(workOrder)), [assignedWorkOrders]);
   const selectedWorkOrder = assignedWorkOrders.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedOperationProgress = selectedWorkOrder ? getOperationProgress(selectedWorkOrder.operations) : null;
   const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
@@ -552,8 +554,8 @@ export default function App() {
 
       <View style={styles.mobileSummary}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{assignedWorkOrders.length}</Text>
-          <Text style={styles.detailLabel}>İş Emri</Text>
+          <Text style={styles.summaryValue}>{activeAssignedWorkOrders.length}</Text>
+          <Text style={styles.detailLabel}>Aktif İş</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{runningWorkOrderCount}</Text>
@@ -574,8 +576,9 @@ export default function App() {
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Operasyonum Olan İş Emirleri</Text>
-        {assignedWorkOrders.map((workOrder) => (
+        <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
+        <Text style={styles.muted}>Sadece devam eden ve işlem yapabileceğiniz operasyonlar burada görünür.</Text>
+        {activeAssignedWorkOrders.map((workOrder) => (
           <Pressable
             key={workOrder.id}
             style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
@@ -596,8 +599,38 @@ export default function App() {
             </View>
           </Pressable>
         ))}
-        {!assignedWorkOrders.length ? <Text style={styles.muted}>Size atanmış operasyonu olan iş emri yok.</Text> : null}
+        {!activeAssignedWorkOrders.length ? <Text style={styles.muted}>Şu anda işlem yapabileceğiniz aktif operasyon yok.</Text> : null}
       </View>
+
+      {closedAssignedWorkOrders.length ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Geçmiş / Kapalı İşler</Text>
+          <Text style={styles.muted}>Tamamlanmış veya eksik kapatılmış işler burada sadece bilgi amaçlı görünür.</Text>
+          {closedAssignedWorkOrders.map((workOrder) => (
+            <Pressable
+              key={workOrder.id}
+              style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
+              onPress={() => setSelectedWorkOrderId(workOrder.id)}
+            >
+              <View style={styles.orderCardHeader}>
+                <View>
+                  <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
+                  <Text style={styles.muted}>
+                    {workOrder.product.code} - {workOrder.product.name}
+                  </Text>
+                </View>
+                <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+              </View>
+              <View style={styles.orderCardFooter}>
+                <Text style={styles.detailValue}>
+                  Üretim: {workOrder.producedQuantity}/{workOrder.plannedQuantity}
+                </Text>
+                <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {selectedWorkOrder ? (
         <View style={styles.card}>
