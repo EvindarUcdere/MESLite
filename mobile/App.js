@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
+import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
 
@@ -292,6 +293,30 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
+    const socket = createMobileSocket();
+    const refreshWorkOrders = () => {
+      loadWorkOrders();
+    };
+
+    socket.on("connect", () => {
+      socket.emit("join:dashboard");
+    });
+    socket.on("operationMessage:created", refreshWorkOrders);
+    socket.on("workOrderOperation:updated", refreshWorkOrders);
+    socket.on("workOrder:updated", refreshWorkOrders);
+    socket.on("production:logged", refreshWorkOrders);
+
+    return () => {
+      socket.emit("leave:dashboard");
+      socket.disconnect();
+    };
+  }, [user?.id]);
 
   async function handleLogin() {
     setError("");

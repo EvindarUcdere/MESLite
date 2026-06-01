@@ -11,7 +11,7 @@ function getDevelopmentHost() {
   return scriptUrl?.match(/^https?:\/\/([^:/]+)/)?.[1] ?? null;
 }
 
-function getApiBaseUrl() {
+export function getApiBaseUrl() {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
