@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const qualityCheckBody = z.object({
   workOrderId: z.string().uuid(),
+  workOrderOperationId: z.string().uuid().optional(),
   status: z.enum(["PASSED", "FAILED", "PARTIAL"]),
   defectQuantity: z.number().int().min(0).default(0),
   defectReason: z.string().optional(),

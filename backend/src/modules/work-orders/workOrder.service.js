@@ -42,6 +42,7 @@ const workOrderInclude = {
         }
       },
       machine: true,
+      workOrderOperation: true,
       attachments: true
     },
     orderBy: { createdAt: "desc" },

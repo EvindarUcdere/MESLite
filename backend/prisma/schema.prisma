@@ -235,6 +235,7 @@ model WorkOrderOperation {
   assignedOperator   User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
   messages           OperationMessage[]
   productionLogs     ProductionLog[]
+  qualityChecks      QualityCheck[]
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
@@ -324,16 +325,18 @@ model ProductionAlertEvent {
 }
 
 model QualityCheck {
-  id             String        @id @default(uuid())
-  workOrderId    String
-  checkedById    String
-  status         QualityStatus
-  defectQuantity Int           @default(0)
-  defectReason   String?
-  note           String?
-  checkedAt      DateTime      @default(now())
-  workOrder      WorkOrder     @relation(fields: [workOrderId], references: [id])
-  checkedBy      User          @relation(fields: [checkedById], references: [id])
+  id                   String              @id @default(uuid())
+  workOrderId          String
+  workOrderOperationId String?
+  checkedById          String
+  status               QualityStatus
+  defectQuantity       Int                 @default(0)
+  defectReason         String?
+  note                 String?
+  checkedAt            DateTime            @default(now())
+  workOrder            WorkOrder           @relation(fields: [workOrderId], references: [id])
+  workOrderOperation   WorkOrderOperation? @relation(fields: [workOrderOperationId], references: [id])
+  checkedBy            User                @relation(fields: [checkedById], references: [id])
 }
 
 model MachineStatusLog {

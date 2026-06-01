@@ -54,6 +54,7 @@ export default function Quality() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     workOrderId: "",
+    workOrderOperationId: "",
     status: "PASSED",
     defectQuantity: 0,
     defectReason: "",
@@ -65,6 +66,11 @@ export default function Quality() {
     [workOrders]
   );
   const selectedWorkOrder = checkCandidates.find((workOrder) => workOrder.id === form.workOrderId);
+  const operationCandidates = useMemo(
+    () => (selectedWorkOrder?.operations ?? []).filter((operation) => operation.producedQuantity > 0),
+    [selectedWorkOrder]
+  );
+  const selectedOperation = operationCandidates.find((operation) => operation.id === form.workOrderOperationId);
   const selectedProductionLogs = selectedWorkOrder?.productionLogs ?? [];
 
   async function loadData() {
@@ -104,7 +110,11 @@ export default function Quality() {
   }, []);
 
   function updateForm(field, value) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "workOrderId" ? { workOrderOperationId: "" } : {})
+    }));
   }
 
   async function handleSubmit(event) {
@@ -120,8 +130,15 @@ export default function Quality() {
         return;
       }
 
-      if (defectQuantity > selectedWorkOrder.producedQuantity) {
-        setError(`Hatalı adet üretim miktarını aşamaz. Üretilen: ${selectedWorkOrder.producedQuantity} adet.`);
+      if ((selectedWorkOrder.operations ?? []).length > 0 && !selectedOperation) {
+        setError("Rotalı iş emirlerinde kalite kontrol için üretim yapılmış bir operasyon seçin.");
+        return;
+      }
+
+      const qualityQuantityLimit = selectedOperation?.producedQuantity ?? selectedWorkOrder.producedQuantity;
+
+      if (defectQuantity > qualityQuantityLimit) {
+        setError(`Hatalı adet kalite kapsamındaki üretim miktarını aşamaz. Üretilen: ${qualityQuantityLimit} adet.`);
         return;
       }
 
@@ -132,6 +149,7 @@ export default function Quality() {
 
       await createQualityCheck({
         workOrderId: form.workOrderId,
+        ...(form.workOrderOperationId ? { workOrderOperationId: form.workOrderOperationId } : {}),
         status: form.status,
         defectQuantity,
         ...(form.defectReason ? { defectReason: form.defectReason } : {}),
@@ -140,6 +158,7 @@ export default function Quality() {
 
       setForm((current) => ({
         ...current,
+        workOrderOperationId: "",
         defectQuantity: 0,
         defectReason: "",
         note: ""
@@ -167,7 +186,7 @@ export default function Quality() {
         <div className="section-title-row">
           <div>
             <h2>Kalite Girişi</h2>
-            <p className="muted-text">Üretimi yapılmış iş emirleri için kalite sonucunu ve hata nedenini kaydedin.</p>
+            <p className="muted-text">Üretimi yapılmış iş emirleri için kalite sonucunu, operasyon adımını ve hata nedenini kaydedin.</p>
           </div>
         </div>
         <form className="work-order-form" onSubmit={handleSubmit}>
@@ -182,6 +201,19 @@ export default function Quality() {
               ))}
             </select>
           </label>
+          {selectedWorkOrder?.operations?.length ? (
+            <label>
+              Operasyon
+              <select value={form.workOrderOperationId} onChange={(event) => updateForm("workOrderOperationId", event.target.value)} required>
+                <option value="">Kalite kontrol adımı seçin</option>
+                {operationCandidates.map((operation) => (
+                  <option key={operation.id} value={operation.id}>
+                    {operation.sequenceNo}. {operation.operationName} - {operation.producedQuantity} adet
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="field-span-all">
             <span className="form-field-title">Hızlı İş Emri Seçimi</span>
             <div className="choice-list">
@@ -228,75 +260,81 @@ export default function Quality() {
         </form>
         {selectedWorkOrder ? (
           <>
-          <div className="quality-context">
-            <div>
-              <span>İş Emri</span>
-              <strong>{selectedWorkOrder.orderNo}</strong>
-            </div>
-            <div>
-              <span>Üretim</span>
-              <strong>{selectedWorkOrder.producedQuantity}</strong>
-            </div>
-            <div>
-              <span>Fire</span>
-              <strong>{selectedWorkOrder.scrapQuantity}</strong>
-            </div>
-            <div>
-              <span>Ürün</span>
-              <strong>{selectedWorkOrder.product.code}</strong>
-            </div>
-          </div>
-          <div className="quality-history">
-            <div className="section-title-row">
+            <div className="quality-context">
               <div>
-                <h3>Üretim Geçmişi</h3>
-                <p className="muted-text">Kalite kararı için son saha kayıtları, fire nedenleri, notlar ve görseller.</p>
+                <span>İş Emri</span>
+                <strong>{selectedWorkOrder.orderNo}</strong>
+              </div>
+              <div>
+                <span>Üretim</span>
+                <strong>{selectedWorkOrder.producedQuantity}</strong>
+              </div>
+              <div>
+                <span>Fire</span>
+                <strong>{selectedWorkOrder.scrapQuantity}</strong>
+              </div>
+              <div>
+                <span>Ürün</span>
+                <strong>{selectedWorkOrder.product.code}</strong>
+              </div>
+              <div>
+                <span>Kalite Operasyonu</span>
+                <strong>{selectedOperation ? `${selectedOperation.sequenceNo}. ${selectedOperation.operationName}` : "Operasyon seçilmedi"}</strong>
               </div>
             </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Zaman</th>
-                    <th>Makine</th>
-                    <th>Operatör</th>
-                    <th>Üretim</th>
-                    <th>Fire</th>
-                    <th>Fire Nedeni</th>
-                    <th>Görsel</th>
-                    <th>Not</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedProductionLogs.map((log) => (
-                    <tr key={log.id}>
-                      <td>{formatDate(log.createdAt)}</td>
-                      <td>{log.machine?.code ?? "-"}</td>
-                      <td>{log.operator?.name ?? "-"}</td>
-                      <td>{log.producedQuantity}</td>
-                      <td>{log.scrapQuantity}</td>
-                      <td>{log.scrapQuantity > 0 ? SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason : "-"}</td>
-                      <td>
-                        {log.attachments?.[0] ? (
-                          <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
-                            <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>{log.note ? <span className="note-chip">{log.note}</span> : "-"}</td>
-                    </tr>
-                  ))}
-                  {selectedProductionLogs.length === 0 ? (
+            <div className="quality-history">
+              <div className="section-title-row">
+                <div>
+                  <h3>Üretim Geçmişi</h3>
+                  <p className="muted-text">Kalite kararı için son saha kayıtları, operasyon adımları, fire nedenleri, notlar ve görseller.</p>
+                </div>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan="8">Bu iş emri için üretim kaydı bulunamadı.</td>
+                      <th>Zaman</th>
+                      <th>Operasyon</th>
+                      <th>Makine</th>
+                      <th>Operatör</th>
+                      <th>Üretim</th>
+                      <th>Fire</th>
+                      <th>Fire Nedeni</th>
+                      <th>Görsel</th>
+                      <th>Not</th>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {selectedProductionLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{formatDate(log.createdAt)}</td>
+                        <td>{log.workOrderOperation ? `${log.workOrderOperation.sequenceNo}. ${log.workOrderOperation.operationName}` : "-"}</td>
+                        <td>{log.machine?.code ?? "-"}</td>
+                        <td>{log.operator?.name ?? "-"}</td>
+                        <td>{log.producedQuantity}</td>
+                        <td>{log.scrapQuantity}</td>
+                        <td>{log.scrapQuantity > 0 ? SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason : "-"}</td>
+                        <td>
+                          {log.attachments?.[0] ? (
+                            <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
+                              <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
+                            </a>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td>{log.note ? <span className="note-chip">{log.note}</span> : "-"}</td>
+                      </tr>
+                    ))}
+                    {selectedProductionLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan="9">Bu iş emri için üretim kaydı bulunamadı.</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
           </>
         ) : null}
         {!isLoading && checkCandidates.length === 0 ? <p className="empty-state">Kalite girişi için önce üretim kaydı girin.</p> : null}
@@ -310,6 +348,7 @@ export default function Quality() {
               <tr>
                 <th>İş Emri</th>
                 <th>Ürün</th>
+                <th>Operasyon</th>
                 <th>Sonuç</th>
                 <th>Hatalı</th>
                 <th>Neden</th>
@@ -323,6 +362,7 @@ export default function Quality() {
                 <tr key={check.id}>
                   <td>{check.workOrder.orderNo}</td>
                   <td>{check.workOrder.product.name}</td>
+                  <td>{check.workOrderOperation ? `${check.workOrderOperation.sequenceNo}. ${check.workOrderOperation.operationName}` : "-"}</td>
                   <td>
                     <span className={`status-pill quality-${check.status.toLowerCase()}`}>{QUALITY_LABELS[check.status] ?? check.status}</span>
                   </td>
@@ -335,7 +375,7 @@ export default function Quality() {
               ))}
               {!isLoading && qualityChecks.length === 0 ? (
                 <tr>
-                  <td colSpan="8">Henüz kalite kontrol kaydı yok.</td>
+                  <td colSpan="9">Henüz kalite kontrol kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>

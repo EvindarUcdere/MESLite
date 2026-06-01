@@ -281,6 +281,20 @@ Web tarafinda uretim yoneticisi icin operasyon akisi kontrol ozeti eklendi.
 
 Bu adim, uretim yoneticisinin tablo icinde tek tek arama yapmadan sorunlu operasyonu yakalamasini ve ilgili timeline'a hizli gecmesini saglar.
 
+### Tamamlanan - Adim 8
+
+Kalite kontrolu operasyon adimina baglandi.
+
+- `QualityCheck` kaydi istege bagli `workOrderOperationId` tutar.
+- Rotali is emirlerinde kalite girisi icin uretim yapilmis operasyon secimi zorunludur.
+- Backend, secilen operasyonun ilgili is emrine ait oldugunu kontrol eder.
+- Hata adedi, kalite kapsamindaki operasyon uretim miktarini asamaz.
+- Web kalite ekraninda is emri secildikten sonra operasyon secimi yapilir.
+- Son kalite kontrolleri tablosunda kalite sonucunun hangi operasyon icin girildigi gorunur.
+- Uretim gecmisi tablosunda uretim kaydinin hangi operasyon adimina ait oldugu gorunur.
+
+Bu adim, kalite problemlerinin is emri genelinde kaybolmasini engeller ve "hata hangi operasyon/makine/operator baglaminda cikti?" sorusuna daha saglam cevap verir.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.
