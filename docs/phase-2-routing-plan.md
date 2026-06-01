@@ -257,6 +257,18 @@ Uretim/fire/not/gorsel kaydi operasyon seviyesine baglandi.
 
 Bu adim, sorun ve performans takibini is emri genelinden operasyon adimina indirir.
 
+### Tamamlanan - Adim 6
+
+Mobil operator operasyon aksiyonlari eklendi.
+
+- Mobilde operator kendi operasyonunu baslatabilir.
+- Mobilde operator kendi operasyonunu duraklatabilir.
+- Mobilde operator kendi operasyonunu tamamlayabilir.
+- Mobilde operator kendi operasyonuna mesaj yazabilir.
+- Mesaj seviyeleri mobilde `Bilgi`, `Uyari`, `Kalite`, `Durus` olarak secilebilir.
+
+Bu adim, operatorun mobil uygulamada sadece veri giren degil, kendi operasyon adimini yoneten kisi olmasini saglar.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

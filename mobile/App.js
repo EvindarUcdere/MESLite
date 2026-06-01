@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
+import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { completeWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "./src/api/workOrders.api";
 
 const STATUS_LABELS = {
@@ -28,6 +29,13 @@ const OPERATION_STAGE_LABELS = {
   PAUSED: "Durakladı",
   COMPLETED: "Bitti"
 };
+
+const MESSAGE_SEVERITIES = [
+  { value: "INFO", label: "Bilgi" },
+  { value: "WARNING", label: "Uyarı" },
+  { value: "QUALITY_ALERT", label: "Kalite" },
+  { value: "STOPPAGE", label: "Duruş" }
+];
 
 const QUICK_QUANTITIES = [1, 5, 10, 25];
 const SCRAP_REASONS = [
@@ -90,6 +98,18 @@ function getOperationProgress(operations = []) {
   };
 }
 
+function canStartOperation(operation) {
+  return ["READY", "PAUSED"].includes(operation.status);
+}
+
+function canPauseOperation(operation) {
+  return operation.status === "IN_PROGRESS";
+}
+
+function canCompleteOperation(operation) {
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status);
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -104,6 +124,7 @@ export default function App() {
   const [isCriticalAlert, setIsCriticalAlert] = useState(false);
   const [alertSeverity, setAlertSeverity] = useState("WARNING");
   const [selectedImage, setSelectedImage] = useState(null);
+  const [operationMessageDrafts, setOperationMessageDrafts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -216,15 +237,66 @@ export default function App() {
     try {
       await action();
       await loadWorkOrders();
+      return true;
     } catch (actionError) {
       if (isUnauthorizedError(actionError)) {
         await clearExpiredSession();
-        return;
+        return false;
       }
 
       setError(getErrorMessage(actionError, fallbackMessage));
+      return false;
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function updateOperationMessageDraft(operationId, field, value) {
+    setOperationMessageDrafts((current) => ({
+      ...current,
+      [operationId]: {
+        message: "",
+        severity: "INFO",
+        ...(current[operationId] ?? {}),
+        [field]: value
+      }
+    }));
+  }
+
+  async function handleOperationAction(action, successText, fallbackMessage) {
+    const isSuccess = await runAction(action, fallbackMessage);
+    if (isSuccess) {
+      setSuccessMessage(successText);
+    }
+  }
+
+  async function handleOperationMessage(operationId) {
+    const draft = operationMessageDrafts[operationId] ?? { message: "", severity: "INFO" };
+    const message = draft.message.trim();
+
+    if (!message) {
+      setError("Operasyon mesajı boş olamaz.");
+      return;
+    }
+
+    const isSuccess = await runAction(
+      () =>
+        createOperationMessage(operationId, {
+          message,
+          severity: draft.severity
+        }),
+      "Operasyon mesajı gönderilemedi."
+    );
+
+    if (isSuccess) {
+      setOperationMessageDrafts((current) => ({
+        ...current,
+        [operationId]: {
+          ...draft,
+          message: ""
+        }
+      }));
+      setSuccessMessage("Operasyon mesajı gönderildi.");
     }
   }
 
@@ -543,6 +615,49 @@ export default function App() {
                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
                     </Text>
                     {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
+                    {isMine ? (
+                      <View style={styles.operationActionRow}>
+                        <Pressable
+                          style={[styles.operationActionButton, !canStartOperation(operation) ? styles.disabledButton : null]}
+                          onPress={() =>
+                            handleOperationAction(
+                              () => startWorkOrderOperation(operation.id),
+                              "Operasyon başlatıldı.",
+                              "Operasyon başlatılamadı."
+                            )
+                          }
+                          disabled={!canStartOperation(operation) || isSubmitting}
+                        >
+                          <Text style={styles.operationActionText}>Başlat</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.operationActionButton, !canPauseOperation(operation) ? styles.disabledButton : null]}
+                          onPress={() =>
+                            handleOperationAction(
+                              () => pauseWorkOrderOperation(operation.id),
+                              "Operasyon duraklatıldı.",
+                              "Operasyon duraklatılamadı."
+                            )
+                          }
+                          disabled={!canPauseOperation(operation) || isSubmitting}
+                        >
+                          <Text style={styles.operationActionText}>Duraklat</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.operationActionButton, !canCompleteOperation(operation) ? styles.disabledButton : null]}
+                          onPress={() =>
+                            handleOperationAction(
+                              () => completeWorkOrderOperation(operation.id),
+                              "Operasyon tamamlandı.",
+                              "Operasyon tamamlanamadı."
+                            )
+                          }
+                          disabled={!canCompleteOperation(operation) || isSubmitting}
+                        >
+                          <Text style={styles.operationActionText}>Tamamla</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                     {(operation.messages ?? []).slice(0, 2).map((message) => (
                       <View key={message.id} style={styles.operationMessage}>
                         <Text style={styles.detailLabel}>{message.severity}</Text>
@@ -551,6 +666,34 @@ export default function App() {
                         </Text>
                       </View>
                     ))}
+                    {isMine ? (
+                      <View style={styles.operationMessageForm}>
+                        <View style={styles.choiceList}>
+                          {MESSAGE_SEVERITIES.map((severity) => (
+                            <Pressable
+                              key={severity.value}
+                              style={[
+                                styles.choiceButton,
+                                (operationMessageDrafts[operation.id]?.severity ?? "INFO") === severity.value ? styles.choiceButtonActive : null
+                              ]}
+                              onPress={() => updateOperationMessageDraft(operation.id, "severity", severity.value)}
+                              disabled={isSubmitting}
+                            >
+                              <Text style={styles.choiceText}>{severity.label}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                        <TextInput
+                          style={styles.input}
+                          value={operationMessageDrafts[operation.id]?.message ?? ""}
+                          onChangeText={(value) => updateOperationMessageDraft(operation.id, "message", value)}
+                          placeholder="Bu operasyon için mesaj yaz"
+                        />
+                        <Pressable style={styles.secondaryButton} onPress={() => handleOperationMessage(operation.id)} disabled={isSubmitting}>
+                          <Text style={styles.secondaryButtonText}>Mesaj Gönder</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
                 );
               })}
@@ -1154,6 +1297,26 @@ const styles = StyleSheet.create({
     color: "#256f6c",
     fontWeight: "900"
   },
+  operationActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  operationActionButton: {
+    minHeight: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    backgroundColor: "#ffffff",
+    borderColor: "#c8d3dd",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  operationActionText: {
+    color: "#17202a",
+    fontSize: 12,
+    fontWeight: "900"
+  },
   operationMessage: {
     gap: 2,
     padding: 8,
@@ -1161,5 +1324,11 @@ const styles = StyleSheet.create({
     borderColor: "#dbe3ea",
     borderRadius: 6,
     borderWidth: 1
+  },
+  operationMessageForm: {
+    gap: 8,
+    paddingTop: 8,
+    borderTopColor: "#dbe3ea",
+    borderTopWidth: 1
   }
 });
