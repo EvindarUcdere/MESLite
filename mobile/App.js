@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { createMobileSocket } from "./src/api/socket";
@@ -179,6 +179,34 @@ function canLogProductionForOperation(operation, userId, workOrder) {
   return Boolean(!isClosedWorkOrder(workOrder) && operation?.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId);
 }
 
+function playNotificationSound() {
+  if (Platform.OS === "web") {
+    const AudioContextClass = globalThis.AudioContext ?? globalThis.webkitAudioContext;
+
+    if (AudioContextClass) {
+      const context = new AudioContextClass();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.22);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.24);
+    }
+  } else {
+    Vibration.vibrate(250);
+  }
+}
+
+function getOperationMessageWorkOrderId(message) {
+  return message?.workOrderOperation?.workOrder?.id ?? message?.workOrderOperation?.workOrderId ?? null;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -194,10 +222,12 @@ export default function App() {
   const [alertSeverity, setAlertSeverity] = useState("WARNING");
   const [selectedImage, setSelectedImage] = useState(null);
   const [operationMessageDrafts, setOperationMessageDrafts] = useState({});
+  const [notificationCounts, setNotificationCounts] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const selectedWorkOrderIdRef = useRef("");
 
   const assignedWorkOrders = useMemo(
     () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
@@ -237,6 +267,10 @@ export default function App() {
           ? "Bu operasyon size atanmadığı için üretim kaydı girilemez."
           : ""
     : "Üretim girişi için bir operasyon seçin.";
+
+  useEffect(() => {
+    selectedWorkOrderIdRef.current = selectedWorkOrderId;
+  }, [selectedWorkOrderId]);
 
   async function clearExpiredSession() {
     await logout();
@@ -303,11 +337,27 @@ export default function App() {
     const refreshWorkOrders = () => {
       loadWorkOrders();
     };
+    const handleOperationMessageCreated = (message) => {
+      const workOrderId = getOperationMessageWorkOrderId(message);
+
+      if (workOrderId && message?.senderId !== user.id) {
+        playNotificationSound();
+
+        if (selectedWorkOrderIdRef.current !== workOrderId) {
+          setNotificationCounts((current) => ({
+            ...current,
+            [workOrderId]: (current[workOrderId] ?? 0) + 1
+          }));
+        }
+      }
+
+      refreshWorkOrders();
+    };
 
     socket.on("connect", () => {
       socket.emit("join:dashboard");
     });
-    socket.on("operationMessage:created", refreshWorkOrders);
+    socket.on("operationMessage:created", handleOperationMessageCreated);
     socket.on("workOrderOperation:updated", refreshWorkOrders);
     socket.on("workOrder:updated", refreshWorkOrders);
     socket.on("production:logged", refreshWorkOrders);
@@ -505,6 +555,11 @@ export default function App() {
 
   function selectWorkOrder(workOrder) {
     setSelectedWorkOrderId(workOrder.id);
+    setNotificationCounts((current) => {
+      const next = { ...current };
+      delete next[workOrder.id];
+      return next;
+    });
 
     const nextProductionOperation = (workOrder.operations ?? []).find((operation) => canLogProductionForOperation(operation, user?.id, workOrder));
     setSelectedOperationId(nextProductionOperation?.id ?? "");
@@ -646,7 +701,10 @@ export default function App() {
                   {workOrder.product.code} - {workOrder.product.name}
                 </Text>
               </View>
-              <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+              <View style={styles.cardBadgeStack}>
+                {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
+                <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+              </View>
             </View>
             <View style={styles.orderCardFooter}>
               <Text style={styles.detailValue}>{workOrder.operations?.filter((operation) => operation.assignedOperatorId === user.id).length ?? 0} adım bende</Text>
@@ -674,7 +732,10 @@ export default function App() {
                     {workOrder.product.code} - {workOrder.product.name}
                   </Text>
                 </View>
-                <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+                <View style={styles.cardBadgeStack}>
+                  {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
+                  <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+                </View>
               </View>
               <View style={styles.orderCardFooter}>
                 <Text style={styles.detailValue}>
@@ -1342,6 +1403,25 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10
+  },
+  cardBadgeStack: {
+    alignItems: "flex-end",
+    gap: 6
+  },
+  notificationBadge: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 8,
+    color: "#ffffff",
+    backgroundColor: "#dc2626",
+    borderColor: "#ffffff",
+    borderRadius: 999,
+    borderWidth: 2,
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 24,
+    overflow: "hidden",
+    textAlign: "center"
   },
   orderCardFooter: {
     flexDirection: "row",
