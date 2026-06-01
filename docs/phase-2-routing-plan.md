@@ -269,6 +269,18 @@ Mobil operator operasyon aksiyonlari eklendi.
 
 Bu adim, operatorun mobil uygulamada sadece veri giren degil, kendi operasyon adimini yoneten kisi olmasini saglar.
 
+### Tamamlanan - Adim 7
+
+Web tarafinda uretim yoneticisi icin operasyon akisi kontrol ozeti eklendi.
+
+- Is Emirleri ekraninda aktif is emri, eksik kapanan operasyon, duraklayan operasyon ve operasyon mesaji sayilari gorunur.
+- Riskli is emirleri kritik/uyari/bilgi seviyesine gore ayrilir.
+- Risk satirinda son operasyon mesaji baglamiyla birlikte gosterilir.
+- Risk satirina tiklandiginda ilgili is emrine gidilir ve timeline vurgulanir.
+- Socket.io eventleri geldikce ekran canli olarak yeniden yuklenir.
+
+Bu adim, uretim yoneticisinin tablo icinde tek tek arama yapmadan sorunlu operasyonu yakalamasini ve ilgili timeline'a hizli gecmesini saglar.
+
 ## Sonuc
 
 Bu faz, MES Lite'i basit uretim kaydi uygulamasindan daha gercekci bir fabrika izlenebilirlik sistemine tasir. Ancak MVP'nin temel akisi stabil hale gelmeden eklenirse proje karmasiklasir. Bu nedenle dogru zaman Faz 2'dir.

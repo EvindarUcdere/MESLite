@@ -1,5 +1,5 @@
 import { Play, Plus, Square, TimerReset } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
@@ -166,6 +166,17 @@ function getFlowRiskText(workOrder) {
   return "Akış normal";
 }
 
+function getLatestOperationMessage(workOrder) {
+  return (workOrder.operations ?? [])
+    .flatMap((operation) =>
+      (operation.messages ?? []).map((message) => ({
+        ...message,
+        operationName: operation.operationName
+      }))
+    )
+    .sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt))[0];
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -190,6 +201,8 @@ export default function WorkOrders() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [operationMessages, setOperationMessages] = useState({});
+  const [focusedWorkOrderId, setFocusedWorkOrderId] = useState("");
+  const workOrderRowRefs = useRef(new Map());
   const [form, setForm] = useState({
     orderNo: "",
     productId: "",
@@ -221,7 +234,8 @@ export default function WorkOrders() {
           workOrder,
           riskLevel: getFlowRiskLevel(workOrder),
           riskText: getFlowRiskText(workOrder),
-          progress: getOperationProgress(workOrder.operations)
+          progress: getOperationProgress(workOrder.operations),
+          latestMessage: getLatestOperationMessage(workOrder)
         })),
     [workOrders]
   );
@@ -353,6 +367,17 @@ export default function WorkOrders() {
     }));
   }
 
+  function focusWorkOrder(workOrderId) {
+    setFocusedWorkOrderId(workOrderId);
+
+    window.requestAnimationFrame(() => {
+      workOrderRowRefs.current.get(workOrderId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
+  }
+
   async function handleOperationMessage(operationId) {
     const draft = operationMessages[operationId] ?? { message: "", severity: "INFO" };
     const message = draft.message.trim();
@@ -464,19 +489,24 @@ export default function WorkOrders() {
           </article>
         </div>
         <div className="flow-risk-list">
-          {flowRiskItems.slice(0, 6).map(({ workOrder, riskLevel, riskText, progress }) => (
-            <div key={workOrder.id} className={`flow-risk-row flow-${riskLevel}`}>
+          {flowRiskItems.slice(0, 6).map(({ workOrder, riskLevel, riskText, progress, latestMessage }) => (
+            <button key={workOrder.id} type="button" className={`flow-risk-row flow-${riskLevel}`} onClick={() => focusWorkOrder(workOrder.id)}>
               <div>
                 <strong>{workOrder.orderNo}</strong>
                 <span>
                   {workOrder.product.name} • {progress.activeOperation?.operationName ?? "Operasyon yok"}
                 </span>
+                {latestMessage ? (
+                  <span>
+                    Son mesaj: {latestMessage.operationName} - {latestMessage.message}
+                  </span>
+                ) : null}
               </div>
               <small>
                 {workOrder.producedQuantity}/{workOrder.plannedQuantity} adet
               </small>
               <em>{riskText}</em>
-            </div>
+            </button>
           ))}
           {!isLoading && flowRiskItems.length === 0 ? <p className="empty-state">Operasyon akışında risk görünmüyor.</p> : null}
         </div>
@@ -577,7 +607,16 @@ export default function WorkOrders() {
 
                 return (
                   <Fragment key={workOrder.id}>
-                    <tr>
+                    <tr
+                      ref={(node) => {
+                        if (node) {
+                          workOrderRowRefs.current.set(workOrder.id, node);
+                        } else {
+                          workOrderRowRefs.current.delete(workOrder.id);
+                        }
+                      }}
+                      className={focusedWorkOrderId === workOrder.id ? "selected-row focused-work-order-row" : undefined}
+                    >
                       <td>{workOrder.orderNo}</td>
                       <td>{workOrder.product.name}</td>
                       <td>{workOrder.route?.name ?? "-"}</td>
@@ -620,7 +659,7 @@ export default function WorkOrders() {
                       </td>
                     </tr>
                     {workOrder.operations?.length ? (
-                      <tr className="operation-timeline-row">
+                      <tr className={`operation-timeline-row ${focusedWorkOrderId === workOrder.id ? "focused-operation-timeline-row" : ""}`}>
                         <td colSpan="9">
                           <div className="operation-flow-summary">
                             <div>

@@ -1003,6 +1003,16 @@ th {
   background: #f8fafc;
 }
 
+.focused-work-order-row td {
+  background: #ecfdf8;
+}
+
+.focused-operation-timeline-row td {
+  border-top: 1px solid #99dfcf;
+  border-bottom: 1px solid #99dfcf;
+  background: #f0fdfa;
+}
+
 .flow-control-panel {
   display: grid;
   gap: 16px;
@@ -1054,14 +1064,29 @@ th {
 
 .flow-risk-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) 130px 190px;
+  grid-template-columns: minmax(260px, 1fr) 130px 190px;
   gap: 12px;
   align-items: center;
+  width: 100%;
   padding: 12px 14px;
   border: 1px solid #dbe3ea;
   border-left: 4px solid #2b7a78;
   border-radius: 8px;
   background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.flow-risk-row:hover,
+.flow-risk-row:focus-visible {
+  border-color: #2b7a78;
+  box-shadow: 0 8px 22px rgba(15, 31, 46, 0.08);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .flow-risk-row div {
@@ -1077,6 +1102,8 @@ th {
 .flow-risk-row span,
 .flow-risk-row small {
   color: #66788a;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .flow-risk-row em {
