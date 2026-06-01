@@ -100,6 +100,26 @@ function getWorkOrderStatusLabel(workOrder) {
   return STATUS_LABELS[workOrder.status] ?? workOrder.status;
 }
 
+function isShortCompletedOperation(operation, workOrder) {
+  return Boolean(operation?.status === "COMPLETED" && workOrder?.plannedQuantity > 0 && operation.producedQuantity < workOrder.plannedQuantity);
+}
+
+function getOperationStageLabel(operation, workOrder) {
+  if (isShortCompletedOperation(operation, workOrder)) {
+    return "Eksik Kapandı";
+  }
+
+  return OPERATION_STAGE_LABELS[operation.status] ?? operation.status;
+}
+
+function getOperationStatusLabel(operation, workOrder) {
+  if (isShortCompletedOperation(operation, workOrder)) {
+    return `Eksik kapandı (${operation.producedQuantity}/${workOrder.plannedQuantity})`;
+  }
+
+  return OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
+}
+
 function getOperationProgress(operations = []) {
   const completed = operations.filter((operation) => operation.status === "COMPLETED").length;
   const activeOperation =
@@ -714,16 +734,29 @@ export default function App() {
                 const nextOperation = selectedWorkOrder.operations[index + 1];
 
                 return (
-                  <View key={operation.id} style={[styles.operationCard, styles[`operation${operation.status}`], isMine ? styles.myOperationCard : null]}>
+                  <View
+                    key={operation.id}
+                    style={[
+                      styles.operationCard,
+                      styles[`operation${operation.status}`],
+                      isShortCompletedOperation(operation, selectedWorkOrder) ? styles.shortCompletedOperationCard : null,
+                      isMine ? styles.myOperationCard : null
+                    ]}
+                  >
                     <View style={styles.operationHeader}>
                       <Text style={styles.operationSequence}>{operation.sequenceNo}</Text>
                       <View style={styles.operationHeaderText}>
                         <Text style={styles.operationName}>{operation.operationName}</Text>
                         <Text style={styles.muted}>{operation.machine?.code ?? "Makine yok"}</Text>
                       </View>
-                      <Text style={styles.operationStage}>{OPERATION_STAGE_LABELS[operation.status] ?? operation.status}</Text>
+                      <Text style={[styles.operationStage, isShortCompletedOperation(operation, selectedWorkOrder) ? styles.shortClosedBadge : null]}>
+                        {getOperationStageLabel(operation, selectedWorkOrder)}
+                      </Text>
                     </View>
-                    <Text style={styles.detailValue}>{OPERATION_STATUS_LABELS[operation.status] ?? operation.status}</Text>
+                    <Text style={styles.detailValue}>{getOperationStatusLabel(operation, selectedWorkOrder)}</Text>
+                    <Text style={styles.muted}>
+                      Bu adım üretimi: {operation.producedQuantity}/{selectedWorkOrder.plannedQuantity} adet
+                    </Text>
                     <Text style={styles.muted}>Operatör: {operation.assignedOperator?.name ?? "-"}</Text>
                     <Text style={styles.muted}>
                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
@@ -731,6 +764,9 @@ export default function App() {
                     {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
                     {isMine && isClosedWorkOrder(selectedWorkOrder) ? (
                       <Text style={styles.muted}>Bu iş emri kapalı. Operasyon aksiyonu yapılamaz.</Text>
+                    ) : null}
+                    {isShortCompletedOperation(operation, selectedWorkOrder) ? (
+                      <Text style={styles.error}>Bu operasyon planlanan adetten düşük kapatılmış. Üretim yöneticisi kontrolü gerekir.</Text>
                     ) : null}
                     {isMine && !isClosedWorkOrder(selectedWorkOrder) ? (
                       <View style={styles.operationActionRow}>
@@ -1352,6 +1388,10 @@ const styles = StyleSheet.create({
   operationCOMPLETED: {
     backgroundColor: "#f0fdf4",
     borderColor: "#16a34a"
+  },
+  shortCompletedOperationCard: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#f97316"
   },
   operationHeader: {
     flexDirection: "row",
