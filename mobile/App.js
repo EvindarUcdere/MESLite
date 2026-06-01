@@ -107,7 +107,7 @@ function canPauseOperation(operation) {
 }
 
 function canCompleteOperation(operation) {
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status);
+  return operation.status === "IN_PROGRESS" && (operation.producedQuantity > 0 || operation.scrapQuantity > 0);
 }
 
 export default function App() {
@@ -724,7 +724,9 @@ export default function App() {
             </Pressable>
           ))}
         </View>
-        {!productionCandidates.length ? <Text style={styles.muted}>Üretim girişi için size atanmış hazır veya üretimde operasyon yok.</Text> : null}
+        {!productionCandidates.length ? (
+          <Text style={styles.muted}>Üretim girişi için size atanmış hazır veya üretimde operasyon yok. Duraklatılan operasyonlarda önce Operasyonu Başlat demelisiniz.</Text>
+        ) : null}
         {selectedProductionOperation && selectedProductionWorkOrder ? (
           <View style={styles.productionNotice}>
             <Text style={styles.detailLabel}>Seçili operasyon</Text>

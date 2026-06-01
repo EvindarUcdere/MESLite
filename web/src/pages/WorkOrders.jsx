@@ -85,7 +85,7 @@ function canPauseOperation(operation) {
 }
 
 function canCompleteOperation(operation) {
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status);
+  return operation.status === "IN_PROGRESS" && (operation.producedQuantity > 0 || operation.scrapQuantity > 0);
 }
 
 function getOperationProgress(operations = []) {
@@ -544,7 +544,11 @@ export default function WorkOrders() {
                                         type="button"
                                         onClick={() => runAction(() => completeWorkOrderOperation(operation.id), "Operasyon tamamlanamadı.")}
                                         disabled={!canCompleteOperation(operation)}
-                                        title="Operasyonu tamamla"
+                                        title={
+                                          canCompleteOperation(operation)
+                                            ? "Operasyonu tamamla"
+                                            : "Tamamlamak için operasyon üretimde olmalı ve üretim/fire girişi yapılmalı."
+                                        }
                                       >
                                         <Square size={14} />
                                       </button>

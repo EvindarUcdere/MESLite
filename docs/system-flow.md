@@ -138,6 +138,26 @@ Durumların anlamı:
 
 MVP'de normal akışta başlatma, duraklatma ve tamamlama operatör mobil ekranından yapılır. Web tarafındaki durum aksiyonları yönetici müdahalesi içindir.
 
+## Operasyon Bazlı Akış
+
+Rotalı iş emirlerinde operatör iş emrinin tamamını değil, kendisine atanan operasyon adımını yönetir.
+
+```text
+WAITING -> READY -> IN_PROGRESS -> PAUSED -> IN_PROGRESS -> COMPLETED
+```
+
+Kurallar:
+
+- Operatör sadece kendisine atanan operasyonu başlatabilir, duraklatabilir ve tamamlayabilir.
+- Operasyon başlatıldığında backend ana iş emrini otomatik `IN_PROGRESS` durumuna alır.
+- Operasyon duraklatıldığında backend ana iş emrini `PAUSED` durumuna alır.
+- Duraklatılan operasyona üretim girişi yapılamaz; önce tekrar başlatılmalıdır.
+- Operasyon tamamlanmadan önce o operasyon için üretim veya fire kaydı girilmelidir.
+- Bir operasyon tamamlanınca sıradaki operasyon otomatik `READY` olur.
+- Son operasyon da tamamlanırsa backend ana iş emrini `COMPLETED` durumuna alır.
+
+Bu kural, üretim sahasında "ekranda tamamlandı ama veritabanında üretim yok" gibi kritik veri kaybı risklerini azaltmak içindir.
+
 ## Üretim Kaydı Nasıl Akar?
 
 Mobilde operatör şu bilgileri girer:

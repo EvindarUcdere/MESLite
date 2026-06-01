@@ -184,6 +184,11 @@ export async function pauseOperation(actor, id) {
       include: operationInclude
     });
 
+    await tx.workOrder.update({
+      where: { id: current.workOrderId },
+      data: { status: "PAUSED" }
+    });
+
     let machine = null;
     if (current.machineId) {
       machine = await tx.machine.update({
@@ -209,8 +214,12 @@ export async function completeOperation(actor, id) {
   const current = await getOperationOrThrow(id);
   assertOperatorCanUseOperation(actor, current);
 
-  if (!["IN_PROGRESS", "PAUSED"].includes(current.status)) {
-    throw new ApiError(400, "Only started operations can be completed");
+  if (current.status !== "IN_PROGRESS") {
+    throw new ApiError(400, "Only in-progress operations can be completed");
+  }
+
+  if (current.producedQuantity <= 0 && current.scrapQuantity <= 0) {
+    throw new ApiError(400, "Production or scrap quantity must be logged before completing an operation");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -239,6 +248,23 @@ export async function completeOperation(actor, id) {
         include: operationInclude
       });
     }
+
+    const remainingOperationCount = await tx.workOrderOperation.count({
+      where: {
+        workOrderId: current.workOrderId,
+        id: { not: id },
+        status: { not: "COMPLETED" }
+      }
+    });
+    const isWorkOrderCompleted = !nextOperation && remainingOperationCount === 0;
+
+    await tx.workOrder.update({
+      where: { id: current.workOrderId },
+      data: {
+        status: isWorkOrderCompleted ? "COMPLETED" : "IN_PROGRESS",
+        ...(isWorkOrderCompleted ? { actualEndDate: new Date() } : {})
+      }
+    });
 
     let machine = null;
     if (current.machineId) {
