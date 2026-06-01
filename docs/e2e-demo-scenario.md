@@ -12,6 +12,23 @@ npm run seed:demo
 
 Script tekrar calistirilabilir. Sadece `E2E-DEMO-` ile baslayan demo is emirlerini temizler ve yeniden olusturur.
 
+## Otomatik Kabul Testi
+
+Demo veri yuklendikten sonra backend kurallarini kontrol etmek icin:
+
+```bash
+npm run test:phase2
+```
+
+Bu test sunlari dogrular:
+
+- 3 demo is emri olustugunu
+- Her demo is emrinde 3 operasyon oldugunu
+- Devam eden ve duran islerde ara operasyon uretimlerinin ana is emri final uretimini sisirmedigini
+- Duran operasyonda durus mesaji oldugunu
+- Kalite sonucunun final operasyon adimina bagli oldugunu
+- Mobil operatorlerin aktif/bekleyen kendi operasyonlarini gorebildigini
+
 ## Demo Kullanici Bilgileri
 
 Tum kullanicilar icin sifre:

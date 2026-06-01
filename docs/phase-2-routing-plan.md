@@ -304,6 +304,7 @@ Faz 2 icin uctan uca demo senaryosu eklendi.
 - Devam eden, duraklatilan ve kalite sonucu olan uc ayri is emri olusturulur.
 - Demo veriler operasyon mesajlari, uretim kayitlari, fire ve kalite sonucuyla birlikte gelir.
 - Rotali uretimde ara operasyon uretimleri is emri final uretimini sisirmeyecek sekilde backend kurali netlestirildi.
+- `npm run test:phase2` komutu ile demo verinin kabul testi otomatik calisir.
 - Test akisi `docs/e2e-demo-scenario.md` dosyasinda belgelendi.
 
 Bu adim, Faz 2'nin portfoy sunumunda ve manuel testlerde tek komutla anlatilabilir bir fabrika senaryosu olarak calismasini saglar.

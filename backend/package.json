@@ -10,7 +10,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
-    "seed:demo": "node prisma/demo-scenario.js"
+    "seed:demo": "node prisma/demo-scenario.js",
+    "test:phase2": "node prisma/phase2-acceptance.js"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",

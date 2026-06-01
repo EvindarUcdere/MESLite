@@ -266,13 +266,27 @@ export async function updateProductionLog(id, data) {
   const workOrderProducedDelta = logContributesToWorkOrder ? producedDelta : 0;
   const nextProducedQuantity = workOrder.producedQuantity + workOrderProducedDelta;
   const nextScrapQuantity = workOrder.scrapQuantity + scrapDelta;
+  const nextOperationProducedQuantity = current.workOrderOperation
+    ? current.workOrderOperation.producedQuantity + producedDelta
+    : null;
+  const nextOperationScrapQuantity = current.workOrderOperation
+    ? current.workOrderOperation.scrapQuantity + scrapDelta
+    : null;
 
   if (nextProducedQuantity < 0 || nextScrapQuantity < 0) {
     throw new ApiError(400, "Production totals cannot become negative");
   }
 
+  if (nextOperationProducedQuantity !== null && (nextOperationProducedQuantity < 0 || nextOperationScrapQuantity < 0)) {
+    throw new ApiError(400, "Operation production totals cannot become negative");
+  }
+
   if (nextProducedQuantity > workOrder.plannedQuantity) {
     throw new ApiError(400, `Produced quantity exceeds planned quantity (${workOrder.plannedQuantity})`);
+  }
+
+  if (nextOperationProducedQuantity !== null && nextOperationProducedQuantity > workOrder.plannedQuantity) {
+    throw new ApiError(400, `Operation produced quantity exceeds planned quantity (${workOrder.plannedQuantity})`);
   }
 
   const result = await prisma.$transaction(async (tx) => {
