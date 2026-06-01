@@ -466,8 +466,8 @@ export default function WorkOrders() {
       <section className="panel flow-control-panel">
         <div className="section-title-row">
           <div>
-            <h2>Üretim Akış Kontrolü</h2>
-            <p className="muted-text">Üretim yöneticisi için operasyon bazlı canlı risk özeti.</p>
+            <h2>Dikkat Gerektiren İş Emirleri</h2>
+            <p className="muted-text">Duruş, eksik kapanma veya yeni operasyon mesajı olan işleri gösterir. Satıra tıklayınca ilgili timeline'a gidilir.</p>
           </div>
         </div>
         <div className="flow-control-summary">
@@ -490,7 +490,7 @@ export default function WorkOrders() {
         </div>
         <div className="flow-risk-list">
           {flowRiskItems.slice(0, 6).map(({ workOrder, riskLevel, riskText, progress, latestMessage }) => (
-            <button key={workOrder.id} type="button" className={`flow-risk-row flow-${riskLevel}`} onClick={() => focusWorkOrder(workOrder.id)}>
+            <button key={workOrder.id} type="button" className={`flow-risk-row flow-${riskLevel}`} onClick={() => focusWorkOrder(workOrder.id)} title="İlgili iş emri timeline'ına git">
               <div>
                 <strong>{workOrder.orderNo}</strong>
                 <span>
@@ -508,7 +508,7 @@ export default function WorkOrders() {
               <em>{riskText}</em>
             </button>
           ))}
-          {!isLoading && flowRiskItems.length === 0 ? <p className="empty-state">Operasyon akışında risk görünmüyor.</p> : null}
+          {!isLoading && flowRiskItems.length === 0 ? <p className="empty-state">Dikkat gerektiren iş emri yok. Duruş, eksik kapanma veya operasyon mesajı olduğunda burada görünür.</p> : null}
         </div>
       </section>
 
