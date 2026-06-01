@@ -4,7 +4,7 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, 
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
-import { completeWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "./src/api/workOrders.api";
+import { getWorkOrders } from "./src/api/workOrders.api";
 
 const STATUS_LABELS = {
   PLANNED: "Planlandı",
@@ -628,7 +628,7 @@ export default function App() {
                           }
                           disabled={!canStartOperation(operation) || isSubmitting}
                         >
-                          <Text style={styles.operationActionText}>Başlat</Text>
+                          <Text style={styles.operationActionText}>Operasyonu Başlat</Text>
                         </Pressable>
                         <Pressable
                           style={[styles.operationActionButton, !canPauseOperation(operation) ? styles.disabledButton : null]}
@@ -641,7 +641,7 @@ export default function App() {
                           }
                           disabled={!canPauseOperation(operation) || isSubmitting}
                         >
-                          <Text style={styles.operationActionText}>Duraklat</Text>
+                          <Text style={styles.operationActionText}>Operasyonu Duraklat</Text>
                         </Pressable>
                         <Pressable
                           style={[styles.operationActionButton, !canCompleteOperation(operation) ? styles.disabledButton : null]}
@@ -654,7 +654,7 @@ export default function App() {
                           }
                           disabled={!canCompleteOperation(operation) || isSubmitting}
                         >
-                          <Text style={styles.operationActionText}>Tamamla</Text>
+                          <Text style={styles.operationActionText}>Operasyonu Tamamla</Text>
                         </Pressable>
                       </View>
                     ) : null}
@@ -701,40 +701,6 @@ export default function App() {
           ) : (
             <Text style={styles.muted}>Bu iş emri için operasyon akışı tanımlı değil.</Text>
           )}
-
-          <Text style={styles.sectionTitle}>İş Emri Aksiyonları</Text>
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.primaryButton, !["PLANNED", "PAUSED"].includes(selectedWorkOrder.status) ? styles.disabledButton : null]}
-              onPress={() => runAction(() => startWorkOrder(selectedWorkOrder.id), "İş emri başlatılamadı.")}
-              disabled={!["PLANNED", "PAUSED"].includes(selectedWorkOrder.status) || isSubmitting}
-            >
-              <Text style={styles.primaryButtonText}>Başlat</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, selectedWorkOrder.status !== "IN_PROGRESS" ? styles.disabledButton : null]}
-              onPress={() => runAction(() => pauseWorkOrder(selectedWorkOrder.id), "İş emri duraklatılamadı.")}
-              disabled={selectedWorkOrder.status !== "IN_PROGRESS" || isSubmitting}
-            >
-              <Text style={styles.secondaryButtonText}>Duraklat</Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.secondaryButton,
-                !["IN_PROGRESS", "PAUSED"].includes(selectedWorkOrder.status) || selectedWorkOrder.producedQuantity <= 0
-                  ? styles.disabledButton
-                  : null
-              ]}
-              onPress={() => runAction(() => completeWorkOrder(selectedWorkOrder.id), "İş emri tamamlanamadı.")}
-              disabled={
-                !["IN_PROGRESS", "PAUSED"].includes(selectedWorkOrder.status) ||
-                selectedWorkOrder.producedQuantity <= 0 ||
-                isSubmitting
-              }
-            >
-              <Text style={styles.secondaryButtonText}>Tamamla</Text>
-            </Pressable>
-          </View>
         </View>
       ) : null}
 
