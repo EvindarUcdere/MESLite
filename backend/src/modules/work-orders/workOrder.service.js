@@ -72,6 +72,11 @@ const workOrderInclude = {
         },
         orderBy: { createdAt: "desc" },
         take: 5
+      },
+      _count: {
+        select: {
+          productionLogs: true
+        }
       }
     },
     orderBy: { sequenceNo: "asc" }

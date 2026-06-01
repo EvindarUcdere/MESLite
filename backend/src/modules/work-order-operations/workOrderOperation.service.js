@@ -32,6 +32,11 @@ const operationInclude = {
     },
     orderBy: { createdAt: "desc" },
     take: 5
+  },
+  _count: {
+    select: {
+      productionLogs: true
+    }
   }
 };
 
@@ -94,6 +99,11 @@ async function getWorkOrderForEmit(workOrderId, tx = prisma) {
             },
             orderBy: { createdAt: "desc" },
             take: 5
+          },
+          _count: {
+            select: {
+              productionLogs: true
+            }
           }
         },
         orderBy: { sequenceNo: "asc" }
@@ -214,12 +224,16 @@ export async function completeOperation(actor, id) {
   const current = await getOperationOrThrow(id);
   assertOperatorCanUseOperation(actor, current);
 
-  if (current.status !== "IN_PROGRESS") {
-    throw new ApiError(400, "Only in-progress operations can be completed");
+  if (!["IN_PROGRESS", "PAUSED"].includes(current.status)) {
+    throw new ApiError(400, "Only started operations can be completed");
   }
 
-  if (current.producedQuantity <= 0 && current.scrapQuantity <= 0) {
-    throw new ApiError(400, "Production or scrap quantity must be logged before completing an operation");
+  const productionLogCount = await prisma.productionLog.count({
+    where: { workOrderOperationId: id }
+  });
+
+  if (productionLogCount === 0) {
+    throw new ApiError(400, "At least one production log must be saved before completing an operation");
   }
 
   const result = await prisma.$transaction(async (tx) => {

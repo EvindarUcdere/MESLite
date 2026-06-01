@@ -151,8 +151,9 @@ Kurallar:
 - Operatör sadece kendisine atanan operasyonu başlatabilir, duraklatabilir ve tamamlayabilir.
 - Operasyon başlatıldığında backend ana iş emrini otomatik `IN_PROGRESS` durumuna alır.
 - Operasyon duraklatıldığında backend ana iş emrini `PAUSED` durumuna alır.
-- Duraklatılan operasyona üretim girişi yapılamaz; önce tekrar başlatılmalıdır.
-- Operasyon tamamlanmadan önce o operasyon için üretim veya fire kaydı girilmelidir.
+- Duraklatılan operasyona üretim/fire/not girişi yapılabilir; operatör duruş anına kadar olan gerçek durumu kaybetmeden kaydeder.
+- Üretim ve fire 0 ise operatör mutlaka açıklama notu girer. Örnek: "Makine alarm verdi, üretim başlamadı."
+- Operasyon tamamlanmadan önce o operasyon için en az bir saha kaydı girilmelidir.
 - Bir operasyon tamamlanınca sıradaki operasyon otomatik `READY` olur.
 - Son operasyon da tamamlanırsa backend ana iş emrini `COMPLETED` durumuna alır.
 

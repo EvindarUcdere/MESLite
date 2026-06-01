@@ -106,8 +106,12 @@ function canPauseOperation(operation) {
   return operation.status === "IN_PROGRESS";
 }
 
+function hasOperationLog(operation) {
+  return Boolean(operation._count?.productionLogs || operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+}
+
 function canCompleteOperation(operation) {
-  return operation.status === "IN_PROGRESS" && (operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation);
 }
 
 export default function App() {
@@ -139,7 +143,7 @@ export default function App() {
   const mySelectedOperations = selectedWorkOrder?.operations?.filter((operation) => operation.assignedOperatorId === user?.id) ?? [];
   const productionCandidates = assignedWorkOrders.flatMap((workOrder) =>
     (workOrder.operations ?? [])
-      .filter((operation) => operation.assignedOperatorId === user?.id && ["READY", "IN_PROGRESS"].includes(operation.status) && operation.machineId)
+      .filter((operation) => operation.assignedOperatorId === user?.id && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId)
       .map((operation) => ({ ...operation, workOrder }))
   );
   const selectedProductionOperation = productionCandidates.find((operation) => operation.id === selectedOperationId);
@@ -317,8 +321,8 @@ export default function App() {
       return;
     }
 
-    if (produced === 0 && scrap === 0) {
-      setError("Üretim veya fire adedinden en az biri sıfırdan büyük olmalı.");
+    if (produced === 0 && scrap === 0 && !note.trim()) {
+      setError("Üretim ve fire 0 ise mutlaka açıklama notu girin. Örn: Makine hatası nedeniyle üretim başlamadı.");
       return;
     }
 
@@ -725,7 +729,7 @@ export default function App() {
           ))}
         </View>
         {!productionCandidates.length ? (
-          <Text style={styles.muted}>Üretim girişi için size atanmış hazır veya üretimde operasyon yok. Duraklatılan operasyonlarda önce Operasyonu Başlat demelisiniz.</Text>
+          <Text style={styles.muted}>Üretim girişi için size atanmış hazır, üretimde veya duraklatılmış operasyon yok.</Text>
         ) : null}
         {selectedProductionOperation && selectedProductionWorkOrder ? (
           <View style={styles.productionNotice}>

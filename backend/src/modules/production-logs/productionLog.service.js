@@ -27,8 +27,10 @@ export function findProductionLogById(id) {
 }
 
 export async function createProductionLog(actor, data) {
-  if (data.producedQuantity === 0 && data.scrapQuantity === 0) {
-    throw new ApiError(400, "Produced or scrap quantity must be greater than zero");
+  const isZeroQuantityLog = data.producedQuantity === 0 && data.scrapQuantity === 0;
+
+  if (isZeroQuantityLog && !data.note?.trim()) {
+    throw new ApiError(400, "A note is required when production and scrap quantities are both zero");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -60,8 +62,8 @@ export async function createProductionLog(actor, data) {
     }
 
     if (operation) {
-      if (!["READY", "IN_PROGRESS"].includes(operation.status)) {
-        throw new ApiError(400, "Production can only be logged for ready or in-progress operations");
+      if (!["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status)) {
+        throw new ApiError(400, "Production can only be logged for ready, in-progress or paused operations");
       }
 
       if (!operation.machineId || operation.machineId !== data.machineId) {
@@ -150,6 +152,11 @@ export async function createProductionLog(actor, data) {
             },
             orderBy: { createdAt: "desc" },
             take: 5
+          },
+          _count: {
+            select: {
+              productionLogs: true
+            }
           }
         }
       });
@@ -158,7 +165,7 @@ export async function createProductionLog(actor, data) {
     const updatedWorkOrder = await tx.workOrder.update({
       where: { id: data.workOrderId },
       data: {
-        status: operation ? "IN_PROGRESS" : workOrder.status,
+        status: operation && operation.status !== "PAUSED" ? "IN_PROGRESS" : workOrder.status,
         actualStartDate: workOrder.actualStartDate ?? (operation ? new Date() : undefined),
         producedQuantity: { increment: data.producedQuantity },
         scrapQuantity: { increment: data.scrapQuantity }

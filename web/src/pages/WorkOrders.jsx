@@ -84,8 +84,12 @@ function canPauseOperation(operation) {
   return operation.status === "IN_PROGRESS";
 }
 
+function hasOperationLog(operation) {
+  return Boolean(operation._count?.productionLogs || operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+}
+
 function canCompleteOperation(operation) {
-  return operation.status === "IN_PROGRESS" && (operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation);
 }
 
 function getOperationProgress(operations = []) {
@@ -547,7 +551,7 @@ export default function WorkOrders() {
                                         title={
                                           canCompleteOperation(operation)
                                             ? "Operasyonu tamamla"
-                                            : "Tamamlamak için operasyon üretimde olmalı ve üretim/fire girişi yapılmalı."
+                                            : "Tamamlamak için bu operasyon adına en az bir üretim/fire/not kaydı girilmeli."
                                         }
                                       >
                                         <Square size={14} />
