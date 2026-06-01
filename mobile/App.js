@@ -110,8 +110,12 @@ function hasOperationLog(operation) {
   return Boolean(operation._count?.productionLogs || operation.producedQuantity > 0 || operation.scrapQuantity > 0);
 }
 
-function canCompleteOperation(operation) {
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation);
+function canCompleteOperation(operation, workOrder, user) {
+  const isManagerOverride = ["ADMIN", "PRODUCTION_MANAGER"].includes(user?.role);
+  const hasPlannedQuantity = workOrder?.plannedQuantity > 0;
+  const meetsPlannedQuantity = !hasPlannedQuantity || operation.producedQuantity >= workOrder.plannedQuantity;
+
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
 }
 
 function canLogProductionForOperation(operation, userId) {
@@ -685,7 +689,7 @@ export default function App() {
                           <Text style={styles.operationActionText}>Operasyonu Duraklat</Text>
                         </Pressable>
                         <Pressable
-                          style={[styles.operationActionButton, !canCompleteOperation(operation) ? styles.disabledButton : null]}
+                          style={[styles.operationActionButton, !canCompleteOperation(operation, selectedWorkOrder, user) ? styles.disabledButton : null]}
                           onPress={() =>
                             handleOperationAction(
                               () => completeWorkOrderOperation(operation.id),
@@ -693,11 +697,16 @@ export default function App() {
                               "Operasyon tamamlanamadı."
                             )
                           }
-                          disabled={!canCompleteOperation(operation) || isSubmitting}
+                          disabled={!canCompleteOperation(operation, selectedWorkOrder, user) || isSubmitting}
                         >
                           <Text style={styles.operationActionText}>Operasyonu Tamamla</Text>
                         </Pressable>
                       </View>
+                    ) : null}
+                    {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity < selectedWorkOrder.plannedQuantity ? (
+                      <Text style={styles.error}>
+                        Planlanan adet tamamlanmadan operatör operasyonu kapatamaz. Üretim: {operation.producedQuantity}/{selectedWorkOrder.plannedQuantity}
+                      </Text>
                     ) : null}
                     {(operation.messages ?? []).slice(0, 2).map((message) => (
                       <View key={message.id} style={styles.operationMessage}>

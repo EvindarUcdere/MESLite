@@ -288,7 +288,7 @@ export async function pauseWorkOrder(id) {
   return result.workOrder;
 }
 
-export async function completeWorkOrder(id) {
+export async function completeWorkOrder(actor, id) {
   const current = await prisma.workOrder.findUnique({ where: { id } });
 
   if (!current) {
@@ -301,6 +301,10 @@ export async function completeWorkOrder(id) {
 
   if (current.producedQuantity <= 0) {
     throw new ApiError(400, "Production quantity must be logged before completing a work order");
+  }
+
+  if (actor.role === "OPERATOR" && current.producedQuantity < current.plannedQuantity) {
+    throw new ApiError(400, `Work order cannot be completed before planned quantity is produced (${current.producedQuantity}/${current.plannedQuantity})`);
   }
 
   const result = await prisma.$transaction(async (tx) => {

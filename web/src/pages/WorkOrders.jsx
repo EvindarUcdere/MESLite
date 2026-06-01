@@ -88,8 +88,12 @@ function hasOperationLog(operation) {
   return Boolean(operation._count?.productionLogs || operation.producedQuantity > 0 || operation.scrapQuantity > 0);
 }
 
-function canCompleteOperation(operation) {
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation);
+function canCompleteOperation(operation, workOrder, user) {
+  const isManagerOverride = [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER].includes(user?.role);
+  const hasPlannedQuantity = workOrder?.plannedQuantity > 0;
+  const meetsPlannedQuantity = !hasPlannedQuantity || operation.producedQuantity >= workOrder.plannedQuantity;
+
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
 }
 
 function getOperationProgress(operations = []) {
@@ -547,11 +551,11 @@ export default function WorkOrders() {
                                       <button
                                         type="button"
                                         onClick={() => runAction(() => completeWorkOrderOperation(operation.id), "Operasyon tamamlanamadı.")}
-                                        disabled={!canCompleteOperation(operation)}
+                                        disabled={!canCompleteOperation(operation, workOrder, user)}
                                         title={
-                                          canCompleteOperation(operation)
+                                          canCompleteOperation(operation, workOrder, user)
                                             ? "Operasyonu tamamla"
-                                            : "Tamamlamak için bu operasyon adına en az bir üretim/fire/not kaydı girilmeli."
+                                            : "Operatör için planlanan adet tamamlanmalı; eksik üretimi yalnızca yönetici kapatabilir."
                                         }
                                       >
                                         <Square size={14} />

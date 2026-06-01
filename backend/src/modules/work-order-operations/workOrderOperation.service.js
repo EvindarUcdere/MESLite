@@ -236,6 +236,13 @@ export async function completeOperation(actor, id) {
     throw new ApiError(400, "At least one production log must be saved before completing an operation");
   }
 
+  if (actor.role === "OPERATOR" && current.producedQuantity < current.workOrder.plannedQuantity) {
+    throw new ApiError(
+      400,
+      `Operation cannot be completed before planned quantity is produced (${current.producedQuantity}/${current.workOrder.plannedQuantity})`
+    );
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const operation = await tx.workOrderOperation.update({
       where: { id },

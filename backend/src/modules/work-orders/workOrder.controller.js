@@ -41,6 +41,6 @@ export async function pause(req, res) {
 }
 
 export async function complete(req, res) {
-  const workOrder = await workOrderService.completeWorkOrder(req.params.id);
+  const workOrder = await workOrderService.completeWorkOrder(req.user, req.params.id);
   res.json({ data: workOrder });
 }

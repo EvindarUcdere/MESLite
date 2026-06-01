@@ -154,6 +154,8 @@ Kurallar:
 - Duraklatılan operasyona üretim/fire/not girişi yapılabilir; operatör duruş anına kadar olan gerçek durumu kaybetmeden kaydeder.
 - Üretim ve fire 0 ise operatör mutlaka açıklama notu girer. Örnek: "Makine alarm verdi, üretim başlamadı."
 - Operasyon tamamlanmadan önce o operasyon için en az bir saha kaydı girilmelidir.
+- Operatör, planlanan adet tamamlanmadan operasyonu `COMPLETED` durumuna alamaz.
+- Eksik üretimi kapatma yetkisi yalnızca admin veya üretim yöneticisindedir. Bu karar müşteri talebi değişikliği gibi istisnai durumlar içindir.
 - Bir operasyon tamamlanınca sıradaki operasyon otomatik `READY` olur.
 - Son operasyon da tamamlanırsa backend ana iş emrini `COMPLETED` durumuna alır.
 
