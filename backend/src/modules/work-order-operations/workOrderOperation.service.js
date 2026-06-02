@@ -2,6 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
+import { createNotification } from "../notifications/notification.service.js";
 
 const operationInclude = {
   workOrder: {
@@ -364,6 +365,26 @@ export async function completeOperation(actor, id) {
         data: { status: "READY" },
         include: operationInclude
       });
+
+      if (readyOperation.assignedOperatorId) {
+        await createNotification(
+          {
+            recipientId: readyOperation.assignedOperatorId,
+            type: "OPERATION_HANDOFF",
+            title: "Yeni operasyon size devredildi",
+            message: `${operation.workOrder.orderNo} iş emrinde ${readyOperation.operationName} operasyonu hazır.`,
+            entityType: "WorkOrderOperation",
+            entityId: readyOperation.id,
+            metadata: {
+              workOrderId: current.workOrderId,
+              orderNo: operation.workOrder.orderNo,
+              operationName: readyOperation.operationName,
+              previousOperationName: operation.operationName
+            }
+          },
+          tx
+        );
+      }
     }
 
     const remainingOperationCount = await tx.workOrderOperation.count({
@@ -465,6 +486,25 @@ export async function createOperationMessage(actor, id, data) {
       }
     }
   });
+
+  if (operation.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+    await createNotification({
+      recipientId: operation.assignedOperatorId,
+      type: "OPERATION_MESSAGE",
+      title: "Operasyon mesajı geldi",
+      message: `${operation.workOrder.orderNo} / ${operation.operationName}: ${message.message}`,
+      entityType: "WorkOrderOperation",
+      entityId: operation.id,
+      metadata: {
+        workOrderId: operation.workOrderId,
+        orderNo: operation.workOrder.orderNo,
+        operationName: operation.operationName,
+        severity: message.severity,
+        senderId: actor.id,
+        senderName: actor.name
+      }
+    });
+  }
 
   await recordAuditLog({
     actorId: actor.id,

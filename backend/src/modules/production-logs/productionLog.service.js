@@ -2,6 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
+import { createNotificationsForRoles } from "../notifications/notification.service.js";
 import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
 
 const includeRelations = {
@@ -125,6 +126,25 @@ export async function createProductionLog(actor, data) {
         message: data.note,
         severity: data.alertSeverity ?? "WARNING"
       });
+
+      await createNotificationsForRoles(
+        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        {
+          type: "CRITICAL_PRODUCTION_ALERT",
+          title: "Kritik üretim uyarısı",
+          message: `${workOrder.orderNo}: ${data.note}`,
+          entityType: "ProductionAlert",
+          entityId: alert.id,
+          metadata: {
+            workOrderId: workOrder.id,
+            orderNo: workOrder.orderNo,
+            productionLogId: log.id,
+            severity: data.alertSeverity ?? "WARNING",
+            operatorId
+          }
+        },
+        tx
+      );
     }
 
     let updatedOperation = null;

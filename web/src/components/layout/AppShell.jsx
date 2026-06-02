@@ -1,7 +1,7 @@
-import { AlertTriangle, BarChart3, Boxes, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Boxes, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore.js";
-import { hasRole, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
+import { hasRole, ROLES, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
 
 const navigationItems = [
   {
@@ -16,6 +16,12 @@ const navigationItems = [
     label: "İş Emirleri",
     icon: ClipboardList,
     roles: ROLE_GROUPS.planning
+  },
+  {
+    to: "/notifications",
+    label: "Bildirimler",
+    icon: Bell,
+    roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.OPERATOR, ROLES.QUALITY_STAFF, ROLES.VIEWER]
   },
   {
     to: "/routes",

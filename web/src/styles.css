@@ -478,6 +478,76 @@ body {
   background: #ffffff;
 }
 
+.notification-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notification-filter-row button,
+.notification-card button {
+  min-height: 36px;
+  padding: 0 12px;
+  color: #17202a;
+  background: #ffffff;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.notification-filter-row .filter-chip-active {
+  color: #ffffff;
+  background: #256f6c;
+  border-color: #256f6c;
+}
+
+.notification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.notification-unread {
+  border-color: #256f6c;
+  background: #f0fdfa;
+}
+
+.notification-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.notification-heading span,
+.read-state {
+  padding: 4px 8px;
+  color: #256f6c;
+  background: #d9f2e8;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notification-card p {
+  margin: 6px 0;
+  color: #33424d;
+}
+
+.notification-card small {
+  color: #60707d;
+}
+
 .note-filter-grid {
   display: grid;
   grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(180px, 1fr));

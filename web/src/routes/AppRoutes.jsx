@@ -6,6 +6,7 @@ import Dashboard from "../pages/Dashboard.jsx";
 import FieldNotes from "../pages/FieldNotes.jsx";
 import Login from "../pages/Login.jsx";
 import Machines from "../pages/Machines.jsx";
+import Notifications from "../pages/Notifications.jsx";
 import Products from "../pages/Products.jsx";
 import Quality from "../pages/Quality.jsx";
 import Reports from "../pages/Reports.jsx";
@@ -23,6 +24,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.managementPlusQuality} />}>
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/field-notes" element={<FieldNotes />} />

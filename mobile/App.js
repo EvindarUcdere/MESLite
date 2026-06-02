@@ -2,6 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
@@ -155,6 +156,19 @@ function getWorkOrderFlowText(workOrder) {
   return getOperationProgress(workOrder.operations).activeOperation?.operationName ?? "Operasyon bekliyor";
 }
 
+function formatDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
 function canStartOperation(operation, workOrder) {
   return !isClosedWorkOrder(workOrder) && ["READY", "PAUSED"].includes(operation.status);
 }
@@ -257,6 +271,8 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [operationMessageDrafts, setOperationMessageDrafts] = useState({});
   const [notificationCounts, setNotificationCounts] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -314,6 +330,8 @@ export default function App() {
     await logout();
     setUser(null);
     setWorkOrders([]);
+    setNotifications([]);
+    setUnreadNotificationCount(0);
     setSelectedWorkOrderId("");
     setSelectedOperationId("");
     setSuccessMessage("");
@@ -339,6 +357,41 @@ export default function App() {
     }
   }
 
+  async function loadNotifications() {
+    try {
+      const response = await getNotifications({ limit: 50 });
+      setNotifications(response.data);
+      setUnreadNotificationCount(response.meta.unreadCount);
+    } catch (notificationError) {
+      if (isUnauthorizedError(notificationError)) {
+        await clearExpiredSession();
+      }
+    }
+  }
+
+  async function handleMarkNotificationRead(notificationId) {
+    try {
+      const response = await markNotificationRead(notificationId);
+      setNotifications((current) =>
+        current.map((notification) => (notification.id === notificationId ? { ...notification, readAt: notification.readAt ?? new Date().toISOString() } : notification))
+      );
+      setUnreadNotificationCount(response.meta.unreadCount);
+    } catch (_error) {
+      setError("Bildirim okundu olarak işaretlenemedi.");
+    }
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    try {
+      const response = await markAllNotificationsRead();
+      const now = new Date().toISOString();
+      setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt ?? now })));
+      setUnreadNotificationCount(response.meta.unreadCount);
+    } catch (_error) {
+      setError("Bildirimler okundu olarak işaretlenemedi.");
+    }
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -349,6 +402,7 @@ export default function App() {
         if (session.token && session.user && isMounted) {
           setUser(session.user);
           await loadWorkOrders();
+          await loadNotifications();
         }
       } catch (_error) {
         if (isMounted) {
@@ -425,12 +479,23 @@ export default function App() {
 
       refreshWorkOrders({ preserveMessage: true });
     };
+    const handleNotificationCreated = (notification) => {
+      if (notification.recipientId !== user.id) {
+        return;
+      }
+
+      playNotificationSound();
+      setSuccessMessage(notification.title);
+      setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]);
+      setUnreadNotificationCount((current) => current + 1);
+    };
 
     socket.on("connect", () => {
       socket.emit("join:dashboard");
     });
     socket.on("operationMessage:created", handleOperationMessageCreated);
     socket.on("workOrderOperation:updated", handleWorkOrderOperationUpdated);
+    socket.on("notification:created", handleNotificationCreated);
     socket.on("workOrder:updated", refreshWorkOrders);
     socket.on("production:logged", refreshWorkOrders);
 
@@ -449,6 +514,7 @@ export default function App() {
       const session = await login({ email, password });
       setUser(session.user);
       await loadWorkOrders();
+      await loadNotifications();
     } catch (loginError) {
       setError(getErrorMessage(loginError, "Giriş yapılamadı."));
     } finally {
@@ -460,6 +526,8 @@ export default function App() {
     await logout();
     setUser(null);
     setWorkOrders([]);
+    setNotifications([]);
+    setUnreadNotificationCount(0);
     setSelectedWorkOrderId("");
     setSelectedOperationId("");
   }
@@ -756,6 +824,33 @@ export default function App() {
           <Text style={styles.inlineButtonText}>Tekrar Dene</Text>
         </Pressable>
       ) : null}
+
+      <View style={styles.card}>
+        <View style={styles.notificationPanelHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Bildirimler</Text>
+            <Text style={styles.muted}>{unreadNotificationCount} okunmamış bildirim</Text>
+          </View>
+          <Pressable style={styles.inlineButton} onPress={handleMarkAllNotificationsRead} disabled={!unreadNotificationCount || isSubmitting}>
+            <Text style={styles.inlineButtonText}>Tümünü Okundu Yap</Text>
+          </Pressable>
+        </View>
+        {notifications.slice(0, 4).map((notification) => (
+          <View key={notification.id} style={[styles.mobileNotificationCard, !notification.readAt ? styles.mobileNotificationUnread : null]}>
+            <View style={styles.mobileNotificationText}>
+              <Text style={styles.detailValue}>{notification.title}</Text>
+              <Text style={styles.muted}>{notification.message}</Text>
+              <Text style={styles.detailLabel}>{formatDateTime(notification.createdAt)}</Text>
+            </View>
+            {!notification.readAt ? (
+              <Pressable style={styles.inlineButton} onPress={() => handleMarkNotificationRead(notification.id)} disabled={isSubmitting}>
+                <Text style={styles.inlineButtonText}>Okundu</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ))}
+        {!notifications.length ? <Text style={styles.muted}>Henüz bildirim yok.</Text> : null}
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
@@ -1541,6 +1636,31 @@ const styles = StyleSheet.create({
   followUpOrderCard: {
     backgroundColor: "#f8fafc",
     borderColor: "#c8d3dd"
+  },
+  notificationPanelHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  mobileNotificationCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: 10,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  mobileNotificationUnread: {
+    backgroundColor: "#f0fdfa",
+    borderColor: "#256f6c"
+  },
+  mobileNotificationText: {
+    flex: 1,
+    gap: 3
   },
   orderNo: {
     color: "#17202a",
