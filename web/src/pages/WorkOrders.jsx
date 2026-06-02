@@ -191,9 +191,14 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function normalize(value) {
+  return value?.toLocaleLowerCase("tr-TR") ?? "";
+}
+
 export default function WorkOrders() {
   const user = useAuthStore((state) => state.user);
   const [workOrders, setWorkOrders] = useState([]);
+  const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [machines, setMachines] = useState([]);
@@ -252,6 +257,39 @@ export default function WorkOrders() {
     () => workOrders.reduce((total, workOrder) => total + (workOrder.operations ?? []).reduce((sum, operation) => sum + (operation.messages?.length ?? 0), 0), 0),
     [workOrders]
   );
+  const filteredWorkOrders = useMemo(() => {
+    const searchText = normalize(search.trim());
+
+    if (!searchText) {
+      return workOrders;
+    }
+
+    return workOrders.filter((workOrder) => {
+      const operationNames = (workOrder.operations ?? []).map((operation) => operation.operationName).join(" ");
+      const operatorNames = [
+        workOrder.assignedOperator?.name,
+        ...(workOrder.operations ?? []).map((operation) => operation.assignedOperator?.name)
+      ].join(" ");
+      const machineTexts = [
+        workOrder.machine?.code,
+        workOrder.machine?.name,
+        ...(workOrder.operations ?? []).flatMap((operation) => [operation.machine?.code, operation.machine?.name])
+      ].join(" ");
+      const statusText = [STATUS_LABELS[workOrder.status], workOrder.status, getFlowRiskText(workOrder)].join(" ");
+      const searchableText = [
+        workOrder.orderNo,
+        workOrder.product?.code,
+        workOrder.product?.name,
+        workOrder.route?.name,
+        statusText,
+        machineTexts,
+        operatorNames,
+        operationNames
+      ].join(" ");
+
+      return normalize(searchableText).includes(searchText);
+    });
+  }, [search, workOrders]);
   const canCreateManualProductionLog = user?.role === ROLES.ADMIN;
 
   async function loadData() {
@@ -582,6 +620,17 @@ export default function WorkOrders() {
             <p className="muted-text">Başlatma, duraklatma ve tamamlama butonları yönetici müdahalesi içindir; normal üretim akışı mobil operatör ekranından ilerler.</p>
           </div>
         </div>
+        <div className="work-order-list-toolbar">
+          <label className="work-order-search">
+            Arama
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="İş emri, ürün, makine, operatör veya durum ara"
+            />
+          </label>
+          <span>{isLoading ? "Liste yükleniyor..." : `${filteredWorkOrders.length}/${workOrders.length} iş emri gösteriliyor`}</span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -598,7 +647,7 @@ export default function WorkOrders() {
               </tr>
             </thead>
             <tbody>
-              {workOrders.map((workOrder) => {
+              {filteredWorkOrders.map((workOrder) => {
                 const progress = workOrder.plannedQuantity > 0 ? Math.round((workOrder.producedQuantity / workOrder.plannedQuantity) * 100) : 0;
                 const startBlockReason = getStartBlockReason(workOrder);
                 const startDisabled = Boolean(startBlockReason);
@@ -782,6 +831,11 @@ export default function WorkOrders() {
               {!isLoading && workOrders.length === 0 ? (
                 <tr>
                   <td colSpan="9">Henüz iş emri yok.</td>
+                </tr>
+              ) : null}
+              {!isLoading && workOrders.length > 0 && filteredWorkOrders.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Arama kriterine uyan iş emri bulunamadı.</td>
                 </tr>
               ) : null}
             </tbody>

@@ -917,6 +917,36 @@ body {
   background: #ffffff;
 }
 
+.work-order-list-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.work-order-list-toolbar span {
+  color: #60707d;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.work-order-search {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 6px;
+  color: #33424d;
+  font-size: 14px;
+}
+
+.work-order-search input {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
 .stack-form {
   display: grid;
   gap: 14px;
@@ -1519,6 +1549,15 @@ th {
 
   .operation-message-form {
     grid-template-columns: 1fr;
+  }
+
+  .work-order-list-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .work-order-list-toolbar span {
+    white-space: normal;
   }
 
   .field-note-image-link {
