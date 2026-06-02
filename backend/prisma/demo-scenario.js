@@ -32,12 +32,25 @@ async function resetDemoWorkOrders() {
   });
   const productionLogIds = productionLogs.map((log) => log.id);
 
+  const operations = await prisma.workOrderOperation.findMany({
+    where: { workOrderId: { in: workOrderIds } },
+    select: { id: true }
+  });
+  const operationIds = operations.map((operation) => operation.id);
+
   const alerts = await prisma.productionAlert.findMany({
     where: { workOrderId: { in: workOrderIds } },
     select: { id: true }
   });
   const alertIds = alerts.map((alert) => alert.id);
 
+  await prisma.notification.deleteMany({
+    where: {
+      entityId: {
+        in: [...workOrderIds, ...operationIds, ...productionLogIds, ...alertIds]
+      }
+    }
+  });
   await prisma.productionAlertEvent.deleteMany({ where: { alertId: { in: alertIds } } });
   await prisma.productionAlert.deleteMany({ where: { id: { in: alertIds } } });
   await prisma.productionLogAttachment.deleteMany({ where: { productionLogId: { in: productionLogIds } } });

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
-import { startOperation } from "../src/modules/work-order-operations/workOrderOperation.service.js";
+import { createProductionLog } from "../src/modules/production-logs/productionLog.service.js";
+import { completeOperation, startOperation } from "../src/modules/work-order-operations/workOrderOperation.service.js";
 import { pauseWorkOrder, startWorkOrder } from "../src/modules/work-orders/workOrder.service.js";
 
 const prisma = new PrismaClient();
@@ -12,6 +13,19 @@ function assert(condition, message) {
 
 function operationByName(workOrder, name) {
   return workOrder.operations.find((operation) => operation.operationName === name);
+}
+
+async function expectRejects(action, messageIncludes) {
+  try {
+    await action();
+  } catch (error) {
+    if (messageIncludes) {
+      assert(error.message.includes(messageIncludes), `Expected error to include "${messageIncludes}", got "${error.message}"`);
+    }
+    return error;
+  }
+
+  throw new Error(`Expected action to fail with "${messageIncludes}"`);
 }
 
 async function main() {
@@ -81,7 +95,15 @@ async function main() {
   await startWorkOrder(runOrder.id);
   const restartedRunOrder = await prisma.workOrder.findUnique({
     where: { id: runOrder.id },
-    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+    include: {
+      operations: {
+        include: {
+          assignedOperator: true,
+          machine: true
+        },
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
   });
   assert(restartedRunOrder.status === "IN_PROGRESS", "Restarting a paused routed work order must restart the work order");
   assert(operationByName(restartedRunOrder, "Montaj").status === "IN_PROGRESS", "Restarting a paused routed work order must restart the paused operation");
@@ -90,6 +112,11 @@ async function main() {
   assert(pauseOrder.producedQuantity === 0, "PAUSE order final produced quantity must not include paused upstream operations");
   assert(operationByName(pauseOrder, "Montaj").status === "PAUSED", "PAUSE Montaj must be paused");
   assert(operationByName(pauseOrder, "Montaj").messages.some((message) => message.severity === "STOPPAGE"), "PAUSE Montaj must include stoppage message");
+
+  await expectRejects(
+    () => completeOperation(operationByName(pauseOrder, "Montaj").assignedOperator, operationByName(pauseOrder, "Montaj").id),
+    "Operation cannot be completed before planned quantity is produced"
+  );
 
   assert(qualityOrder.status === "COMPLETED", "QUALITY order must be completed");
   assert(qualityOrder.producedQuantity === 50, "QUALITY order final produced quantity must equal final operation output");
@@ -144,6 +171,55 @@ async function main() {
     "Quality operator must see waiting quality operation for RUN"
   );
 
+  const runMontaj = operationByName(restartedRunOrder, "Montaj");
+  const runQuality = operationByName(restartedRunOrder, "Kalite Kontrol");
+  const qualityNotificationCountBefore = await prisma.notification.count({
+    where: {
+      recipientId: runQuality.assignedOperatorId,
+      type: "OPERATION_HANDOFF",
+      entityId: runQuality.id
+    }
+  });
+
+  await createProductionLog(runMontaj.assignedOperator, {
+    workOrderId: restartedRunOrder.id,
+    workOrderOperationId: runMontaj.id,
+    machineId: runMontaj.machineId,
+    producedQuantity: 60,
+    scrapQuantity: 0,
+    note: "Acceptance test: montaj planlanan adedi tamamladı."
+  });
+
+  const afterMontajLog = await prisma.workOrder.findUnique({
+    where: { id: restartedRunOrder.id },
+    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+  });
+
+  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 120, "Montaj production log must increase operation quantity to 120");
+  assert(afterMontajLog.producedQuantity === 0, "Intermediate Montaj production must not increase final work order quantity");
+
+  await completeOperation(runMontaj.assignedOperator, runMontaj.id);
+
+  const afterMontajComplete = await prisma.workOrder.findUnique({
+    where: { id: restartedRunOrder.id },
+    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+  });
+  const readyQuality = operationByName(afterMontajComplete, "Kalite Kontrol");
+  const qualityNotificationCountAfter = await prisma.notification.count({
+    where: {
+      recipientId: readyQuality.assignedOperatorId,
+      type: "OPERATION_HANDOFF",
+      entityId: readyQuality.id
+    }
+  });
+
+  assert(operationByName(afterMontajComplete, "Montaj").status === "COMPLETED", "Completed Montaj operation must be completed");
+  assert(readyQuality.status === "READY", "Completing Montaj must prepare the next quality operation");
+  assert(
+    qualityNotificationCountAfter === qualityNotificationCountBefore + 1,
+    "Completing an operation must notify the next assigned operator"
+  );
+
   console.log({
     acceptance: "ok",
     checkedWorkOrders: workOrders.map((workOrder) => workOrder.orderNo),
@@ -156,7 +232,11 @@ async function main() {
       "final production quantity",
       "quality check operation link",
       "short-completed operation reopen",
-      "assigned active mobile operations"
+      "assigned active mobile operations",
+      "operator cannot complete short production",
+      "production log updates operation totals",
+      "intermediate operation does not inflate final quantity",
+      "operation handoff notification"
     ]
   });
 }

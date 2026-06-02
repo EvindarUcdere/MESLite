@@ -29,6 +29,9 @@ Bu test sunlari dogrular:
 - Kalite sonucunun final operasyon adimina bagli oldugunu
 - Eksik kapanan operasyonun uretim yoneticisi/admin tarafindan yeniden acilabildigini
 - Mobil operatorlerin aktif/bekleyen kendi operasyonlarini gorebildigini
+- Operatorun planlanan adetten dusuk uretimi operasyon tamamlandi diye kapatamadigini
+- Ara operasyon uretim kaydinin sadece ilgili operasyon adedini artirdigini, final is emri adedini sisirmedigini
+- Bir operasyon tamamlandiginda sonraki operasyonun `READY` oldugunu ve siradaki operatore bildirim gittigini
 
 ## Demo Kullanici Bilgileri
 
@@ -141,3 +144,14 @@ Kesim 100, Montaj 100, Kalite 100 girildiginde is emri 300 uretilmis gibi gorunm
 ```
 
 Ara operasyonlar surec izlenebilirligi icindir. Final operasyon ise musterinin teslim alacagi bitmis urun miktarini temsil eder.
+
+## Faz 2 Kabul Kriterleri
+
+Bu senaryoda kabul testi bilincli olarak servis katmanini dogrular:
+
+- `workOrderOperation.service.js`: Operasyon baslatma, duraklatma, yeniden acma, tamamlama ve sonraki operasyona devir kurallari.
+- `productionLog.service.js`: Uretim/fire kaydi, operasyon bazli adet toplami, kritik uyari ve veri tutarliligi.
+- `notification.service.js`: Operasyon devri ve kritik olaylarda ilgili kullanicilara kalici bildirim olusturma.
+- `Prisma`: Tum bu aksiyonlarin PostgreSQL uzerinde kalici ve iliskili olarak yazilmasi.
+
+Bu testin amaci sadece UI'nin calistigini gostermek degildir. Fabrika ortaminda asil risk, ekranda islem yapilmis gibi gorunup veritabaninda yanlis toplam, yanlis durum veya eksik bildirim kalmasidir. Bu nedenle kabul testi dogrudan backend is kurallarini calistirir.
