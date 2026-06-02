@@ -286,9 +286,11 @@ export default function App() {
     setError("Oturum süresi doldu. Lütfen tekrar giriş yapın.");
   }
 
-  async function loadWorkOrders() {
+  async function loadWorkOrders({ preserveMessage = false } = {}) {
     setError("");
-    setSuccessMessage("");
+    if (!preserveMessage) {
+      setSuccessMessage("");
+    }
 
     try {
       const data = await getWorkOrders();
@@ -338,8 +340,8 @@ export default function App() {
     }
 
     const socket = createMobileSocket();
-    const refreshWorkOrders = () => {
-      loadWorkOrders();
+    const refreshWorkOrders = (options) => {
+      loadWorkOrders(options);
     };
     const handleOperationMessageCreated = (message) => {
       const workOrderId = getOperationMessageWorkOrderId(message);
@@ -355,22 +357,26 @@ export default function App() {
         }
       }
 
-      refreshWorkOrders();
+      refreshWorkOrders({ preserveMessage: true });
     };
     const handleWorkOrderOperationUpdated = (operation) => {
       const workOrderId = getOperationWorkOrderId(operation);
       const isAssignedToCurrentUser = operation?.assignedOperatorId === user.id;
       const isActionableStatus = ["READY", "IN_PROGRESS", "PAUSED"].includes(operation?.status);
 
-      if (workOrderId && isAssignedToCurrentUser && isActionableStatus && selectedWorkOrderIdRef.current !== workOrderId) {
+      if (workOrderId && isAssignedToCurrentUser && isActionableStatus) {
         playNotificationSound();
-        setNotificationCounts((current) => ({
-          ...current,
-          [workOrderId]: (current[workOrderId] ?? 0) + 1
-        }));
+        setSuccessMessage(`${operation.operationName} operasyonu ${OPERATION_STATUS_LABELS[operation.status] ?? operation.status.toLowerCase()} durumuna alındı.`);
+
+        if (selectedWorkOrderIdRef.current !== workOrderId) {
+          setNotificationCounts((current) => ({
+            ...current,
+            [workOrderId]: (current[workOrderId] ?? 0) + 1
+          }));
+        }
       }
 
-      refreshWorkOrders();
+      refreshWorkOrders({ preserveMessage: true });
     };
 
     socket.on("connect", () => {
