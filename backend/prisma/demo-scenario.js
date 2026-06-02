@@ -403,6 +403,54 @@ async function main() {
         defectReason: "Yuzey cizigi",
         note: "Kalan 48 urun sevke uygun."
       }
+    },
+    {
+      orderNo: `${demoOrderPrefix}REOPEN`,
+      plannedQuantity: 120,
+      producedQuantity: 0,
+      scrapQuantity: 1,
+      status: "PAUSED",
+      actualStartDate: now,
+      operations: [
+        {
+          operationName: "Kesim",
+          machineId: cuttingMachine.id,
+          assignedOperatorId: cuttingOperator.id,
+          status: "COMPLETED",
+          producedQuantity: 48,
+          scrapQuantity: 1,
+          startedAt: now,
+          completedAt: now
+        },
+        {
+          operationName: "Montaj",
+          machineId: assemblyMachine.id,
+          assignedOperatorId: assemblyOperator.id,
+          status: "PAUSED",
+          producedQuantity: 0,
+          scrapQuantity: 0,
+          startedAt: now
+        },
+        {
+          operationName: "Kalite Kontrol",
+          machineId: qualityMachine.id,
+          assignedOperatorId: qualityOperator.id,
+          status: "WAITING",
+          producedQuantity: 0,
+          scrapQuantity: 0
+        }
+      ],
+      logs: [
+        { sequenceNo: 1, producedQuantity: 48, scrapQuantity: 1, scrapReason: "PROCESS_DEVIATION", note: "Kesim eksik kapandi, musteri planina gore yeniden acilabilir." }
+      ],
+      messages: [
+        {
+          sequenceNo: 1,
+          senderId: manager.id,
+          severity: "WARNING",
+          message: "Kesim eksik kapandi; gerekirse yeniden uretime alinacak."
+        }
+      ]
     }
   ];
 

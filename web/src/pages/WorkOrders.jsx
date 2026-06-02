@@ -77,8 +77,9 @@ function canComplete(workOrder) {
   return ["IN_PROGRESS", "PAUSED"].includes(workOrder.status) && workOrder.producedQuantity > 0;
 }
 
-function canStartOperation(operation) {
-  return ["READY", "PAUSED"].includes(operation.status);
+function canStartOperation(operation, workOrder, user) {
+  const isManagerOverride = [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER].includes(user?.role);
+  return ["READY", "PAUSED"].includes(operation.status) || (isManagerOverride && isShortCompletedOperation(operation, workOrder));
 }
 
 function canPauseOperation(operation) {
@@ -710,8 +711,8 @@ export default function WorkOrders() {
                                       <button
                                         type="button"
                                         onClick={() => runAction(() => startWorkOrderOperation(operation.id), "Operasyon başlatılamadı.")}
-                                        disabled={!canStartOperation(operation)}
-                                        title="Operasyonu başlat"
+                                        disabled={!canStartOperation(operation, workOrder, user)}
+                                        title={isShortCompletedOperation(operation, workOrder) ? "Eksik kapanan operasyonu yeniden üretime al" : "Operasyonu başlat"}
                                       >
                                         <Play size={14} />
                                       </button>

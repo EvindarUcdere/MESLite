@@ -301,7 +301,7 @@ Faz 2 icin uctan uca demo senaryosu eklendi.
 
 - `npm run seed:demo` komutu ile tekrar calistirilabilir demo veri uretilir.
 - Demo rota `Kesim -> Montaj -> Kalite Kontrol` akisini kullanir.
-- Devam eden, duraklatilan ve kalite sonucu olan uc ayri is emri olusturulur.
+- Devam eden, duraklatilan, kalite sonucu olan ve eksik kapanip yeniden acilabilen dort ayri is emri olusturulur.
 - Demo veriler operasyon mesajlari, uretim kayitlari, fire ve kalite sonucuyla birlikte gelir.
 - Rotali uretimde ara operasyon uretimleri is emri final uretimini sisirmeyecek sekilde backend kurali netlestirildi.
 - `npm run test:phase2` komutu ile demo verinin kabul testi otomatik calisir.

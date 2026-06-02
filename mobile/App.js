@@ -207,6 +207,10 @@ function getOperationMessageWorkOrderId(message) {
   return message?.workOrderOperation?.workOrder?.id ?? message?.workOrderOperation?.workOrderId ?? null;
 }
 
+function getOperationWorkOrderId(operation) {
+  return operation?.workOrder?.id ?? operation?.workOrderId ?? null;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState("operator@meslite.local");
@@ -353,12 +357,27 @@ export default function App() {
 
       refreshWorkOrders();
     };
+    const handleWorkOrderOperationUpdated = (operation) => {
+      const workOrderId = getOperationWorkOrderId(operation);
+      const isAssignedToCurrentUser = operation?.assignedOperatorId === user.id;
+      const isActionableStatus = ["READY", "IN_PROGRESS", "PAUSED"].includes(operation?.status);
+
+      if (workOrderId && isAssignedToCurrentUser && isActionableStatus && selectedWorkOrderIdRef.current !== workOrderId) {
+        playNotificationSound();
+        setNotificationCounts((current) => ({
+          ...current,
+          [workOrderId]: (current[workOrderId] ?? 0) + 1
+        }));
+      }
+
+      refreshWorkOrders();
+    };
 
     socket.on("connect", () => {
       socket.emit("join:dashboard");
     });
     socket.on("operationMessage:created", handleOperationMessageCreated);
-    socket.on("workOrderOperation:updated", refreshWorkOrders);
+    socket.on("workOrderOperation:updated", handleWorkOrderOperationUpdated);
     socket.on("workOrder:updated", refreshWorkOrders);
     socket.on("production:logged", refreshWorkOrders);
 

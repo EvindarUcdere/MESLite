@@ -46,6 +46,15 @@ function assertOperatorCanUseOperation(actor, operation) {
   }
 }
 
+function canReopenShortCompletedOperation(actor, operation) {
+  return (
+    ["ADMIN", "PRODUCTION_MANAGER"].includes(actor.role) &&
+    operation.status === "COMPLETED" &&
+    operation.workOrder.plannedQuantity > 0 &&
+    operation.producedQuantity < operation.workOrder.plannedQuantity
+  );
+}
+
 async function getOperationOrThrow(id) {
   const operation = await prisma.workOrderOperation.findUnique({
     where: { id },
@@ -135,13 +144,31 @@ export function findAssignedOperations(operatorId) {
 export async function startOperation(actor, id) {
   const current = await getOperationOrThrow(id);
   assertOperatorCanUseOperation(actor, current);
+  const isReopeningShortCompletedOperation = canReopenShortCompletedOperation(actor, current);
 
   if (["COMPLETED", "CANCELLED"].includes(current.workOrder.status)) {
     throw new ApiError(400, "Operations of completed or cancelled work orders cannot be started");
   }
 
-  if (!["READY", "PAUSED"].includes(current.status)) {
-    throw new ApiError(400, "Only ready or paused operations can be started");
+  if (!["READY", "PAUSED"].includes(current.status) && !isReopeningShortCompletedOperation) {
+    throw new ApiError(400, "Only ready, paused or short-completed operations can be started");
+  }
+
+  let downstreamOperations = [];
+  if (isReopeningShortCompletedOperation) {
+    downstreamOperations = await prisma.workOrderOperation.findMany({
+      where: {
+        workOrderId: current.workOrderId,
+        sequenceNo: { gt: current.sequenceNo }
+      },
+      orderBy: { sequenceNo: "asc" }
+    });
+
+    const hasDownstreamProduction = downstreamOperations.some((operation) => operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+
+    if (hasDownstreamProduction) {
+      throw new ApiError(400, "Short-completed operation cannot be reopened after downstream production was logged");
+    }
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -149,10 +176,36 @@ export async function startOperation(actor, id) {
       where: { id },
       data: {
         status: "IN_PROGRESS",
-        startedAt: current.startedAt ?? new Date()
+        startedAt: current.startedAt ?? new Date(),
+        completedAt: null
       },
       include: operationInclude
     });
+
+    let resetOperations = [];
+    if (isReopeningShortCompletedOperation && downstreamOperations.length) {
+      await tx.workOrderOperation.updateMany({
+        where: {
+          workOrderId: current.workOrderId,
+          sequenceNo: { gt: current.sequenceNo },
+          status: { not: "WAITING" }
+        },
+        data: {
+          status: "WAITING",
+          startedAt: null,
+          completedAt: null
+        }
+      });
+
+      resetOperations = await tx.workOrderOperation.findMany({
+        where: {
+          workOrderId: current.workOrderId,
+          sequenceNo: { gt: current.sequenceNo }
+        },
+        include: operationInclude,
+        orderBy: { sequenceNo: "asc" }
+      });
+    }
 
     const workOrder = await tx.workOrder.update({
       where: { id: current.workOrderId },
@@ -171,10 +224,11 @@ export async function startOperation(actor, id) {
     }
 
     const fullWorkOrder = await getWorkOrderForEmit(current.workOrderId, tx);
-    return { operation, workOrder: fullWorkOrder ?? workOrder, machine };
+    return { operation, resetOperations, workOrder: fullWorkOrder ?? workOrder, machine };
   });
 
   emitEvent("workOrderOperation:updated", result.operation);
+  result.resetOperations.forEach((operation) => emitEvent("workOrderOperation:updated", operation));
   emitEvent("workOrder:updated", result.workOrder);
   if (result.machine) {
     emitEvent("machine:statusChanged", result.machine);

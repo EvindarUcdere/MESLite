@@ -22,11 +22,12 @@ npm run test:phase2
 
 Bu test sunlari dogrular:
 
-- 3 demo is emri olustugunu
+- 4 demo is emri olustugunu
 - Her demo is emrinde 3 operasyon oldugunu
 - Devam eden ve duran islerde ara operasyon uretimlerinin ana is emri final uretimini sisirmedigini
 - Duran operasyonda durus mesaji oldugunu
 - Kalite sonucunun final operasyon adimina bagli oldugunu
+- Eksik kapanan operasyonun uretim yoneticisi/admin tarafindan yeniden acilabildigini
 - Mobil operatorlerin aktif/bekleyen kendi operasyonlarini gorebildigini
 
 ## Demo Kullanici Bilgileri
@@ -112,6 +113,22 @@ Beklenen sonuc:
 
 - Web `Kalite` ekraninda son kalite kontrollerinde operasyon `3. Kalite Kontrol` olarak gorunur.
 - Kalite sonucu artik sadece is emrine degil, operasyon adimina baglidir.
+
+### `E2E-DEMO-REOPEN`
+
+Amac: Eksik kapanan operasyonun yeniden uretime alinmasini test etmek.
+
+- Plan: 120 adet
+- Kesim 48 adet ile eksik kapanmis durumdadir.
+- Montaj duraklamistir ama henuz uretim girmemistir.
+- Uretim yoneticisi veya admin web uzerinden Kesim operasyonunu yeniden baslatabilir.
+
+Beklenen sonuc:
+
+- Kesim yeniden `IN_PROGRESS` olur.
+- Kesim daha once girilen 48 adet uretim bilgisini korur.
+- Montaj tekrar `WAITING` durumuna doner.
+- Kesim operatoru mobilde operasyon guncellemesini anlik bildirim olarak alir.
 
 ## Backend Kural Notu
 

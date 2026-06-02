@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { startOperation } from "../src/modules/work-order-operations/workOrderOperation.service.js";
 import { pauseWorkOrder, startWorkOrder } from "../src/modules/work-orders/workOrder.service.js";
 
 const prisma = new PrismaClient();
@@ -44,15 +45,17 @@ async function main() {
     }
   });
 
-  assert(workOrders.length === 3, `Expected 3 demo work orders, found ${workOrders.length}`);
+  assert(workOrders.length === 4, `Expected 4 demo work orders, found ${workOrders.length}`);
 
   const runOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-RUN");
   const pauseOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-PAUSE");
   const qualityOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-QUALITY");
+  const reopenOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-REOPEN");
 
   assert(runOrder, "E2E-DEMO-RUN is missing");
   assert(pauseOrder, "E2E-DEMO-PAUSE is missing");
   assert(qualityOrder, "E2E-DEMO-QUALITY is missing");
+  assert(reopenOrder, "E2E-DEMO-REOPEN is missing");
 
   for (const workOrder of workOrders) {
     assert(workOrder.operations.length === 3, `${workOrder.orderNo} must have 3 operations`);
@@ -95,6 +98,22 @@ async function main() {
   assert(qualityOrder.qualityChecks[0].workOrderOperation?.operationName === "Kalite Kontrol", "Quality check must be linked to final operation");
   assert(qualityOrder.qualityChecks[0].defectQuantity === 2, "Quality check defect quantity must be 2");
 
+  assert(reopenOrder.status === "PAUSED", "REOPEN order must start paused");
+  assert(operationByName(reopenOrder, "Kesim").status === "COMPLETED", "REOPEN Kesim must start completed");
+  assert(operationByName(reopenOrder, "Kesim").producedQuantity === 48, "REOPEN Kesim must be short completed");
+  assert(operationByName(reopenOrder, "Montaj").status === "PAUSED", "REOPEN Montaj must start paused");
+
+  const admin = await prisma.user.findUnique({ where: { email: "admin@meslite.local" } });
+  await startOperation(admin, operationByName(reopenOrder, "Kesim").id);
+  const reopenedOrder = await prisma.workOrder.findUnique({
+    where: { id: reopenOrder.id },
+    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+  });
+  assert(reopenedOrder.status === "IN_PROGRESS", "Reopening short-completed operation must restart the work order");
+  assert(operationByName(reopenedOrder, "Kesim").status === "IN_PROGRESS", "Short-completed operation must reopen as in progress");
+  assert(operationByName(reopenedOrder, "Kesim").producedQuantity === 48, "Reopened operation must keep previous production quantity");
+  assert(operationByName(reopenedOrder, "Montaj").status === "WAITING", "Downstream operation without production must reset to waiting");
+
   const activeAssignedOperations = await prisma.workOrderOperation.findMany({
     where: {
       assignedOperator: {
@@ -136,6 +155,7 @@ async function main() {
       "paused operation",
       "final production quantity",
       "quality check operation link",
+      "short-completed operation reopen",
       "assigned active mobile operations"
     ]
   });
