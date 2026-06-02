@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { pauseWorkOrder, startWorkOrder } from "../src/modules/work-orders/workOrder.service.js";
 
 const prisma = new PrismaClient();
 
@@ -66,6 +67,22 @@ async function main() {
   assert(operationByName(runOrder, "Montaj").status === "IN_PROGRESS", "RUN Montaj must be in progress");
   assert(operationByName(runOrder, "Montaj").messages.length >= 2, "RUN Montaj must include operation messages");
 
+  await pauseWorkOrder(runOrder.id);
+  const pausedRunOrder = await prisma.workOrder.findUnique({
+    where: { id: runOrder.id },
+    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+  });
+  assert(pausedRunOrder.status === "PAUSED", "Pausing a routed work order must pause the work order");
+  assert(operationByName(pausedRunOrder, "Montaj").status === "PAUSED", "Pausing a routed work order must pause the active operation");
+
+  await startWorkOrder(runOrder.id);
+  const restartedRunOrder = await prisma.workOrder.findUnique({
+    where: { id: runOrder.id },
+    include: { operations: { orderBy: { sequenceNo: "asc" } } }
+  });
+  assert(restartedRunOrder.status === "IN_PROGRESS", "Restarting a paused routed work order must restart the work order");
+  assert(operationByName(restartedRunOrder, "Montaj").status === "IN_PROGRESS", "Restarting a paused routed work order must restart the paused operation");
+
   assert(pauseOrder.status === "PAUSED", "PAUSE order must be paused");
   assert(pauseOrder.producedQuantity === 0, "PAUSE order final produced quantity must not include paused upstream operations");
   assert(operationByName(pauseOrder, "Montaj").status === "PAUSED", "PAUSE Montaj must be paused");
@@ -115,6 +132,7 @@ async function main() {
       "demo work order count",
       "operation statuses",
       "operation messages",
+      "work order pause/start operation sync",
       "paused operation",
       "final production quantity",
       "quality check operation link",

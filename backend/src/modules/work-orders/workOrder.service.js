@@ -217,7 +217,14 @@ export async function assignMachine(id, machineId) {
 }
 
 export async function startWorkOrder(id) {
-  const current = await prisma.workOrder.findUnique({ where: { id } });
+  const current = await prisma.workOrder.findUnique({
+    where: { id },
+    include: {
+      operations: {
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
+  });
 
   if (!current) {
     throw new ApiError(404, "Work order not found");
@@ -227,11 +234,58 @@ export async function startWorkOrder(id) {
     throw new ApiError(400, "Completed or cancelled work orders cannot be started");
   }
 
-  if (!current.machineId || !current.assignedOperatorId) {
+  const hasOperationFlow = current.operations.length > 0;
+  const targetOperation = hasOperationFlow
+    ? current.operations.find((operation) => operation.status === "PAUSED") ?? current.operations.find((operation) => operation.status === "READY")
+    : null;
+
+  if (hasOperationFlow && !targetOperation) {
+    throw new ApiError(400, "No paused or ready operation can be started for this work order");
+  }
+
+  if (hasOperationFlow && (!targetOperation.machineId || !targetOperation.assignedOperatorId)) {
+    throw new ApiError(400, "Operation machine and operator must be assigned before starting production");
+  }
+
+  if (!hasOperationFlow && (!current.machineId || !current.assignedOperatorId)) {
     throw new ApiError(400, "Machine and operator must be assigned before starting production");
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    let operation = null;
+
+    if (targetOperation) {
+      operation = await tx.workOrderOperation.update({
+        where: { id: targetOperation.id },
+        data: {
+          status: "IN_PROGRESS",
+          startedAt: targetOperation.startedAt ?? new Date()
+        },
+        include: {
+          workOrder: { include: { product: true, route: true } },
+          routeOperation: true,
+          machine: true,
+          assignedOperator: {
+            select: { id: true, name: true, email: true, role: true }
+          },
+          messages: {
+            include: {
+              sender: {
+                select: { id: true, name: true, email: true, role: true }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5
+          },
+          _count: {
+            select: {
+              productionLogs: true
+            }
+          }
+        }
+      });
+    }
+
     const updated = await tx.workOrder.update({
       where: { id },
       data: {
@@ -242,20 +296,30 @@ export async function startWorkOrder(id) {
     });
 
     const machine = await tx.machine.update({
-      where: { id: current.machineId },
+      where: { id: targetOperation?.machineId ?? current.machineId },
       data: { status: "RUNNING" }
     });
 
-    return { workOrder: updated, machine };
+    return { workOrder: updated, operation, machine };
   });
 
+  if (result.operation) {
+    emitEvent("workOrderOperation:updated", result.operation);
+  }
   emitEvent("workOrder:updated", result.workOrder);
   emitEvent("machine:statusChanged", result.machine);
   return result.workOrder;
 }
 
 export async function pauseWorkOrder(id) {
-  const current = await prisma.workOrder.findUnique({ where: { id } });
+  const current = await prisma.workOrder.findUnique({
+    where: { id },
+    include: {
+      operations: {
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
+  });
 
   if (!current) {
     throw new ApiError(404, "Work order not found");
@@ -265,7 +329,44 @@ export async function pauseWorkOrder(id) {
     throw new ApiError(400, "Only in-progress work orders can be paused");
   }
 
+  const activeOperation = current.operations.find((operation) => operation.status === "IN_PROGRESS");
+
   const result = await prisma.$transaction(async (tx) => {
+    let operation = null;
+
+    if (current.operations.length) {
+      if (!activeOperation) {
+        throw new ApiError(400, "No in-progress operation can be paused for this work order");
+      }
+
+      operation = await tx.workOrderOperation.update({
+        where: { id: activeOperation.id },
+        data: { status: "PAUSED" },
+        include: {
+          workOrder: { include: { product: true, route: true } },
+          routeOperation: true,
+          machine: true,
+          assignedOperator: {
+            select: { id: true, name: true, email: true, role: true }
+          },
+          messages: {
+            include: {
+              sender: {
+                select: { id: true, name: true, email: true, role: true }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 5
+          },
+          _count: {
+            select: {
+              productionLogs: true
+            }
+          }
+        }
+      });
+    }
+
     const updated = await tx.workOrder.update({
       where: { id },
       data: { status: "PAUSED" },
@@ -274,18 +375,25 @@ export async function pauseWorkOrder(id) {
 
     let machine = null;
 
-    if (current.machineId) {
+    const machineId = activeOperation?.machineId ?? current.machineId;
+
+    if (machineId) {
       machine = await tx.machine.update({
-        where: { id: current.machineId },
+        where: { id: machineId },
         data: { status: "STOPPED" }
       });
     }
 
-    return { workOrder: updated, machine };
+    return { workOrder: updated, operation, machine };
   });
 
+  if (result.operation) {
+    emitEvent("workOrderOperation:updated", result.operation);
+  }
   emitEvent("workOrder:updated", result.workOrder);
-  emitEvent("machine:statusChanged", result.machine);
+  if (result.machine) {
+    emitEvent("machine:statusChanged", result.machine);
+  }
   return result.workOrder;
 }
 
