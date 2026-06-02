@@ -179,6 +179,36 @@ function canLogProductionForOperation(operation, userId, workOrder) {
   return Boolean(!isClosedWorkOrder(workOrder) && operation?.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status) && operation.machineId);
 }
 
+function hasActionableOperationForUser(workOrder, userId) {
+  return Boolean(
+    userId &&
+      !isClosedWorkOrder(workOrder) &&
+      workOrder.operations?.some((operation) => operation.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status))
+  );
+}
+
+function hasCompletedOperationForUser(workOrder, userId) {
+  return Boolean(userId && workOrder.operations?.some((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED"));
+}
+
+function getMyCurrentOperationText(workOrder, userId) {
+  const actionableOperation = workOrder.operations?.find((operation) => operation.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status));
+
+  if (actionableOperation) {
+    return `${actionableOperation.operationName} sizde`;
+  }
+
+  const completedOperation = [...(workOrder.operations ?? [])]
+    .reverse()
+    .find((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED");
+
+  if (completedOperation && !isClosedWorkOrder(workOrder)) {
+    return `${completedOperation.operationName} bitti, akış devam ediyor`;
+  }
+
+  return "Size atanmış adım yok";
+}
+
 function playNotificationSound() {
   if (Platform.OS === "web") {
     const AudioContextClass = globalThis.AudioContext ?? globalThis.webkitAudioContext;
@@ -237,7 +267,11 @@ export default function App() {
     () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
     [user, workOrders]
   );
-  const activeAssignedWorkOrders = useMemo(() => assignedWorkOrders.filter((workOrder) => !isClosedWorkOrder(workOrder)), [assignedWorkOrders]);
+  const activeAssignedWorkOrders = useMemo(() => assignedWorkOrders.filter((workOrder) => hasActionableOperationForUser(workOrder, user?.id)), [assignedWorkOrders, user?.id]);
+  const handoffAssignedWorkOrders = useMemo(
+    () => assignedWorkOrders.filter((workOrder) => !isClosedWorkOrder(workOrder) && !hasActionableOperationForUser(workOrder, user?.id) && hasCompletedOperationForUser(workOrder, user?.id)),
+    [assignedWorkOrders, user?.id]
+  );
   const closedAssignedWorkOrders = useMemo(() => assignedWorkOrders.filter((workOrder) => isClosedWorkOrder(workOrder)), [assignedWorkOrders]);
   const selectedWorkOrder = assignedWorkOrders.find((workOrder) => workOrder.id === selectedWorkOrderId);
   const selectedOperationProgress = selectedWorkOrder ? getOperationProgress(selectedWorkOrder.operations) : null;
@@ -260,7 +294,7 @@ export default function App() {
       : productionCandidates;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
-  const runningWorkOrderCount = assignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
+  const runningWorkOrderCount = activeAssignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
   const productionBlockReason = rawSelectedProductionOperation
     ? !rawSelectedProductionOperation.machineId
@@ -345,9 +379,18 @@ export default function App() {
     };
     const handleOperationMessageCreated = (message) => {
       const workOrderId = getOperationMessageWorkOrderId(message);
+      const operation = { operationName: "Operasyon", status: "INFO", ...(message?.workOrderOperation ?? {}) };
 
       if (workOrderId && message?.senderId !== user.id) {
         playNotificationSound();
+
+        setSuccessMessage(
+          operation.status === "READY"
+            ? `Yeni operasyon size devredildi: ${operation.operationName}. Üretime başlayabilirsiniz.`
+            : `${operation.operationName} operasyonu ${OPERATION_STATUS_LABELS[operation.status] ?? operation.status.toLowerCase()} durumuna alındı.`
+        );
+
+        setSuccessMessage("Yeni operasyon mesajı alındı.");
 
         if (selectedWorkOrderIdRef.current !== workOrderId) {
           setNotificationCounts((current) => ({
@@ -366,7 +409,11 @@ export default function App() {
 
       if (workOrderId && isAssignedToCurrentUser && isActionableStatus) {
         playNotificationSound();
-        setSuccessMessage(`${operation.operationName} operasyonu ${OPERATION_STATUS_LABELS[operation.status] ?? operation.status.toLowerCase()} durumuna alındı.`);
+        setSuccessMessage(
+          operation.status === "READY"
+            ? `Yeni operasyon size devredildi: ${operation.operationName}. Üretime başlayabilirsiniz.`
+            : `${operation.operationName} operasyonu ${OPERATION_STATUS_LABELS[operation.status] ?? operation.status.toLowerCase()} durumuna alındı.`
+        );
 
         if (selectedWorkOrderIdRef.current !== workOrderId) {
           setNotificationCounts((current) => ({
@@ -732,13 +779,44 @@ export default function App() {
               </View>
             </View>
             <View style={styles.orderCardFooter}>
-              <Text style={styles.detailValue}>{workOrder.operations?.filter((operation) => operation.assignedOperatorId === user.id).length ?? 0} adım bende</Text>
+              <Text style={styles.detailValue}>{getMyCurrentOperationText(workOrder, user.id)}</Text>
               <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
             </View>
           </Pressable>
         ))}
         {!activeAssignedWorkOrders.length ? <Text style={styles.muted}>Şu anda işlem yapabileceğiniz aktif operasyon yok.</Text> : null}
       </View>
+
+      {handoffAssignedWorkOrders.length ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Devam Eden Takiplerim</Text>
+          <Text style={styles.muted}>Sizin adımınız tamamlandı; ürün sonraki operatörde üretime devam ediyor.</Text>
+          {handoffAssignedWorkOrders.map((workOrder) => (
+            <Pressable
+              key={workOrder.id}
+              style={[styles.orderCard, styles.followUpOrderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
+              onPress={() => selectWorkOrder(workOrder)}
+            >
+              <View style={styles.orderCardHeader}>
+                <View>
+                  <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
+                  <Text style={styles.muted}>
+                    {workOrder.product.code} - {workOrder.product.name}
+                  </Text>
+                </View>
+                <View style={styles.cardBadgeStack}>
+                  {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
+                  <Text style={styles.statusBadge}>{getWorkOrderStatusLabel(workOrder)}</Text>
+                </View>
+              </View>
+              <View style={styles.orderCardFooter}>
+                <Text style={styles.detailValue}>{getMyCurrentOperationText(workOrder, user.id)}</Text>
+                <Text style={styles.muted}>Şu an: {getWorkOrderFlowText(workOrder)}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {closedAssignedWorkOrders.length ? (
         <View style={styles.card}>
@@ -922,7 +1000,7 @@ export default function App() {
                           onPress={() =>
                             handleOperationAction(
                               () => completeWorkOrderOperation(operation.id),
-                              "Operasyon tamamlandı.",
+                              nextOperation ? `Operasyon tamamlandı. Sıradaki adım ${nextOperation.assignedOperator?.name ?? "sonraki operatör"} için hazırlandı.` : "Operasyon tamamlandı. İş akışı tamamlandı.",
                               "Operasyon tamamlanamadı."
                             )
                           }
@@ -1459,6 +1537,10 @@ const styles = StyleSheet.create({
   },
   selectedOrderRow: {
     backgroundColor: "#f0fdfa"
+  },
+  followUpOrderCard: {
+    backgroundColor: "#f8fafc",
+    borderColor: "#c8d3dd"
   },
   orderNo: {
     color: "#17202a",
