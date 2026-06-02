@@ -21,6 +21,6 @@ export async function addAttachment(req, res) {
 }
 
 export async function update(req, res) {
-  const log = await productionLogService.updateProductionLog(req.params.id, req.validated.body);
+  const log = await productionLogService.updateProductionLog(req.user, req.params.id, req.validated.body);
   res.json({ data: log });
 }

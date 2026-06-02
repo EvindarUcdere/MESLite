@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 
 const workOrderInclude = {
   product: true,
@@ -156,6 +157,24 @@ export async function createWorkOrder(userId, data) {
       });
     }
 
+    await recordAuditLog(
+      {
+        actorId: userId,
+        action: "WORK_ORDER_CREATED",
+        entityType: "WorkOrder",
+        entityId: workOrder.id,
+        summary: `${workOrder.orderNo} iş emri oluşturuldu`,
+        metadata: {
+          orderNo: workOrder.orderNo,
+          plannedQuantity: workOrder.plannedQuantity,
+          productId: workOrder.productId,
+          routeId: workOrder.routeId,
+          operationCount: route?.operations.length ?? 0
+        }
+      },
+      tx
+    );
+
     return tx.workOrder.findUnique({
       where: { id: workOrder.id },
       include: workOrderInclude
@@ -166,57 +185,105 @@ export async function createWorkOrder(userId, data) {
   return result;
 }
 
-export async function updateWorkOrderStatus(id, status) {
+export async function updateWorkOrderStatus(actor, id, status) {
   const statusDates = {
     ...(status === "IN_PROGRESS" ? { actualStartDate: new Date() } : {}),
     ...(status === "COMPLETED" ? { actualEndDate: new Date() } : {})
   };
 
-  const workOrder = await prisma.workOrder.update({
-    where: { id },
-    data: { status, ...statusDates },
-    include: workOrderInclude
+  const workOrder = await prisma.$transaction(async (tx) => {
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: { status, ...statusDates },
+      include: workOrderInclude
+    });
+
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_STATUS_CHANGED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emri durumu ${status} yapıldı`,
+        metadata: { status }
+      },
+      tx
+    );
+
+    return updated;
   });
 
   emitEvent("workOrder:updated", workOrder);
   return workOrder;
 }
 
-export async function assignOperator(id, operatorId) {
+export async function assignOperator(actor, id, operatorId) {
   const operator = await prisma.user.findUnique({ where: { id: operatorId } });
 
   if (!operator || operator.role !== "OPERATOR" || !operator.isActive) {
     throw new ApiError(400, "Active operator user is required");
   }
 
-  const workOrder = await prisma.workOrder.update({
-    where: { id },
-    data: { assignedOperatorId: operatorId },
-    include: workOrderInclude
+  const workOrder = await prisma.$transaction(async (tx) => {
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: { assignedOperatorId: operatorId },
+      include: workOrderInclude
+    });
+
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_OPERATOR_ASSIGNED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emrine ${operator.name} operatörü atandı`,
+        metadata: { operatorId, operatorName: operator.name }
+      },
+      tx
+    );
+
+    return updated;
   });
 
   emitEvent("workOrder:updated", workOrder);
   return workOrder;
 }
 
-export async function assignMachine(id, machineId) {
+export async function assignMachine(actor, id, machineId) {
   const machine = await prisma.machine.findUnique({ where: { id: machineId } });
 
   if (!machine || !machine.isActive) {
     throw new ApiError(400, "Active machine is required");
   }
 
-  const workOrder = await prisma.workOrder.update({
-    where: { id },
-    data: { machineId },
-    include: workOrderInclude
+  const workOrder = await prisma.$transaction(async (tx) => {
+    const updated = await tx.workOrder.update({
+      where: { id },
+      data: { machineId },
+      include: workOrderInclude
+    });
+
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_MACHINE_ASSIGNED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emrine ${machine.code} makinesi atandı`,
+        metadata: { machineId, machineCode: machine.code, machineName: machine.name }
+      },
+      tx
+    );
+
+    return updated;
   });
 
   emitEvent("workOrder:updated", workOrder);
   return workOrder;
 }
 
-export async function startWorkOrder(id) {
+export async function startWorkOrder(id, actor) {
   const current = await prisma.workOrder.findUnique({
     where: { id },
     include: {
@@ -300,6 +367,23 @@ export async function startWorkOrder(id) {
       data: { status: "RUNNING" }
     });
 
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_STARTED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emri başlatıldı`,
+        metadata: {
+          orderNo: updated.orderNo,
+          operationId: operation?.id,
+          operationName: operation?.operationName,
+          machineId: machine.id
+        }
+      },
+      tx
+    );
+
     return { workOrder: updated, operation, machine };
   });
 
@@ -311,7 +395,7 @@ export async function startWorkOrder(id) {
   return result.workOrder;
 }
 
-export async function pauseWorkOrder(id) {
+export async function pauseWorkOrder(id, actor) {
   const current = await prisma.workOrder.findUnique({
     where: { id },
     include: {
@@ -384,6 +468,23 @@ export async function pauseWorkOrder(id) {
       });
     }
 
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_PAUSED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emri duraklatıldı`,
+        metadata: {
+          orderNo: updated.orderNo,
+          operationId: operation?.id,
+          operationName: operation?.operationName,
+          machineId
+        }
+      },
+      tx
+    );
+
     return { workOrder: updated, operation, machine };
   });
 
@@ -434,6 +535,24 @@ export async function completeWorkOrder(actor, id) {
         data: { status: "IDLE" }
       });
     }
+
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "WORK_ORDER_COMPLETED",
+        entityType: "WorkOrder",
+        entityId: updated.id,
+        summary: `${updated.orderNo} iş emri tamamlandı`,
+        metadata: {
+          orderNo: updated.orderNo,
+          plannedQuantity: current.plannedQuantity,
+          producedQuantity: current.producedQuantity,
+          scrapQuantity: current.scrapQuantity,
+          managerOverride: actor?.role !== "OPERATOR" && current.producedQuantity < current.plannedQuantity
+        }
+      },
+      tx
+    );
 
     return { workOrder: updated, machine };
   });

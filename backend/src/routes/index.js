@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { auditLogRoutes } from "../modules/audit-logs/auditLog.routes.js";
 import { authRoutes } from "../modules/auth/auth.routes.js";
 import { dashboardRoutes } from "../modules/dashboard/dashboard.routes.js";
 import { machineRoutes } from "../modules/machines/machine.routes.js";
@@ -17,6 +18,7 @@ import { workOrderRoutes } from "../modules/work-orders/workOrder.routes.js";
 export const apiRoutes = Router();
 
 apiRoutes.use("/auth", authRoutes);
+apiRoutes.use("/audit-logs", auditLogRoutes);
 apiRoutes.use("/dashboard", dashboardRoutes);
 apiRoutes.use("/machines", machineRoutes);
 apiRoutes.use("/production-lines", productionLineRoutes);

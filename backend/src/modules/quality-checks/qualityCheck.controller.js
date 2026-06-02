@@ -11,11 +11,11 @@ export async function detail(req, res) {
 }
 
 export async function create(req, res) {
-  const check = await qualityCheckService.createQualityCheck(req.user.id, req.validated.body);
+  const check = await qualityCheckService.createQualityCheck(req.user, req.validated.body);
   res.status(201).json({ data: check });
 }
 
 export async function update(req, res) {
-  const check = await qualityCheckService.updateQualityCheck(req.params.id, req.validated.body);
+  const check = await qualityCheckService.updateQualityCheck(req.user, req.params.id, req.validated.body);
   res.json({ data: check });
 }

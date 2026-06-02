@@ -100,6 +100,7 @@ model User {
   alertEvents        ProductionAlertEvent[]
   qualityChecks      QualityCheck[]
   machineStatusLogs  MachineStatusLog[]
+  auditLogs          AuditLog[]
 }
 
 model Product {
@@ -348,4 +349,21 @@ model MachineStatusLog {
   createdAt   DateTime      @default(now())
   machine     Machine       @relation(fields: [machineId], references: [id])
   changedBy   User          @relation(fields: [changedById], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String
+  action      String
+  entityType  String
+  entityId    String?
+  summary     String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User     @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }

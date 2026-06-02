@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 
 const operationInclude = {
   workOrder: {
@@ -223,6 +224,25 @@ export async function startOperation(actor, id) {
       });
     }
 
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: isReopeningShortCompletedOperation ? "OPERATION_REOPENED" : "OPERATION_STARTED",
+        entityType: "WorkOrderOperation",
+        entityId: operation.id,
+        summary: `${operation.workOrder.orderNo} / ${operation.operationName} operasyonu ${isReopeningShortCompletedOperation ? "yeniden açıldı" : "başlatıldı"}`,
+        metadata: {
+          workOrderId: current.workOrderId,
+          orderNo: operation.workOrder.orderNo,
+          sequenceNo: operation.sequenceNo,
+          previousStatus: current.status,
+          nextStatus: operation.status,
+          resetOperationIds: resetOperations.map((resetOperation) => resetOperation.id)
+        }
+      },
+      tx
+    );
+
     const fullWorkOrder = await getWorkOrderForEmit(current.workOrderId, tx);
     return { operation, resetOperations, workOrder: fullWorkOrder ?? workOrder, machine };
   });
@@ -264,6 +284,24 @@ export async function pauseOperation(actor, id) {
         data: { status: "STOPPED" }
       });
     }
+
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "OPERATION_PAUSED",
+        entityType: "WorkOrderOperation",
+        entityId: operation.id,
+        summary: `${operation.workOrder.orderNo} / ${operation.operationName} operasyonu duraklatıldı`,
+        metadata: {
+          workOrderId: current.workOrderId,
+          orderNo: operation.workOrder.orderNo,
+          sequenceNo: operation.sequenceNo,
+          previousStatus: current.status,
+          nextStatus: operation.status
+        }
+      },
+      tx
+    );
 
     const workOrder = await getWorkOrderForEmit(current.workOrderId, tx);
     return { operation, workOrder, machine };
@@ -353,6 +391,28 @@ export async function completeOperation(actor, id) {
       });
     }
 
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "OPERATION_COMPLETED",
+        entityType: "WorkOrderOperation",
+        entityId: operation.id,
+        summary: `${operation.workOrder.orderNo} / ${operation.operationName} operasyonu tamamlandı`,
+        metadata: {
+          workOrderId: current.workOrderId,
+          orderNo: operation.workOrder.orderNo,
+          sequenceNo: operation.sequenceNo,
+          producedQuantity: operation.producedQuantity,
+          scrapQuantity: operation.scrapQuantity,
+          plannedQuantity: current.workOrder.plannedQuantity,
+          shortCompleted: operation.producedQuantity < current.workOrder.plannedQuantity,
+          nextOperationId: readyOperation?.id,
+          workOrderCompleted: isWorkOrderCompleted
+        }
+      },
+      tx
+    );
+
     const workOrder = await getWorkOrderForEmit(current.workOrderId, tx);
     return { operation, readyOperation, workOrder, machine };
   });
@@ -403,6 +463,20 @@ export async function createOperationMessage(actor, id, data) {
           machine: true
         }
       }
+    }
+  });
+
+  await recordAuditLog({
+    actorId: actor.id,
+    action: "OPERATION_MESSAGE_CREATED",
+    entityType: "WorkOrderOperation",
+    entityId: operation.id,
+    summary: `${message.workOrderOperation.workOrder.orderNo} / ${operation.operationName} operasyonuna mesaj bırakıldı`,
+    metadata: {
+      workOrderId: operation.workOrderId,
+      messageId: message.id,
+      severity: message.severity,
+      message: message.message
     }
   });
 

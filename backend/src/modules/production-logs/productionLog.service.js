@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
+import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
 
 const includeRelations = {
@@ -183,6 +184,28 @@ export async function createProductionLog(actor, data) {
       }
     });
 
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "PRODUCTION_LOG_CREATED",
+        entityType: "ProductionLog",
+        entityId: log.id,
+        summary: `${workOrder.orderNo} için üretim girişi yapıldı (${data.producedQuantity} üretim, ${data.scrapQuantity} fire)`,
+        metadata: {
+          workOrderId: data.workOrderId,
+          workOrderOperationId: data.workOrderOperationId,
+          orderNo: workOrder.orderNo,
+          machineId: data.machineId,
+          producedQuantity: data.producedQuantity,
+          scrapQuantity: data.scrapQuantity,
+          scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
+          hasNote: Boolean(data.note?.trim()),
+          criticalAlert: Boolean(data.isCriticalAlert)
+        }
+      },
+      tx
+    );
+
     return { log, workOrder: updatedWorkOrder, operation: updatedOperation, alert };
   });
 
@@ -227,13 +250,28 @@ export async function addProductionLogAttachment(actor, productionLogId, file) {
     }
   });
 
+  await recordAuditLog({
+    actorId: actor.id,
+    action: "PRODUCTION_ATTACHMENT_ADDED",
+    entityType: "ProductionLog",
+    entityId: productionLogId,
+    summary: `${productionLog.workOrder.orderNo} üretim kaydına görsel kanıt eklendi`,
+    metadata: {
+      workOrderId: productionLog.workOrderId,
+      attachmentId: attachment.id,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      size: attachment.size
+    }
+  });
+
   const updatedLog = await findProductionLogById(productionLogId);
 
   emitEvent("production:logged", updatedLog);
   return attachment;
 }
 
-export async function updateProductionLog(id, data) {
+export async function updateProductionLog(actor, id, data) {
   const current = await prisma.productionLog.findUnique({
     where: { id },
     include: {
@@ -322,6 +360,27 @@ export async function updateProductionLog(id, data) {
         }
       });
     }
+
+    await recordAuditLog(
+      {
+        actorId: actor?.id,
+        action: "PRODUCTION_LOG_UPDATED",
+        entityType: "ProductionLog",
+        entityId: log.id,
+        summary: `${workOrder.orderNo} üretim kaydı güncellendi`,
+        metadata: {
+          workOrderId: current.workOrderId,
+          workOrderOperationId: current.workOrderOperationId,
+          producedDelta,
+          scrapDelta,
+          previousProducedQuantity: current.producedQuantity,
+          nextProducedQuantity: log.producedQuantity,
+          previousScrapQuantity: current.scrapQuantity,
+          nextScrapQuantity: log.scrapQuantity
+        }
+      },
+      tx
+    );
 
     return { log, workOrder, operation };
   });

@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell.jsx";
 import Alerts from "../pages/Alerts.jsx";
+import AuditLogs from "../pages/AuditLogs.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import FieldNotes from "../pages/FieldNotes.jsx";
 import Login from "../pages/Login.jsx";
@@ -39,6 +40,7 @@ export function AppRoutes() {
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.management} />}>
             <Route path="/reports" element={<Reports />} />
+            <Route path="/audit-logs" element={<AuditLogs />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.adminOnly} />}>
             <Route path="/users" element={<Users />} />
