@@ -31,6 +31,14 @@ mobile/   Expo operator app
 docs/     Architecture and implementation notes
 ```
 
+## Key Documentation
+
+- `docs/architecture.md`: system principles and module boundaries
+- `docs/system-flow.md`: role-based factory workflow
+- `docs/phase-2-routing-plan.md`: operation routing implementation plan and progress
+- `docs/phase-2-technical-review.md`: Phase 2 technical review for portfolio/interview use
+- `docs/e2e-demo-scenario.md`: repeatable demo data and acceptance test scenario
+
 ## Local Development
 
 Start backend, web dashboard, and mobile web together:
