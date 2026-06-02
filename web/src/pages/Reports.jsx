@@ -109,6 +109,9 @@ export default function Reports() {
   const qualityStatusData = mapCountsToChartData(report?.qualityStatusCounts);
   const machinePerformanceData = report?.machinePerformance ?? [];
   const productPerformanceData = report?.productPerformance ?? [];
+  const shiftPerformanceData = report?.shiftPerformance ?? [];
+  const operatorShiftPerformanceData = report?.operatorShiftPerformance ?? [];
+  const machineShiftPerformanceData = report?.machineShiftPerformance ?? [];
   const scrapReasonData = mapCountsToChartData(report?.scrapReasonCounts);
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
@@ -137,6 +140,25 @@ export default function Reports() {
       </section>
 
       <section className="operations-grid">
+        <article className="panel chart-panel">
+          <h2>Vardiya Performansı</h2>
+          {shiftPerformanceData.length ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={shiftPerformanceData}>
+                <CartesianGrid stroke="#edf1f5" vertical={false} />
+                <XAxis dataKey="shiftName" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="producedQuantity" name="Üretim" fill="#256f6c" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="scrapQuantity" name="Fire" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Vardiya performans verisi yok.</p>
+          )}
+        </article>
+
         <article className="panel chart-panel">
           <h2>Makine Performansı</h2>
           <ResponsiveContainer width="100%" height={280}>
@@ -261,6 +283,117 @@ export default function Reports() {
             <p className="empty-state">Makine durum verisi yok.</p>
           )}
         </article>
+      </section>
+
+      <section className="panel">
+        <h2>Vardiya Performans Detayı</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Vardiya</th>
+                <th>Saat</th>
+                <th>Üretim</th>
+                <th>Fire</th>
+                <th>Fire Oranı</th>
+                <th>Operatör</th>
+                <th>Makine</th>
+                <th>Kayıt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shiftPerformanceData.map((shift) => (
+                <tr key={shift.shiftId}>
+                  <td>{shift.shiftName}</td>
+                  <td>{shift.shiftTimeRange}</td>
+                  <td>{shift.producedQuantity}</td>
+                  <td>{shift.scrapQuantity}</td>
+                  <td>{shift.scrapRate}%</td>
+                  <td>{shift.operatorCount}</td>
+                  <td>{shift.machineCount}</td>
+                  <td>{shift.logCount}</td>
+                </tr>
+              ))}
+              {!isLoading && shiftPerformanceData.length === 0 ? (
+                <tr>
+                  <td colSpan="8">Henüz vardiya performans verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Vardiya Bazlı Operatör Performansı</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Vardiya</th>
+                <th>Operatör</th>
+                <th>Üretim</th>
+                <th>Fire</th>
+                <th>Fire Oranı</th>
+                <th>Kayıt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operatorShiftPerformanceData.map((item) => (
+                <tr key={`${item.shiftId}-${item.operatorId}`}>
+                  <td>{item.shiftName}</td>
+                  <td>{item.operatorName}</td>
+                  <td>{item.producedQuantity}</td>
+                  <td>{item.scrapQuantity}</td>
+                  <td>{item.scrapRate}%</td>
+                  <td>{item.logCount}</td>
+                </tr>
+              ))}
+              {!isLoading && operatorShiftPerformanceData.length === 0 ? (
+                <tr>
+                  <td colSpan="6">Henüz vardiya bazlı operatör verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Vardiya Bazlı Makine Performansı</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Vardiya</th>
+                <th>Makine</th>
+                <th>Ad</th>
+                <th>Üretim</th>
+                <th>Fire</th>
+                <th>Fire Oranı</th>
+                <th>Kayıt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {machineShiftPerformanceData.map((item) => (
+                <tr key={`${item.shiftId}-${item.machineId}`}>
+                  <td>{item.shiftName}</td>
+                  <td>{item.machineCode}</td>
+                  <td>{item.machineName}</td>
+                  <td>{item.producedQuantity}</td>
+                  <td>{item.scrapQuantity}</td>
+                  <td>{item.scrapRate}%</td>
+                  <td>{item.logCount}</td>
+                </tr>
+              ))}
+              {!isLoading && machineShiftPerformanceData.length === 0 ? (
+                <tr>
+                  <td colSpan="7">Henüz vardiya bazlı makine verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel">

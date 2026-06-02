@@ -160,6 +160,7 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
         producedQuantity: log.producedQuantity,
         scrapQuantity: log.scrapQuantity,
         scrapReason: log.scrapReason,
+        shiftId: log.shiftId,
         note: log.note
       }
     });
@@ -218,6 +219,24 @@ async function main() {
     create: { name: "E2E Demo Hattı", description: "Uctan uca Faz 2 test hatti" }
   });
 
+  const [morningShift, eveningShift, nightShift] = await Promise.all([
+    prisma.shift.upsert({
+      where: { name: "E2E Sabah Vardiyasi" },
+      update: { startTime: "06:00", endTime: "14:00", isActive: true },
+      create: { name: "E2E Sabah Vardiyasi", startTime: "06:00", endTime: "14:00" }
+    }),
+    prisma.shift.upsert({
+      where: { name: "E2E Aksam Vardiyasi" },
+      update: { startTime: "14:00", endTime: "22:00", isActive: true },
+      create: { name: "E2E Aksam Vardiyasi", startTime: "14:00", endTime: "22:00" }
+    }),
+    prisma.shift.upsert({
+      where: { name: "E2E Gece Vardiyasi" },
+      update: { startTime: "22:00", endTime: "06:00", isActive: true },
+      create: { name: "E2E Gece Vardiyasi", startTime: "22:00", endTime: "06:00" }
+    })
+  ]);
+
   const [cuttingMachine, assemblyMachine, qualityMachine] = await Promise.all([
     prisma.machine.upsert({
       where: { code: "E2E-KSM-01" },
@@ -246,6 +265,11 @@ async function main() {
     cutting: cuttingMachine,
     assembly: assemblyMachine,
     quality: qualityMachine
+  };
+  const shifts = {
+    morning: morningShift,
+    evening: eveningShift,
+    night: nightShift
   };
   const { route, routeOperations } = await createRoute({ product, machines });
   const now = new Date();
@@ -288,8 +312,8 @@ async function main() {
         }
       ],
       logs: [
-        { sequenceNo: 1, producedQuantity: 120, scrapQuantity: 1, scrapReason: "MACHINE_SETUP", note: "Kesim tamamlandi, 1 parca ayar firesi." },
-        { sequenceNo: 2, producedQuantity: 60, scrapQuantity: 2, scrapReason: "PROCESS_DEVIATION", note: "Montaj devam ediyor, sag kapakta cizik izlendi." }
+        { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 120, scrapQuantity: 1, scrapReason: "MACHINE_SETUP", note: "Kesim tamamlandi, 1 parca ayar firesi." },
+        { sequenceNo: 2, shiftId: shifts.evening.id, producedQuantity: 60, scrapQuantity: 2, scrapReason: "PROCESS_DEVIATION", note: "Montaj devam ediyor, sag kapakta cizik izlendi." }
       ],
       messages: [
         {
@@ -343,8 +367,8 @@ async function main() {
         }
       ],
       logs: [
-        { sequenceNo: 1, producedQuantity: 80, scrapQuantity: 0, note: "Kesim sorunsuz tamamlandi." },
-        { sequenceNo: 2, producedQuantity: 25, scrapQuantity: 4, scrapReason: "MACHINE_SETUP", note: "Montaj fiksturu gevsedigi icin is durduruldu." }
+        { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 80, scrapQuantity: 0, note: "Kesim sorunsuz tamamlandi." },
+        { sequenceNo: 2, shiftId: shifts.night.id, producedQuantity: 25, scrapQuantity: 4, scrapReason: "MACHINE_SETUP", note: "Montaj fiksturu gevsedigi icin is durduruldu." }
       ],
       messages: [
         {
@@ -396,9 +420,9 @@ async function main() {
         }
       ],
       logs: [
-        { sequenceNo: 1, producedQuantity: 50, scrapQuantity: 0, note: "Kesim olculeri uygun." },
-        { sequenceNo: 2, producedQuantity: 50, scrapQuantity: 1, scrapReason: "OPERATOR_ERROR", note: "Bir parca montajda hasar gordu." },
-        { sequenceNo: 3, producedQuantity: 50, scrapQuantity: 0, note: "Final kalite kontrol tamamlandi." }
+        { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 50, scrapQuantity: 0, note: "Kesim olculeri uygun." },
+        { sequenceNo: 2, shiftId: shifts.evening.id, producedQuantity: 50, scrapQuantity: 1, scrapReason: "OPERATOR_ERROR", note: "Bir parca montajda hasar gordu." },
+        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 50, scrapQuantity: 0, note: "Final kalite kontrol tamamlandi." }
       ],
       messages: [
         {
@@ -454,7 +478,7 @@ async function main() {
         }
       ],
       logs: [
-        { sequenceNo: 1, producedQuantity: 48, scrapQuantity: 1, scrapReason: "PROCESS_DEVIATION", note: "Kesim eksik kapandi, musteri planina gore yeniden acilabilir." }
+        { sequenceNo: 1, shiftId: shifts.night.id, producedQuantity: 48, scrapQuantity: 1, scrapReason: "PROCESS_DEVIATION", note: "Kesim eksik kapandi, musteri planina gore yeniden acilabilir." }
       ],
       messages: [
         {

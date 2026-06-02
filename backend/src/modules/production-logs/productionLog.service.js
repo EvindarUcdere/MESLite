@@ -14,6 +14,42 @@ const includeRelations = {
   attachments: true
 };
 
+function timeToMinutes(time) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function isTimeInShift(nowMinutes, shift) {
+  const startMinutes = timeToMinutes(shift.startTime);
+  const endMinutes = timeToMinutes(shift.endTime);
+
+  if (startMinutes === endMinutes) {
+    return true;
+  }
+
+  if (startMinutes < endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
+async function findShiftIdForLog(tx, explicitShiftId, date = new Date()) {
+  if (explicitShiftId) {
+    return explicitShiftId;
+  }
+
+  const shifts = await tx.shift.findMany({
+    where: { isActive: true },
+    orderBy: { startTime: "asc" }
+  });
+
+  const nowMinutes = date.getHours() * 60 + date.getMinutes();
+  const activeShift = shifts.filter((shift) => isTimeInShift(nowMinutes, shift)).at(-1);
+
+  return activeShift?.id;
+}
+
 export function findProductionLogs() {
   return prisma.productionLog.findMany({
     include: includeRelations,
@@ -95,13 +131,15 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(400, "Assigned operator is required before logging production");
     }
 
+    const shiftId = await findShiftIdForLog(tx, data.shiftId, data.endedAt ? new Date(data.endedAt) : new Date());
+
     const log = await tx.productionLog.create({
       data: {
         workOrderId: data.workOrderId,
         workOrderOperationId: data.workOrderOperationId,
         operatorId,
         machineId: data.machineId,
-        shiftId: data.shiftId,
+        shiftId,
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
         scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,

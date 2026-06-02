@@ -37,6 +37,7 @@ docs/     Architecture and implementation notes
 - `docs/system-flow.md`: role-based factory workflow
 - `docs/phase-2-routing-plan.md`: operation routing implementation plan and progress
 - `docs/phase-2-technical-review.md`: Phase 2 technical review for portfolio/interview use
+- `docs/phase-3-shift-reporting.md`: Phase 3 shift-based production reporting notes
 - `docs/e2e-demo-scenario.md`: repeatable demo data and acceptance test scenario
 
 ## Local Development

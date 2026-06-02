@@ -24,6 +24,39 @@ function sumScrapByReason(productionLogs) {
   }, {});
 }
 
+function createMetricGroup(base) {
+  return {
+    ...base,
+    producedQuantity: 0,
+    scrapQuantity: 0,
+    logCount: 0
+  };
+}
+
+function addLogMetrics(item, log) {
+  item.producedQuantity += log.producedQuantity;
+  item.scrapQuantity += log.scrapQuantity;
+  item.logCount += 1;
+}
+
+function sortByProducedThenScrap(items) {
+  return items.sort((first, second) => {
+    if (first.shiftId === "UNASSIGNED" && second.shiftId !== "UNASSIGNED") {
+      return 1;
+    }
+
+    if (second.shiftId === "UNASSIGNED" && first.shiftId !== "UNASSIGNED") {
+      return -1;
+    }
+
+    if (second.producedQuantity !== first.producedQuantity) {
+      return second.producedQuantity - first.producedQuantity;
+    }
+
+    return first.scrapQuantity - second.scrapQuantity;
+  });
+}
+
 export async function getOverviewReport() {
   const [workOrders, productionLogs, qualityChecks, machines, machineStatusLogs] = await Promise.all([
     prisma.workOrder.findMany({
@@ -40,6 +73,7 @@ export async function getOverviewReport() {
       include: {
         workOrder: { include: { product: true } },
         machine: true,
+        shift: true,
         operator: {
           select: { id: true, name: true, email: true, role: true }
         }
@@ -105,6 +139,55 @@ export async function getOverviewReport() {
     return acc;
   }, {});
 
+  const shiftPerformanceMap = {};
+  const operatorShiftPerformanceMap = {};
+  const machineShiftPerformanceMap = {};
+
+  productionLogs.forEach((log) => {
+    const shiftId = log.shiftId ?? "UNASSIGNED";
+    const shiftName = log.shift?.name ?? "Vardiya Yok";
+    const shiftTimeRange = log.shift ? `${log.shift.startTime}-${log.shift.endTime}` : "-";
+
+    if (!shiftPerformanceMap[shiftId]) {
+      shiftPerformanceMap[shiftId] = createMetricGroup({
+        shiftId,
+        shiftName,
+        shiftTimeRange,
+        operatorIds: new Set(),
+        machineIds: new Set()
+      });
+    }
+
+    addLogMetrics(shiftPerformanceMap[shiftId], log);
+    shiftPerformanceMap[shiftId].operatorIds.add(log.operatorId);
+    shiftPerformanceMap[shiftId].machineIds.add(log.machineId);
+
+    const operatorShiftKey = `${shiftId}:${log.operatorId}`;
+    if (!operatorShiftPerformanceMap[operatorShiftKey]) {
+      operatorShiftPerformanceMap[operatorShiftKey] = createMetricGroup({
+        shiftId,
+        shiftName,
+        shiftTimeRange,
+        operatorId: log.operatorId,
+        operatorName: log.operator.name
+      });
+    }
+    addLogMetrics(operatorShiftPerformanceMap[operatorShiftKey], log);
+
+    const machineShiftKey = `${shiftId}:${log.machineId}`;
+    if (!machineShiftPerformanceMap[machineShiftKey]) {
+      machineShiftPerformanceMap[machineShiftKey] = createMetricGroup({
+        shiftId,
+        shiftName,
+        shiftTimeRange,
+        machineId: log.machineId,
+        machineCode: log.machine.code,
+        machineName: log.machine.name
+      });
+    }
+    addLogMetrics(machineShiftPerformanceMap[machineShiftKey], log);
+  });
+
   const machinePerformance = Object.values(machinePerformanceMap).map((item) => ({
     ...item,
     scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
@@ -114,6 +197,31 @@ export async function getOverviewReport() {
     ...item,
     scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
   }));
+
+  const shiftPerformance = sortByProducedThenScrap(
+    Object.values(shiftPerformanceMap).map((item) => ({
+      ...item,
+      operatorCount: item.operatorIds.size,
+      machineCount: item.machineIds.size,
+      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity),
+      operatorIds: undefined,
+      machineIds: undefined
+    }))
+  );
+
+  const operatorShiftPerformance = sortByProducedThenScrap(
+    Object.values(operatorShiftPerformanceMap).map((item) => ({
+      ...item,
+      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+    }))
+  );
+
+  const machineShiftPerformance = sortByProducedThenScrap(
+    Object.values(machineShiftPerformanceMap).map((item) => ({
+      ...item,
+      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+    }))
+  );
 
   return {
     summary: {
@@ -132,6 +240,9 @@ export async function getOverviewReport() {
     qualityStatusCounts: countBy(qualityChecks, "status"),
     machinePerformance,
     productPerformance,
+    shiftPerformance,
+    operatorShiftPerformance,
+    machineShiftPerformance,
     scrapReasonCounts: sumScrapByReason(productionLogs),
     recentProductionLogs: productionLogs.slice(0, 10),
     recentQualityChecks: qualityChecks.slice(0, 10)
