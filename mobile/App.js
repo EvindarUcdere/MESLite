@@ -262,6 +262,7 @@ export default function App() {
   const [workOrders, setWorkOrders] = useState([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState("");
   const [selectedOperationId, setSelectedOperationId] = useState("");
+  const [activeMobileView, setActiveMobileView] = useState("WORKS");
   const [producedQuantity, setProducedQuantity] = useState("10");
   const [scrapQuantity, setScrapQuantity] = useState("0");
   const [scrapReason, setScrapReason] = useState("");
@@ -695,6 +696,7 @@ export default function App() {
 
   function selectWorkOrder(workOrder) {
     setSelectedWorkOrderId(workOrder.id);
+    setActiveMobileView("DETAIL");
     setNotificationCounts((current) => {
       const next = { ...current };
       delete next[workOrder.id];
@@ -852,37 +854,57 @@ export default function App() {
         {!notifications.length ? <Text style={styles.muted}>Henüz bildirim yok.</Text> : null}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
-        <Text style={styles.muted}>Sadece devam eden ve işlem yapabileceğiniz operasyonlar burada görünür.</Text>
-        {activeAssignedWorkOrders.map((workOrder) => (
-          <Pressable
-            key={workOrder.id}
-            style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
-            onPress={() => selectWorkOrder(workOrder)}
-          >
-            <View style={styles.orderCardHeader}>
-              <View>
-                <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
-                <Text style={styles.muted}>
-                  {workOrder.product.code} - {workOrder.product.name}
-                </Text>
-              </View>
-              <View style={styles.cardBadgeStack}>
-                {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
-                <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
-              </View>
-            </View>
-            <View style={styles.orderCardFooter}>
-              <Text style={styles.detailValue}>{getMyCurrentOperationText(workOrder, user.id)}</Text>
-              <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
-            </View>
-          </Pressable>
-        ))}
-        {!activeAssignedWorkOrders.length ? <Text style={styles.muted}>Şu anda işlem yapabileceğiniz aktif operasyon yok.</Text> : null}
+      <View style={[styles.card, styles.tabCard]}>
+        <View style={styles.mobileTabBar}>
+          {[
+            { value: "WORKS", label: "İşler" },
+            { value: "DETAIL", label: "Detay" },
+            { value: "PRODUCTION", label: "Üretim" }
+          ].map((tab) => (
+            <Pressable
+              key={tab.value}
+              style={[styles.mobileTabButton, activeMobileView === tab.value ? styles.mobileTabButtonActive : null]}
+              onPress={() => setActiveMobileView(tab.value)}
+            >
+              <Text style={[styles.mobileTabText, activeMobileView === tab.value ? styles.mobileTabTextActive : null]}>{tab.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
-      {handoffAssignedWorkOrders.length ? (
+      {activeMobileView === "WORKS" ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
+          <Text style={styles.muted}>Sadece devam eden ve işlem yapabileceğiniz operasyonlar burada görünür.</Text>
+          {activeAssignedWorkOrders.map((workOrder) => (
+            <Pressable
+              key={workOrder.id}
+              style={[styles.orderCard, selectedWorkOrderId === workOrder.id ? styles.selectedOrderRow : null]}
+              onPress={() => selectWorkOrder(workOrder)}
+            >
+              <View style={styles.orderCardHeader}>
+                <View>
+                  <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
+                  <Text style={styles.muted}>
+                    {workOrder.product.code} - {workOrder.product.name}
+                  </Text>
+                </View>
+                <View style={styles.cardBadgeStack}>
+                  {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
+                  <Text style={[styles.statusBadge, isShortClosedWorkOrder(workOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(workOrder)}</Text>
+                </View>
+              </View>
+              <View style={styles.orderCardFooter}>
+                <Text style={styles.detailValue}>{getMyCurrentOperationText(workOrder, user.id)}</Text>
+                <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
+              </View>
+            </Pressable>
+          ))}
+          {!activeAssignedWorkOrders.length ? <Text style={styles.muted}>Şu anda işlem yapabileceğiniz aktif operasyon yok.</Text> : null}
+        </View>
+      ) : null}
+
+      {activeMobileView === "WORKS" && handoffAssignedWorkOrders.length ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Devam Eden Takiplerim</Text>
           <Text style={styles.muted}>Sizin adımınız tamamlandı; ürün sonraki operatörde üretime devam ediyor.</Text>
@@ -913,7 +935,7 @@ export default function App() {
         </View>
       ) : null}
 
-      {closedAssignedWorkOrders.length ? (
+      {activeMobileView === "WORKS" && closedAssignedWorkOrders.length ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Geçmiş / Kapalı İşler</Text>
           <Text style={styles.muted}>Tamamlanmış veya eksik kapatılmış işler burada sadece bilgi amaçlı görünür.</Text>
@@ -946,7 +968,7 @@ export default function App() {
         </View>
       ) : null}
 
-      {selectedWorkOrder ? (
+      {activeMobileView === "DETAIL" && selectedWorkOrder ? (
         <View style={styles.card}>
           <View style={styles.detailHeader}>
             <View>
@@ -1156,6 +1178,14 @@ export default function App() {
         </View>
       ) : null}
 
+      {activeMobileView === "DETAIL" && !selectedWorkOrder ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>İş Emri Detayı</Text>
+          <Text style={styles.muted}>Detay görmek için İşler sekmesinden bir iş emri seçin.</Text>
+        </View>
+      ) : null}
+
+      {activeMobileView === "PRODUCTION" ? (
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Üretim Girişi</Text>
         <Text style={styles.label}>İş Emri</Text>
@@ -1167,6 +1197,7 @@ export default function App() {
               onPress={() => {
                 setSelectedOperationId(operation.id);
                 setSelectedWorkOrderId(operation.workOrder.id);
+                setActiveMobileView("PRODUCTION");
               }}
             >
               <Text style={styles.choiceText}>{operation.workOrder.orderNo}</Text>
@@ -1279,6 +1310,7 @@ export default function App() {
           <Text style={styles.primaryButtonText}>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</Text>
         </Pressable>
       </View>
+      ) : null}
 
     </ScrollView>
   );
@@ -1287,13 +1319,17 @@ export default function App() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: "#f4f7f9"
+    backgroundColor: "#eef3f6"
   },
   pageContent: {
-    gap: 16,
+    width: "100%",
+    maxWidth: 620,
+    alignSelf: "center",
+    gap: 12,
     minHeight: fullScreenHeight,
-    padding: 20,
-    paddingTop: 48
+    padding: 14,
+    paddingTop: 28,
+    paddingBottom: 36
   },
   authPage: {
     flex: 1,
@@ -1315,10 +1351,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 16,
-    padding: 18,
-    backgroundColor: "#17202a",
-    borderRadius: 8
+    gap: 12,
+    padding: 16,
+    backgroundColor: "#17313a",
+    borderRadius: 10
   },
   eyebrow: {
     marginBottom: 4,
@@ -1328,8 +1364,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase"
   },
   title: {
-    fontSize: 28,
-    fontWeight: "800",
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "900",
     color: "#ffffff"
   },
   authTitle: {
@@ -1347,14 +1384,14 @@ const styles = StyleSheet.create({
   },
   mobileSummary: {
     flexDirection: "row",
-    gap: 10
+    gap: 8
   },
   summaryItem: {
     flex: 1,
-    minHeight: 72,
+    minHeight: 64,
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
+    padding: 8,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
     borderRadius: 8,
@@ -1362,35 +1399,40 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: "#17202a",
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: "900"
   },
   card: {
-    gap: 12,
-    padding: 16,
+    gap: 10,
+    padding: 14,
     backgroundColor: "#ffffff",
-    borderColor: "#dbe3ea",
+    borderColor: "#d6e0e8",
     borderRadius: 8,
     borderWidth: 1
   },
+  tabCard: {
+    padding: 8
+  },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
     color: "#17202a"
   },
   detailHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12
   },
   statusBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     color: "#256f6c",
     backgroundColor: "#d9f2e8",
     borderRadius: 999,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800"
   },
   shortClosedBadge: {
@@ -1399,16 +1441,18 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: "row",
-    gap: 10
+    flexWrap: "wrap",
+    gap: 8
   },
   detailBox: {
     flex: 1,
     gap: 4,
+    minWidth: 140,
     minHeight: 66,
     justifyContent: "center",
     padding: 10,
-    backgroundColor: "#f7fafc",
-    borderColor: "#edf1f5",
+    backgroundColor: "#f8fbfc",
+    borderColor: "#e6edf2",
     borderRadius: 6,
     borderWidth: 1
   },
@@ -1420,11 +1464,12 @@ const styles = StyleSheet.create({
   detailValue: {
     color: "#17202a",
     fontSize: 14,
+    lineHeight: 19,
     fontWeight: "800"
   },
   kpiRow: {
     flexDirection: "row",
-    gap: 10
+    gap: 8
   },
   kpiBox: {
     flex: 1,
@@ -1433,8 +1478,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 10,
-    backgroundColor: "#f7fafc",
-    borderColor: "#edf1f5",
+    backgroundColor: "#f8fbfc",
+    borderColor: "#e6edf2",
     borderRadius: 6,
     borderWidth: 1
   },
@@ -1466,7 +1511,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   input: {
-    minHeight: 42,
+    minHeight: 46,
     paddingHorizontal: 12,
     color: "#17202a",
     backgroundColor: "#ffffff",
@@ -1475,7 +1520,7 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   primaryButton: {
-    minHeight: 42,
+    minHeight: 46,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -1487,7 +1532,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   secondaryButton: {
-    minHeight: 42,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
@@ -1513,7 +1558,7 @@ const styles = StyleSheet.create({
   },
   inlineButton: {
     alignSelf: "flex-start",
-    minHeight: 36,
+    minHeight: 38,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -1530,7 +1575,7 @@ const styles = StyleSheet.create({
     color: "#60707d"
   },
   productionNotice: {
-    gap: 4,
+    gap: 5,
     padding: 12,
     backgroundColor: "#f0fdfa",
     borderColor: "#b9eadb",
@@ -1543,7 +1588,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   quickButton: {
-    minWidth: 48,
+    minWidth: 58,
+    minHeight: 42,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -1589,10 +1635,10 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   orderCard: {
-    gap: 12,
+    gap: 10,
     padding: 12,
     backgroundColor: "#ffffff",
-    borderColor: "#edf1f5",
+    borderColor: "#dbe3ea",
     borderRadius: 8,
     borderWidth: 1
   },
@@ -1623,6 +1669,7 @@ const styles = StyleSheet.create({
   },
   orderCardFooter: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
@@ -1631,7 +1678,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1
   },
   selectedOrderRow: {
-    backgroundColor: "#f0fdfa"
+    backgroundColor: "#eefaf7",
+    borderColor: "#256f6c"
   },
   followUpOrderCard: {
     backgroundColor: "#f8fafc",
@@ -1639,12 +1687,14 @@ const styles = StyleSheet.create({
   },
   notificationPanelHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10
   },
   mobileNotificationCard: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
@@ -1662,6 +1712,33 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3
   },
+  mobileTabBar: {
+    flexDirection: "row",
+    gap: 6,
+    padding: 4,
+    backgroundColor: "#eef3f6",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  mobileTabButton: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderRadius: 6
+  },
+  mobileTabButtonActive: {
+    backgroundColor: "#256f6c"
+  },
+  mobileTabText: {
+    color: "#60707d",
+    fontWeight: "900"
+  },
+  mobileTabTextActive: {
+    color: "#ffffff"
+  },
   orderNo: {
     color: "#17202a",
     fontWeight: "800"
@@ -1677,21 +1754,29 @@ const styles = StyleSheet.create({
     gap: 8
   },
   choiceButton: {
+    minHeight: 38,
+    justifyContent: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: "#edf1f5",
-    borderRadius: 999
+    borderColor: "#edf1f5",
+    borderRadius: 999,
+    borderWidth: 1
   },
   operationChoiceButton: {
-    minWidth: 180,
+    minWidth: 150,
+    flexGrow: 1,
     gap: 3,
     paddingHorizontal: 12,
     paddingVertical: 9,
     backgroundColor: "#edf1f5",
-    borderRadius: 8
+    borderColor: "#edf1f5",
+    borderRadius: 8,
+    borderWidth: 1
   },
   choiceButtonActive: {
-    backgroundColor: "#d9f2e8"
+    backgroundColor: "#d9f2e8",
+    borderColor: "#256f6c"
   },
   choiceText: {
     color: "#17202a",
@@ -1702,10 +1787,11 @@ const styles = StyleSheet.create({
   },
   operationSummary: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8
   },
   operationCard: {
-    gap: 7,
+    gap: 8,
     padding: 12,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
@@ -1742,6 +1828,7 @@ const styles = StyleSheet.create({
   operationHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
+    flexWrap: "wrap",
     gap: 10
   },
   operationSequence: {
@@ -1761,7 +1848,8 @@ const styles = StyleSheet.create({
   },
   operationName: {
     color: "#17202a",
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: "900"
   },
   operationStage: {
@@ -1784,7 +1872,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   operationActionButton: {
-    minHeight: 34,
+    minHeight: 40,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
