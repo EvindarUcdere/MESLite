@@ -81,29 +81,48 @@ async function createRoute({ product, machines }) {
     }
   });
 
-  await prisma.routeOperation.deleteMany({ where: { routeId: route.id } });
-
-  const routeOperations = await Promise.all([
-    prisma.routeOperation.create({
-      data: {
+  const routeOperationInputs = [
+    {
+      where: { routeId_sequenceNo: { routeId: route.id, sequenceNo: 1 } },
+      update: {
+        operationName: "Kesim",
+        defaultMachineId: machines.cutting.id,
+        estimatedMinutes: 35,
+        requiresQualityCheck: false
+      },
+      create: {
         routeId: route.id,
         operationName: "Kesim",
         sequenceNo: 1,
         defaultMachineId: machines.cutting.id,
         estimatedMinutes: 35
       }
-    }),
-    prisma.routeOperation.create({
-      data: {
+    },
+    {
+      where: { routeId_sequenceNo: { routeId: route.id, sequenceNo: 2 } },
+      update: {
+        operationName: "Montaj",
+        defaultMachineId: machines.assembly.id,
+        estimatedMinutes: 55,
+        requiresQualityCheck: false
+      },
+      create: {
         routeId: route.id,
         operationName: "Montaj",
         sequenceNo: 2,
         defaultMachineId: machines.assembly.id,
         estimatedMinutes: 55
       }
-    }),
-    prisma.routeOperation.create({
-      data: {
+    },
+    {
+      where: { routeId_sequenceNo: { routeId: route.id, sequenceNo: 3 } },
+      update: {
+        operationName: "Kalite Kontrol",
+        defaultMachineId: machines.quality.id,
+        estimatedMinutes: 20,
+        requiresQualityCheck: true
+      },
+      create: {
         routeId: route.id,
         operationName: "Kalite Kontrol",
         sequenceNo: 3,
@@ -111,8 +130,10 @@ async function createRoute({ product, machines }) {
         estimatedMinutes: 20,
         requiresQualityCheck: true
       }
-    })
-  ]);
+    }
+  ];
+
+  const routeOperations = await Promise.all(routeOperationInputs.map((operation) => prisma.routeOperation.upsert(operation)));
 
   return { route, routeOperations };
 }

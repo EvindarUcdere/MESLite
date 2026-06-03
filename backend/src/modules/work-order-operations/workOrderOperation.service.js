@@ -446,10 +446,10 @@ export async function completeOperation(actor, id) {
   });
   const transferQuantity = getOperationTransferQuantity(current, previousOperation);
 
-  if (actor.role === "OPERATOR" && current.producedQuantity < transferQuantity) {
+  if (actor.role === "OPERATOR" && current.producedQuantity + current.scrapQuantity < transferQuantity) {
     throw new ApiError(
       400,
-      `Operation cannot be completed before transferable quantity is produced (${current.producedQuantity}/${transferQuantity})`
+      `Operation cannot be completed before transferable quantity is processed (${current.producedQuantity + current.scrapQuantity}/${transferQuantity})`
     );
   }
 
@@ -548,7 +548,7 @@ export async function completeOperation(actor, id) {
           scrapQuantity: operation.scrapQuantity,
           plannedQuantity: current.workOrder.plannedQuantity,
           transferQuantity,
-          shortCompleted: operation.producedQuantity < transferQuantity,
+          shortCompleted: operation.producedQuantity + operation.scrapQuantity < transferQuantity,
           nextOperationId: readyOperation?.id,
           workOrderCompleted: isWorkOrderCompleted
         }

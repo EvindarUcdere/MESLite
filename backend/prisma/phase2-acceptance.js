@@ -117,7 +117,7 @@ async function main() {
 
   await expectRejects(
     () => completeOperation(operationByName(pauseOrder, "Montaj").assignedOperator, operationByName(pauseOrder, "Montaj").id),
-    "Operation cannot be completed before transferable quantity is produced"
+    "Operation cannot be completed before transferable quantity is processed"
   );
 
   assert(qualityOrder.status === "COMPLETED", "QUALITY order must be completed");
@@ -191,7 +191,7 @@ async function main() {
     workOrderId: restartedRunOrder.id,
     workOrderOperationId: runMontaj.id,
     machineId: runMontaj.machineId,
-    producedQuantity: 59,
+    producedQuantity: 57,
     scrapQuantity: 0,
     note: "Acceptance test: montaj devredilen adedi tamamladı."
   });
@@ -201,7 +201,7 @@ async function main() {
     include: { operations: { orderBy: { sequenceNo: "asc" } } }
   });
 
-  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 119, "Montaj production log must increase operation quantity to transferred quantity 119");
+  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 117, "Montaj production log must increase operation quantity while scrap completes transferred processing");
   assert(afterMontajLog.producedQuantity === 0, "Intermediate Montaj production must not increase final work order quantity");
 
   await completeOperation(runMontaj.assignedOperator, runMontaj.id);

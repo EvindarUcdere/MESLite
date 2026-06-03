@@ -956,7 +956,7 @@ body {
 
 .work-order-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
   align-items: end;
 }
@@ -970,6 +970,12 @@ body {
 
 .field-span-all {
   grid-column: 1 / -1;
+}
+
+.work-order-form > button {
+  align-self: end;
+  min-width: 180px;
+  width: max-content;
 }
 
 .form-field-title {

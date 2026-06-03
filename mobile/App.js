@@ -87,7 +87,7 @@ function getOperationRemainingQuantity(operation, workOrder) {
     return 0;
   }
 
-  return Math.max(getOperationTransferQuantity(operation, workOrder) - operation.producedQuantity, 0);
+  return Math.max(getOperationTransferQuantity(operation, workOrder) - operation.producedQuantity - operation.scrapQuantity, 0);
 }
 
 function getOperationTransferQuantity(operation, workOrder) {
@@ -140,7 +140,11 @@ function getWorkOrderStatusLabel(workOrder) {
 }
 
 function isShortCompletedOperation(operation, workOrder) {
-  return Boolean(operation?.status === "COMPLETED" && getOperationTransferQuantity(operation, workOrder) > 0 && operation.producedQuantity < getOperationTransferQuantity(operation, workOrder));
+  return Boolean(
+    operation?.status === "COMPLETED" &&
+      getOperationTransferQuantity(operation, workOrder) > 0 &&
+      operation.producedQuantity + operation.scrapQuantity < getOperationTransferQuantity(operation, workOrder)
+  );
 }
 
 function getOperationStageLabel(operation, workOrder) {
@@ -153,7 +157,7 @@ function getOperationStageLabel(operation, workOrder) {
 
 function getOperationStatusLabel(operation, workOrder) {
   if (isShortCompletedOperation(operation, workOrder)) {
-    return `Eksik kapandı (${operation.producedQuantity}/${getOperationTransferQuantity(operation, workOrder)})`;
+    return `Eksik kapandı (${operation.producedQuantity + operation.scrapQuantity}/${getOperationTransferQuantity(operation, workOrder)})`;
   }
 
   return OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
@@ -222,7 +226,7 @@ function canCompleteOperation(operation, workOrder, user) {
   const isManagerOverride = ["ADMIN", "PRODUCTION_MANAGER"].includes(user?.role);
   const transferQuantity = getOperationTransferQuantity(operation, workOrder);
   const hasTransferQuantity = transferQuantity > 0;
-  const meetsTransferQuantity = !hasTransferQuantity || operation.producedQuantity >= transferQuantity;
+  const meetsTransferQuantity = !hasTransferQuantity || operation.producedQuantity + operation.scrapQuantity >= transferQuantity;
 
   return !isClosedWorkOrder(workOrder) && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsTransferQuantity);
 }
@@ -1227,9 +1231,9 @@ export default function App() {
                       </View>
                       </>
                     ) : null}
-                    {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity < operationTransferQuantity ? (
+                    {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity + operation.scrapQuantity < operationTransferQuantity ? (
                       <Text style={styles.error}>
-                        Devredilen adet tamamlanmadan operatör operasyonu kapatamaz. Üretim: {operation.producedQuantity}/{operationTransferQuantity}
+                        Devredilen adet işlenmeden operatör operasyonu kapatamaz. İşlenen: {operation.producedQuantity + operation.scrapQuantity}/{operationTransferQuantity}
                       </Text>
                     ) : null}
                     {(operation.messages ?? []).slice(0, 2).map((message) => (

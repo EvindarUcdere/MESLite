@@ -120,16 +120,35 @@ function hasOperationLog(operation) {
   return Boolean(operation._count?.productionLogs || operation.producedQuantity > 0 || operation.scrapQuantity > 0);
 }
 
+function getOperationTransferQuantity(operation, workOrder) {
+  if (!operation || !workOrder) {
+    return 0;
+  }
+
+  const previousOperation = (workOrder.operations ?? [])
+    .filter((item) => item.sequenceNo < operation.sequenceNo)
+    .sort((first, second) => second.sequenceNo - first.sequenceNo)[0];
+
+  if (!previousOperation) {
+    return workOrder.plannedQuantity;
+  }
+
+  return Math.max(previousOperation.producedQuantity - previousOperation.scrapQuantity, 0);
+}
+
 function canCompleteOperation(operation, workOrder, user) {
   const isManagerOverride = [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER].includes(user?.role);
-  const hasPlannedQuantity = workOrder?.plannedQuantity > 0;
-  const meetsPlannedQuantity = !hasPlannedQuantity || operation.producedQuantity >= workOrder.plannedQuantity;
+  const transferQuantity = getOperationTransferQuantity(operation, workOrder);
+  const hasTransferQuantity = transferQuantity > 0;
+  const processedQuantity = operation.producedQuantity + operation.scrapQuantity;
+  const meetsTransferQuantity = !hasTransferQuantity || processedQuantity >= transferQuantity;
 
-  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
+  return ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsTransferQuantity);
 }
 
 function isShortCompletedOperation(operation, workOrder) {
-  return Boolean(operation.status === "COMPLETED" && workOrder.plannedQuantity > 0 && operation.producedQuantity < workOrder.plannedQuantity);
+  const transferQuantity = getOperationTransferQuantity(operation, workOrder);
+  return Boolean(operation.status === "COMPLETED" && transferQuantity > 0 && operation.producedQuantity + operation.scrapQuantity < transferQuantity);
 }
 
 function getOperationStageLabel(operation, workOrder) {
@@ -142,7 +161,7 @@ function getOperationStageLabel(operation, workOrder) {
 
 function getOperationStatusLabel(operation, workOrder) {
   if (isShortCompletedOperation(operation, workOrder)) {
-    return `Eksik kapandı (${operation.producedQuantity}/${workOrder.plannedQuantity})`;
+    return `Eksik kapandı (${operation.producedQuantity + operation.scrapQuantity}/${getOperationTransferQuantity(operation, workOrder)})`;
   }
 
   return OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
@@ -867,7 +886,7 @@ export default function WorkOrders() {
                                         title={
                                           canCompleteOperation(operation, workOrder, user)
                                             ? "Operasyonu tamamla"
-                                            : "Operatör için planlanan adet tamamlanmalı; eksik üretimi yalnızca yönetici kapatabilir."
+                                            : "Operatör için devredilen adet işlenmeli; eksik işlemi yalnızca yönetici kapatabilir."
                                         }
                                       >
                                         <Square size={14} />

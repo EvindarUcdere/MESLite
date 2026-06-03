@@ -142,9 +142,14 @@ export async function createProductionLog(actor, data) {
       : null;
     const transferQuantity = getOperationTransferQuantity(operation, previousOperation, workOrder);
     const remainingQuantity = operation ? transferQuantity - operation.producedQuantity : workOrder.plannedQuantity - workOrder.producedQuantity;
+    const remainingProcessQuantity = operation ? transferQuantity - operation.producedQuantity - operation.scrapQuantity : remainingQuantity;
 
     if (data.producedQuantity > Math.max(remainingQuantity, 0)) {
       throw new ApiError(400, `Produced quantity exceeds transferable remaining quantity (${Math.max(remainingQuantity, 0)})`);
+    }
+
+    if (operation && data.producedQuantity + data.scrapQuantity > Math.max(remainingProcessQuantity, 0)) {
+      throw new ApiError(400, `Processed quantity exceeds transferable remaining quantity (${Math.max(remainingProcessQuantity, 0)})`);
     }
 
     const operatorId = actor.role === "OPERATOR" ? actor.id : operation?.assignedOperatorId ?? workOrder.assignedOperatorId;
@@ -282,7 +287,8 @@ export async function createProductionLog(actor, data) {
           hasNote: Boolean(data.note?.trim()),
           criticalAlert: Boolean(data.isCriticalAlert),
           transferQuantity,
-          remainingQuantity
+          remainingQuantity,
+          remainingProcessQuantity
         }
       },
       tx
@@ -411,6 +417,10 @@ export async function updateProductionLog(actor, id, data) {
 
   if (nextOperationProducedQuantity !== null && nextOperationProducedQuantity > operationTransferQuantity) {
     throw new ApiError(400, `Operation produced quantity exceeds transferable quantity (${operationTransferQuantity})`);
+  }
+
+  if (nextOperationProducedQuantity !== null && nextOperationProducedQuantity + nextOperationScrapQuantity > operationTransferQuantity) {
+    throw new ApiError(400, `Operation processed quantity exceeds transferable quantity (${operationTransferQuantity})`);
   }
 
   const nextOperation = currentOperationIndex >= 0 ? workOrder.operations[currentOperationIndex + 1] : null;
