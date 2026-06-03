@@ -2,6 +2,8 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
+import { createNotificationsForRoles } from "../notifications/notification.service.js";
+import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
 
 const includeRelations = {
   workOrder: {
@@ -221,6 +223,87 @@ function withTraceability(check) {
   };
 }
 
+async function findQualityActionOwner(tx) {
+  const productionManager = await tx.user.findFirst({
+    where: { role: "PRODUCTION_MANAGER", isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true }
+  });
+
+  if (productionManager) {
+    return productionManager;
+  }
+
+  return tx.user.findFirst({
+    where: { role: "ADMIN", isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true }
+  });
+}
+
+async function createQualityActionIfNeeded(tx, { actor, workOrder, selectedOperation, qualityCheck }) {
+  if (!["FAILED", "PARTIAL"].includes(qualityCheck.status) || !selectedOperation?.id) {
+    return null;
+  }
+
+  const productionLog = await tx.productionLog.findFirst({
+    where: {
+      workOrderId: workOrder.id,
+      workOrderOperationId: selectedOperation.id
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (!productionLog) {
+    return null;
+  }
+
+  const owner = await findQualityActionOwner(tx);
+  const severity = qualityCheck.status === "FAILED" ? "CRITICAL" : "WARNING";
+  const title = `Kalite uygunsuzlugu - ${workOrder.orderNo}`;
+  const message = [
+    `${selectedOperation.sequenceNo}. ${selectedOperation.operationName} operasyonunda kalite sonucu ${qualityCheck.status}.`,
+    `Hatali adet: ${qualityCheck.defectQuantity}.`,
+    qualityCheck.defectReason ? `Neden: ${qualityCheck.defectReason}.` : null,
+    qualityCheck.note ? `Not: ${qualityCheck.note}` : null
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const alert = await createProductionAlert(tx, {
+    productionLog,
+    actor,
+    title,
+    message,
+    severity,
+    assignedToId: owner?.id ?? null
+  });
+
+  await createNotificationsForRoles(
+    ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+    {
+      type: "QUALITY_NONCONFORMITY",
+      title: "Kalite uygunsuzlugu aksiyonu",
+      message: `${workOrder.orderNo}: ${qualityCheck.defectReason ?? qualityCheck.status}`,
+      entityType: "ProductionAlert",
+      entityId: alert.id,
+      metadata: {
+        workOrderId: workOrder.id,
+        orderNo: workOrder.orderNo,
+        workOrderOperationId: selectedOperation.id,
+        operationName: selectedOperation.operationName,
+        qualityCheckId: qualityCheck.id,
+        defectQuantity: qualityCheck.defectQuantity,
+        defectReason: qualityCheck.defectReason,
+        status: qualityCheck.status
+      }
+    },
+    tx
+  );
+
+  return alert;
+}
+
 export async function findQualityChecks() {
   const checks = await prisma.qualityCheck.findMany({
     include: includeRelations,
@@ -281,7 +364,7 @@ export async function createQualityCheck(actor, data) {
     throw new ApiError(400, "Defect reason is required for failed or partial quality checks");
   }
 
-  const qualityCheck = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const created = await tx.qualityCheck.create({
       data: {
         workOrderId: data.workOrderId,
@@ -315,11 +398,21 @@ export async function createQualityCheck(actor, data) {
       tx
     );
 
-    return created;
+    const alert = await createQualityActionIfNeeded(tx, {
+      actor,
+      workOrder,
+      selectedOperation,
+      qualityCheck: created
+    });
+
+    return { qualityCheck: created, alert };
   });
 
-  emitEvent("quality:checked", qualityCheck);
-  return withTraceability(qualityCheck);
+  emitEvent("quality:checked", result.qualityCheck);
+  if (result.alert) {
+    emitEvent("productionAlert:created", result.alert);
+  }
+  return withTraceability(result.qualityCheck);
 }
 
 export async function updateQualityCheck(actor, id, data) {

@@ -39,12 +39,13 @@ export function findProductionAlerts({ status } = {}) {
   });
 }
 
-export async function createProductionAlert(tx, { productionLog, actor, title, message, severity = "WARNING" }) {
+export async function createProductionAlert(tx, { productionLog, actor, title, message, severity = "WARNING", assignedToId = null }) {
   const alert = await tx.productionAlert.create({
     data: {
       productionLogId: productionLog.id,
       workOrderId: productionLog.workOrderId,
       createdById: actor.id,
+      assignedToId,
       title,
       message,
       severity
