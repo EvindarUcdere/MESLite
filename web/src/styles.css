@@ -1625,6 +1625,44 @@ th {
   font-size: 18px;
 }
 
+.pending-quality-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pending-quality-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(140px, 1fr));
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  background: #f7fbff;
+  border: 1px solid #cfe3f5;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pending-quality-card:hover {
+  border-color: #2b7a78;
+  box-shadow: 0 8px 20px rgba(43, 122, 120, 0.12);
+}
+
+.pending-quality-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.pending-quality-card span {
+  color: #60707d;
+  font-size: 13px;
+}
+
+.pending-quality-card strong {
+  color: #17202a;
+}
+
 .traceability-panel {
   display: grid;
   gap: 14px;
@@ -1778,7 +1816,8 @@ th {
   }
 
   .flow-control-summary,
-  .flow-risk-row {
+  .flow-risk-row,
+  .pending-quality-card {
     grid-template-columns: 1fr;
   }
 

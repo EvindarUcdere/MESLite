@@ -59,16 +59,18 @@ async function main() {
     }
   });
 
-  assert(workOrders.length === 4, `Expected 4 demo work orders, found ${workOrders.length}`);
+  assert(workOrders.length === 5, `Expected 5 demo work orders, found ${workOrders.length}`);
 
   const runOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-RUN");
   const pauseOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-PAUSE");
   const qualityOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-QUALITY");
+  const pendingQualityOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-QUALITY-PENDING");
   const reopenOrder = workOrders.find((workOrder) => workOrder.orderNo === "E2E-DEMO-REOPEN");
 
   assert(runOrder, "E2E-DEMO-RUN is missing");
   assert(pauseOrder, "E2E-DEMO-PAUSE is missing");
   assert(qualityOrder, "E2E-DEMO-QUALITY is missing");
+  assert(pendingQualityOrder, "E2E-DEMO-QUALITY-PENDING is missing");
   assert(reopenOrder, "E2E-DEMO-REOPEN is missing");
 
   for (const workOrder of workOrders) {
@@ -124,6 +126,10 @@ async function main() {
   assert(qualityOrder.qualityChecks.length === 1, "QUALITY order must have one quality check");
   assert(qualityOrder.qualityChecks[0].workOrderOperation?.operationName === "Kalite Kontrol", "Quality check must be linked to final operation");
   assert(qualityOrder.qualityChecks[0].defectQuantity === 2, "Quality check defect quantity must be 2");
+
+  assert(pendingQualityOrder.status === "COMPLETED", "QUALITY-PENDING order must be completed");
+  assert(operationByName(pendingQualityOrder, "Kalite Kontrol").status === "COMPLETED", "QUALITY-PENDING quality operation must be completed");
+  assert(pendingQualityOrder.qualityChecks.length === 0, "QUALITY-PENDING order must not have a quality result yet");
 
   assert(reopenOrder.status === "PAUSED", "REOPEN order must start paused");
   assert(operationByName(reopenOrder, "Kesim").status === "COMPLETED", "REOPEN Kesim must start completed");

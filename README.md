@@ -42,6 +42,7 @@ docs/     Architecture and implementation notes
 - `docs/phase-3-operation-time-tracking.md`: Phase 3 operation time and delay tracking notes
 - `docs/phase-3-quality-traceability.md`: Phase 3 quality traceability and root-cause context notes
 - `docs/phase-3-quality-action-tracking.md`: Phase 3 quality nonconformity action tracking notes
+- `docs/phase-3-quality-pending-flow.md`: Phase 3 pending quality result flow notes
 - `docs/e2e-demo-scenario.md`: repeatable demo data and acceptance test scenario
 
 ## Local Development

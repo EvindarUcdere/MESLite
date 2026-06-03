@@ -33,6 +33,8 @@ const RELATION_LABELS = {
   UNKNOWN: "Bilinmiyor"
 };
 
+const QUALITY_OPERATION_KEYWORDS = ["kalite", "quality", "kontrol"];
+
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function getAttachmentUrl(attachment) {
@@ -58,6 +60,26 @@ function formatDate(value) {
 
 function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
+}
+
+function isQualityOperation(operation) {
+  const name = operation.operationName?.toLocaleLowerCase("tr-TR") ?? "";
+  return QUALITY_OPERATION_KEYWORDS.some((keyword) => name.includes(keyword));
+}
+
+function getQualityPendingItems(workOrders, qualityChecks) {
+  const checkedOperationIds = new Set(qualityChecks.map((check) => check.workOrderOperationId).filter(Boolean));
+
+  return workOrders
+    .flatMap((workOrder) =>
+      (workOrder.operations ?? [])
+        .filter((operation) => operation.status === "COMPLETED" && operation.producedQuantity > 0 && isQualityOperation(operation) && !checkedOperationIds.has(operation.id))
+        .map((operation) => ({
+          workOrder,
+          operation
+        }))
+    )
+    .sort((a, b) => new Date(b.operation.completedAt ?? b.workOrder.updatedAt).getTime() - new Date(a.operation.completedAt ?? a.workOrder.updatedAt).getTime());
 }
 
 function getSelectedWorkOrderTrace(workOrder) {
@@ -227,6 +249,7 @@ export default function Quality() {
     () => workOrders.filter((workOrder) => workOrder.producedQuantity > 0 && workOrder.status !== "CANCELLED"),
     [workOrders]
   );
+  const pendingQualityItems = useMemo(() => getQualityPendingItems(workOrders, qualityChecks), [workOrders, qualityChecks]);
   const selectedWorkOrder = checkCandidates.find((workOrder) => workOrder.id === form.workOrderId);
   const operationCandidates = useMemo(
     () => (selectedWorkOrder?.operations ?? []).filter((operation) => operation.producedQuantity > 0),
@@ -277,6 +300,18 @@ export default function Quality() {
       ...current,
       [field]: value,
       ...(field === "workOrderId" ? { workOrderOperationId: "" } : {})
+    }));
+  }
+
+  function selectPendingQualityItem(item) {
+    setForm((current) => ({
+      ...current,
+      workOrderId: item.workOrder.id,
+      workOrderOperationId: item.operation.id,
+      status: "PASSED",
+      defectQuantity: 0,
+      defectReason: "",
+      note: ""
     }));
   }
 
@@ -344,6 +379,43 @@ export default function Quality() {
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="panel">
+        <div className="section-title-row">
+          <div>
+            <h2>Kalite Sonucu Bekleyen Isler</h2>
+            <p className="muted-text">Mobil kalite operasyonu tamamlanmis ama resmi kalite sonucu henuz girilmemis isler.</p>
+          </div>
+          <span className="status-pill status-planned">{pendingQualityItems.length} bekliyor</span>
+        </div>
+        <div className="pending-quality-list">
+          {pendingQualityItems.map((item) => (
+            <button className="pending-quality-card" key={item.operation.id} type="button" onClick={() => selectPendingQualityItem(item)}>
+              <div>
+                <strong>{item.workOrder.orderNo}</strong>
+                <span>{item.workOrder.product.name}</span>
+              </div>
+              <div>
+                <span>Operasyon</span>
+                <strong>
+                  {item.operation.sequenceNo}. {item.operation.operationName}
+                </strong>
+              </div>
+              <div>
+                <span>Uretim / Fire</span>
+                <strong>
+                  {item.operation.producedQuantity} / {item.operation.scrapQuantity}
+                </strong>
+              </div>
+              <div>
+                <span>Tamamlanma</span>
+                <strong>{formatDate(item.operation.completedAt)}</strong>
+              </div>
+            </button>
+          ))}
+          {!isLoading && pendingQualityItems.length === 0 ? <p className="empty-state">Kalite sonucu bekleyen is yok.</p> : null}
+        </div>
+      </section>
 
       <section className="panel">
         <div className="section-title-row">

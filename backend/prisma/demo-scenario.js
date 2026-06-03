@@ -299,6 +299,7 @@ async function main() {
   const pauseStart = minutesAgo(now, 150);
   const qualityStart = minutesAgo(now, 260);
   const reopenStart = minutesAgo(now, 190);
+  const pendingQualityStart = minutesAgo(now, 170);
 
   const scenarios = [
     {
@@ -494,6 +495,61 @@ async function main() {
         defectReason: "Yuzey cizigi",
         note: "Kalan 48 urun sevke uygun."
       }
+    },
+    {
+      orderNo: `${demoOrderPrefix}QUALITY-PENDING`,
+      plannedQuantity: 100,
+      producedQuantity: 100,
+      scrapQuantity: 2,
+      status: "COMPLETED",
+      actualStartDate: pendingQualityStart,
+      actualEndDate: minutesAgo(now, 20),
+      operations: [
+        {
+          operationName: "Kesim",
+          machineId: cuttingMachine.id,
+          assignedOperatorId: cuttingOperator.id,
+          status: "COMPLETED",
+          producedQuantity: 100,
+          scrapQuantity: 0,
+          startedAt: pendingQualityStart,
+          completedAt: minutesAgo(now, 125)
+        },
+        {
+          operationName: "Montaj",
+          machineId: assemblyMachine.id,
+          assignedOperatorId: assemblyOperator.id,
+          status: "COMPLETED",
+          producedQuantity: 100,
+          scrapQuantity: 2,
+          startedAt: minutesAgo(now, 120),
+          completedAt: minutesAgo(now, 55)
+        },
+        {
+          operationName: "Kalite Kontrol",
+          machineId: qualityMachine.id,
+          assignedOperatorId: qualityOperator.id,
+          status: "COMPLETED",
+          producedQuantity: 100,
+          scrapQuantity: 0,
+          startedAt: minutesAgo(now, 50),
+          completedAt: minutesAgo(now, 20)
+        }
+      ],
+      logs: [
+        { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 100, scrapQuantity: 0, note: "Kesim tam parti tamamlandi." },
+        { sequenceNo: 2, shiftId: shifts.evening.id, producedQuantity: 100, scrapQuantity: 2, scrapReason: "PROCESS_DEVIATION", note: "Montajda iki parca yuzey kontrolune ayrildi." },
+        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 100, scrapQuantity: 0, note: "Kalite operasyonu tamamlandi, resmi sonuc bekleniyor." }
+      ],
+      messages: [
+        {
+          sequenceNo: 3,
+          senderId: qualityOperator.id,
+          severity: "QUALITY_ALERT",
+          message: "Numune kontrol tamamlandi, kalite personeli sonuc girmeli."
+        }
+      ],
+      downtimes: []
     },
     {
       orderNo: `${demoOrderPrefix}REOPEN`,
