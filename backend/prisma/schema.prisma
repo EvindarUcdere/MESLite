@@ -80,6 +80,16 @@ enum ScrapReason {
   OTHER
 }
 
+enum DowntimeReason {
+  MACHINE_FAILURE
+  MATERIAL_WAITING
+  QUALITY_WAITING
+  MAINTENANCE
+  SETUP
+  OPERATOR_BREAK
+  OTHER
+}
+
 model User {
   id                 String                 @id @default(uuid())
   name               String
@@ -94,6 +104,7 @@ model User {
   assignedOperations WorkOrderOperation[]   @relation("AssignedWorkOrderOperations")
   operationMessages  OperationMessage[]
   productionLogs     ProductionLog[]
+  operationDowntimes OperationDowntime[]
   createdAlerts      ProductionAlert[]      @relation("CreatedAlerts")
   assignedAlerts     ProductionAlert[]      @relation("AssignedAlerts")
   resolvedAlerts     ProductionAlert[]      @relation("ResolvedAlerts")
@@ -140,6 +151,7 @@ model Machine {
   workOrders             WorkOrder[]
   workOrderOperations    WorkOrderOperation[]
   productionLogs         ProductionLog[]
+  operationDowntimes     OperationDowntime[]
   machineStatusLogs      MachineStatusLog[]
   defaultRouteOperations RouteOperation[]
 }
@@ -179,12 +191,13 @@ model RouteOperation {
 }
 
 model Shift {
-  id             String          @id @default(uuid())
-  name           String          @unique
-  startTime      String
-  endTime        String
-  isActive       Boolean         @default(true)
-  productionLogs ProductionLog[]
+  id                 String              @id @default(uuid())
+  name               String              @unique
+  startTime          String
+  endTime            String
+  isActive           Boolean             @default(true)
+  productionLogs     ProductionLog[]
+  operationDowntimes OperationDowntime[]
 }
 
 model WorkOrder {
@@ -214,6 +227,7 @@ model WorkOrder {
   productionAlerts   ProductionAlert[]
   qualityChecks      QualityCheck[]
   operations         WorkOrderOperation[]
+  operationDowntimes OperationDowntime[]
 }
 
 model WorkOrderOperation {
@@ -238,6 +252,7 @@ model WorkOrderOperation {
   messages           OperationMessage[]
   productionLogs     ProductionLog[]
   qualityChecks      QualityCheck[]
+  downtimes          OperationDowntime[]
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
@@ -254,6 +269,30 @@ model OperationMessage {
   sender               User                     @relation(fields: [senderId], references: [id])
 
   @@map("operation_messages")
+}
+
+model OperationDowntime {
+  id                   String             @id @default(uuid())
+  workOrderId          String
+  workOrderOperationId String
+  machineId            String?
+  operatorId           String?
+  shiftId              String?
+  reason               DowntimeReason
+  note                 String?
+  startedAt            DateTime           @default(now())
+  endedAt              DateTime?
+  createdAt            DateTime           @default(now())
+  workOrder            WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderOperation   WorkOrderOperation @relation(fields: [workOrderOperationId], references: [id], onDelete: Cascade)
+  machine              Machine?           @relation(fields: [machineId], references: [id])
+  operator             User?              @relation(fields: [operatorId], references: [id])
+  shift                Shift?             @relation(fields: [shiftId], references: [id])
+
+  @@index([workOrderOperationId, startedAt])
+  @@index([machineId, startedAt])
+  @@index([shiftId, startedAt])
+  @@map("operation_downtimes")
 }
 
 model ProductionLog {
@@ -353,15 +392,15 @@ model MachineStatusLog {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  actorId     String
-  action      String
-  entityType  String
-  entityId    String?
-  summary     String
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  actor       User     @relation(fields: [actorId], references: [id])
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User     @relation(fields: [actorId], references: [id])
 
   @@index([createdAt])
   @@index([actorId])

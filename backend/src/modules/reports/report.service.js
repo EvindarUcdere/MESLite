@@ -24,6 +24,13 @@ function sumScrapByReason(productionLogs) {
   }, {});
 }
 
+function countByReason(items) {
+  return items.reduce((acc, item) => {
+    acc[item.reason] = (acc[item.reason] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
 function createMetricGroup(base) {
   return {
     ...base,
@@ -58,7 +65,7 @@ function sortByProducedThenScrap(items) {
 }
 
 export async function getOverviewReport() {
-  const [workOrders, productionLogs, qualityChecks, machines, machineStatusLogs] = await Promise.all([
+  const [workOrders, productionLogs, qualityChecks, machines, machineStatusLogs, operationDowntimes] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         product: true,
@@ -94,6 +101,19 @@ export async function getOverviewReport() {
       where: { status: { in: ["STOPPED", "MAINTENANCE"] } },
       orderBy: { createdAt: "desc" },
       take: 100
+    }),
+    prisma.operationDowntime.findMany({
+      include: {
+        workOrder: { include: { product: true } },
+        workOrderOperation: true,
+        machine: true,
+        operator: {
+          select: { id: true, name: true, email: true, role: true }
+        },
+        shift: true
+      },
+      orderBy: { startedAt: "desc" },
+      take: 250
     })
   ]);
 
@@ -142,6 +162,9 @@ export async function getOverviewReport() {
   const shiftPerformanceMap = {};
   const operatorShiftPerformanceMap = {};
   const machineShiftPerformanceMap = {};
+  const downtimeByShiftMap = {};
+  const downtimeByMachineMap = {};
+  const downtimeByOperationMap = {};
 
   productionLogs.forEach((log) => {
     const shiftId = log.shiftId ?? "UNASSIGNED";
@@ -186,6 +209,42 @@ export async function getOverviewReport() {
       });
     }
     addLogMetrics(machineShiftPerformanceMap[machineShiftKey], log);
+  });
+
+  operationDowntimes.forEach((downtime) => {
+    const shiftId = downtime.shiftId ?? "UNASSIGNED";
+    const shiftName = downtime.shift?.name ?? "Vardiya Yok";
+    const machineId = downtime.machineId ?? "UNASSIGNED";
+    const machineCode = downtime.machine?.code ?? "Makine Yok";
+    const machineName = downtime.machine?.name ?? "Makine Yok";
+    const operationId = downtime.workOrderOperationId;
+    const operationName = downtime.workOrderOperation.operationName;
+
+    if (!downtimeByShiftMap[shiftId]) {
+      downtimeByShiftMap[shiftId] = { shiftId, shiftName, totalCount: 0, reasonCounts: {} };
+    }
+    downtimeByShiftMap[shiftId].totalCount += 1;
+    downtimeByShiftMap[shiftId].reasonCounts[downtime.reason] = (downtimeByShiftMap[shiftId].reasonCounts[downtime.reason] ?? 0) + 1;
+
+    if (!downtimeByMachineMap[machineId]) {
+      downtimeByMachineMap[machineId] = { machineId, machineCode, machineName, totalCount: 0, reasonCounts: {} };
+    }
+    downtimeByMachineMap[machineId].totalCount += 1;
+    downtimeByMachineMap[machineId].reasonCounts[downtime.reason] = (downtimeByMachineMap[machineId].reasonCounts[downtime.reason] ?? 0) + 1;
+
+    if (!downtimeByOperationMap[operationId]) {
+      downtimeByOperationMap[operationId] = {
+        operationId,
+        operationName,
+        orderNo: downtime.workOrder.orderNo,
+        productCode: downtime.workOrder.product.code,
+        totalCount: 0,
+        reasonCounts: {}
+      };
+    }
+    downtimeByOperationMap[operationId].totalCount += 1;
+    downtimeByOperationMap[operationId].reasonCounts[downtime.reason] =
+      (downtimeByOperationMap[operationId].reasonCounts[downtime.reason] ?? 0) + 1;
   });
 
   const machinePerformance = Object.values(machinePerformanceMap).map((item) => ({
@@ -237,6 +296,11 @@ export async function getOverviewReport() {
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
     machineDowntimeReasonCounts: countBy(machineStatusLogs, "reason"),
+    operationDowntimeReasonCounts: countByReason(operationDowntimes),
+    operationDowntimeByShift: Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount),
+    operationDowntimeByMachine: Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount),
+    operationDowntimeByOperation: Object.values(downtimeByOperationMap).sort((first, second) => second.totalCount - first.totalCount),
+    recentOperationDowntimes: operationDowntimes.slice(0, 10),
     qualityStatusCounts: countBy(qualityChecks, "status"),
     machinePerformance,
     productPerformance,

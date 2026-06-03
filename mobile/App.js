@@ -39,6 +39,18 @@ const MESSAGE_SEVERITIES = [
   { value: "STOPPAGE", label: "Duruş" }
 ];
 
+const DOWNTIME_REASONS = [
+  { value: "MACHINE_FAILURE", label: "Makine Arızası" },
+  { value: "MATERIAL_WAITING", label: "Malzeme Bekleniyor" },
+  { value: "QUALITY_WAITING", label: "Kalite Bekleniyor" },
+  { value: "MAINTENANCE", label: "Bakım" },
+  { value: "SETUP", label: "Ayar/Setup" },
+  { value: "OPERATOR_BREAK", label: "Mola" },
+  { value: "OTHER", label: "Diğer" }
+];
+
+const DOWNTIME_REASON_LABELS = Object.fromEntries(DOWNTIME_REASONS.map((reason) => [reason.value, reason.label]));
+
 const QUICK_QUANTITIES = [1, 5, 10, 25];
 const SCRAP_REASONS = [
   { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
@@ -271,6 +283,7 @@ export default function App() {
   const [alertSeverity, setAlertSeverity] = useState("WARNING");
   const [selectedImage, setSelectedImage] = useState(null);
   const [operationMessageDrafts, setOperationMessageDrafts] = useState({});
+  const [operationDowntimeDrafts, setOperationDowntimeDrafts] = useState({});
   const [notificationCounts, setNotificationCounts] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -567,11 +580,37 @@ export default function App() {
     }));
   }
 
+  function updateOperationDowntimeDraft(operationId, field, value) {
+    setOperationDowntimeDrafts((current) => ({
+      ...current,
+      [operationId]: {
+        reason: "MACHINE_FAILURE",
+        note: "",
+        ...(current[operationId] ?? {}),
+        [field]: value
+      }
+    }));
+  }
+
   async function handleOperationAction(action, successText, fallbackMessage) {
     const isSuccess = await runAction(action, fallbackMessage);
     if (isSuccess) {
       setSuccessMessage(successText);
     }
+  }
+
+  async function handlePauseOperation(operationId) {
+    const draft = operationDowntimeDrafts[operationId] ?? { reason: "MACHINE_FAILURE", note: "" };
+
+    await handleOperationAction(
+      () =>
+        pauseWorkOrderOperation(operationId, {
+          reason: draft.reason,
+          note: draft.note?.trim() || undefined
+        }),
+      "Operasyon duraklatıldı. Duruş nedeni kaydedildi.",
+      "Operasyon duraklatılamadı."
+    );
   }
 
   async function handleOperationMessage(operationId) {
@@ -1077,6 +1116,15 @@ export default function App() {
                     <Text style={styles.muted}>
                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
                     </Text>
+                    {(operation.downtimes ?? []).length ? (
+                      <View style={styles.operationMessage}>
+                        <Text style={styles.detailLabel}>Son Duruş</Text>
+                        <Text style={styles.muted}>
+                          {DOWNTIME_REASON_LABELS[operation.downtimes[0].reason] ?? operation.downtimes[0].reason}
+                          {operation.downtimes[0].note ? ` - ${operation.downtimes[0].note}` : ""}
+                        </Text>
+                      </View>
+                    ) : null}
                     {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
                     {isMine && isClosedWorkOrder(selectedWorkOrder) ? (
                       <Text style={styles.muted}>Bu iş emri kapalı. Operasyon aksiyonu yapılamaz.</Text>
@@ -1085,6 +1133,33 @@ export default function App() {
                       <Text style={styles.error}>Bu operasyon planlanan adetten düşük kapatılmış. Üretim yöneticisi kontrolü gerekir.</Text>
                     ) : null}
                     {isMine && !isClosedWorkOrder(selectedWorkOrder) ? (
+                      <>
+                      {canPauseOperation(operation, selectedWorkOrder) ? (
+                        <View style={styles.operationMessageForm}>
+                          <Text style={styles.detailLabel}>Duruş Nedeni</Text>
+                          <View style={styles.choiceList}>
+                            {DOWNTIME_REASONS.map((reason) => (
+                              <Pressable
+                                key={reason.value}
+                                style={[
+                                  styles.choiceButton,
+                                  (operationDowntimeDrafts[operation.id]?.reason ?? "MACHINE_FAILURE") === reason.value ? styles.choiceButtonActive : null
+                                ]}
+                                onPress={() => updateOperationDowntimeDraft(operation.id, "reason", reason.value)}
+                                disabled={isSubmitting}
+                              >
+                                <Text style={styles.choiceText}>{reason.label}</Text>
+                              </Pressable>
+                            ))}
+                          </View>
+                          <TextInput
+                            style={styles.input}
+                            value={operationDowntimeDrafts[operation.id]?.note ?? ""}
+                            onChangeText={(value) => updateOperationDowntimeDraft(operation.id, "note", value)}
+                            placeholder="Duruş notu yaz"
+                          />
+                        </View>
+                      ) : null}
                       <View style={styles.operationActionRow}>
                         <Pressable
                           style={[styles.operationActionButton, !canStartOperation(operation, selectedWorkOrder) ? styles.disabledButton : null]}
@@ -1102,11 +1177,7 @@ export default function App() {
                         <Pressable
                           style={[styles.operationActionButton, !canPauseOperation(operation, selectedWorkOrder) ? styles.disabledButton : null]}
                           onPress={() =>
-                            handleOperationAction(
-                              () => pauseWorkOrderOperation(operation.id),
-                              "Operasyon duraklatıldı.",
-                              "Operasyon duraklatılamadı."
-                            )
+                            handlePauseOperation(operation.id)
                           }
                           disabled={!canPauseOperation(operation, selectedWorkOrder) || isSubmitting}
                         >
@@ -1126,6 +1197,7 @@ export default function App() {
                           <Text style={styles.operationActionText}>Operasyonu Tamamla</Text>
                         </Pressable>
                       </View>
+                      </>
                     ) : null}
                     {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity < selectedWorkOrder.plannedQuantity ? (
                       <Text style={styles.error}>

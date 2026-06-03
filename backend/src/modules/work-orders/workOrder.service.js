@@ -75,6 +75,21 @@ const workOrderInclude = {
         orderBy: { createdAt: "desc" },
         take: 5
       },
+      downtimes: {
+        include: {
+          shift: true,
+          operator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { startedAt: "desc" },
+        take: 5
+      },
       _count: {
         select: {
           productionLogs: true

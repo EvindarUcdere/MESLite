@@ -40,6 +40,18 @@ const MESSAGE_SEVERITY_LABELS = {
   STOPPAGE: "Duruş"
 };
 
+const DOWNTIME_REASONS = [
+  { value: "MACHINE_FAILURE", label: "Makine Arızası" },
+  { value: "MATERIAL_WAITING", label: "Malzeme Bekleniyor" },
+  { value: "QUALITY_WAITING", label: "Kalite Bekleniyor" },
+  { value: "MAINTENANCE", label: "Bakım" },
+  { value: "SETUP", label: "Ayar/Setup" },
+  { value: "OPERATOR_BREAK", label: "Mola" },
+  { value: "OTHER", label: "Diğer" }
+];
+
+const DOWNTIME_REASON_LABELS = Object.fromEntries(DOWNTIME_REASONS.map((reason) => [reason.value, reason.label]));
+
 const SCRAP_REASONS = [
   { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
   { value: "MACHINE_SETUP", label: "Makine Ayarı" },
@@ -207,6 +219,7 @@ export default function WorkOrders() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [operationMessages, setOperationMessages] = useState({});
+  const [operationDowntimes, setOperationDowntimes] = useState({});
   const [focusedWorkOrderId, setFocusedWorkOrderId] = useState("");
   const workOrderRowRefs = useRef(new Map());
   const [form, setForm] = useState({
@@ -404,6 +417,27 @@ export default function WorkOrders() {
         [field]: value
       }
     }));
+  }
+
+  function updateOperationDowntime(operationId, field, value) {
+    setOperationDowntimes((current) => ({
+      ...current,
+      [operationId]: {
+        reason: "MACHINE_FAILURE",
+        note: "",
+        ...(current[operationId] ?? {}),
+        [field]: value
+      }
+    }));
+  }
+
+  function pauseOperationWithReason(operationId) {
+    const draft = operationDowntimes[operationId] ?? { reason: "MACHINE_FAILURE", note: "" };
+
+    return pauseWorkOrderOperation(operationId, {
+      reason: draft.reason,
+      note: draft.note?.trim() || undefined
+    });
   }
 
   function focusWorkOrder(workOrderId) {
@@ -756,6 +790,34 @@ export default function WorkOrders() {
                                     <small>
                                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}
                                     </small>
+                                    {(operation.downtimes ?? []).length ? (
+                                      <div className="operation-message-row message-stoppage">
+                                        <span>Son Duruş</span>
+                                        <p>
+                                          {DOWNTIME_REASON_LABELS[operation.downtimes[0].reason] ?? operation.downtimes[0].reason}
+                                          {operation.downtimes[0].note ? ` - ${operation.downtimes[0].note}` : ""}
+                                        </p>
+                                      </div>
+                                    ) : null}
+                                    {canPauseOperation(operation) ? (
+                                      <div className="operation-message-form">
+                                        <select
+                                          value={operationDowntimes[operation.id]?.reason ?? "MACHINE_FAILURE"}
+                                          onChange={(event) => updateOperationDowntime(operation.id, "reason", event.target.value)}
+                                        >
+                                          {DOWNTIME_REASONS.map((reason) => (
+                                            <option key={reason.value} value={reason.value}>
+                                              {reason.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <input
+                                          value={operationDowntimes[operation.id]?.note ?? ""}
+                                          onChange={(event) => updateOperationDowntime(operation.id, "note", event.target.value)}
+                                          placeholder="Duruş notu"
+                                        />
+                                      </div>
+                                    ) : null}
                                     <div className="operation-action-row">
                                       <button
                                         type="button"
@@ -767,7 +829,7 @@ export default function WorkOrders() {
                                       </button>
                                       <button
                                         type="button"
-                                        onClick={() => runAction(() => pauseWorkOrderOperation(operation.id), "Operasyon duraklatılamadı.")}
+                                        onClick={() => runAction(() => pauseOperationWithReason(operation.id), "Operasyon duraklatılamadı.")}
                                         disabled={!canPauseOperation(operation)}
                                         title="Operasyonu duraklat"
                                       >

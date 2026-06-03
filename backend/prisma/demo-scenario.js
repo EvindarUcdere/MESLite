@@ -57,6 +57,7 @@ async function resetDemoWorkOrders() {
   await prisma.productionLog.deleteMany({ where: { id: { in: productionLogIds } } });
   await prisma.qualityCheck.deleteMany({ where: { workOrderId: { in: workOrderIds } } });
   await prisma.operationMessage.deleteMany({ where: { workOrderOperation: { workOrderId: { in: workOrderIds } } } });
+  await prisma.operationDowntime.deleteMany({ where: { workOrderId: { in: workOrderIds } } });
   await prisma.workOrderOperation.deleteMany({ where: { workOrderId: { in: workOrderIds } } });
   await prisma.workOrder.deleteMany({ where: { id: { in: workOrderIds } } });
 }
@@ -174,6 +175,23 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
         senderId: message.senderId,
         severity: message.severity,
         message: message.message
+      }
+    });
+  }
+
+  for (const downtimeEntry of scenario.downtimes ?? []) {
+    const operation = workOrder.operations[downtimeEntry.sequenceNo - 1];
+    await prisma.operationDowntime.create({
+      data: {
+        workOrderId: workOrder.id,
+        workOrderOperationId: operation.id,
+        machineId: operation.machineId,
+        operatorId: operation.assignedOperatorId,
+        shiftId: downtimeEntry.shiftId,
+        reason: downtimeEntry.reason,
+        note: downtimeEntry.note,
+        startedAt: downtimeEntry.startedAt ?? new Date(),
+        endedAt: downtimeEntry.endedAt
       }
     });
   }
@@ -328,6 +346,14 @@ async function main() {
           severity: "INFO",
           message: "Montaj bittiginde kalite kontrol operatorune haber verin."
         }
+      ],
+      downtimes: [
+        {
+          sequenceNo: 2,
+          shiftId: shifts.evening.id,
+          reason: "QUALITY_WAITING",
+          note: "Montaj sonrasi kalite onayi bekleniyor."
+        }
       ]
     },
     {
@@ -376,6 +402,14 @@ async function main() {
           senderId: assemblyOperator.id,
           severity: "STOPPAGE",
           message: "Fikstur baglantisi gevsek, bakim kontrolu bekleniyor."
+        }
+      ],
+      downtimes: [
+        {
+          sequenceNo: 2,
+          shiftId: shifts.night.id,
+          reason: "MACHINE_FAILURE",
+          note: "Fikstur baglantisi gevsek, bakim ekibi bekleniyor."
         }
       ]
     },
@@ -432,6 +466,15 @@ async function main() {
           message: "2 urunde yuzey cizigi tespit edildi, paketleme oncesi ayrildi."
         }
       ],
+      downtimes: [
+        {
+          sequenceNo: 3,
+          shiftId: shifts.evening.id,
+          reason: "QUALITY_WAITING",
+          note: "Yuzey cizigi icin numune kontrolu yapildi.",
+          endedAt: now
+        }
+      ],
       qualityCheck: {
         sequenceNo: 3,
         checkedById: qualityStaff.id,
@@ -486,6 +529,14 @@ async function main() {
           senderId: manager.id,
           severity: "WARNING",
           message: "Kesim eksik kapandi; gerekirse yeniden uretime alinacak."
+        }
+      ],
+      downtimes: [
+        {
+          sequenceNo: 1,
+          shiftId: shifts.night.id,
+          reason: "MATERIAL_WAITING",
+          note: "Kesim icin ek malzeme bekleniyor."
         }
       ]
     }

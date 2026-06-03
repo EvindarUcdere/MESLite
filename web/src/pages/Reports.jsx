@@ -52,12 +52,23 @@ const SCRAP_REASON_LABELS = {
   UNKNOWN: "Belirtilmemiş"
 };
 
+const DOWNTIME_REASON_LABELS = {
+  MACHINE_FAILURE: "Makine Arızası",
+  MATERIAL_WAITING: "Malzeme Bekleniyor",
+  QUALITY_WAITING: "Kalite Bekleniyor",
+  MAINTENANCE: "Bakım",
+  SETUP: "Ayar/Setup",
+  OPERATOR_BREAK: "Mola",
+  OTHER: "Diğer",
+  UNKNOWN: "Belirtilmemiş"
+};
+
 const DOWNTIME_REASON_COLORS = ["#dc2626", "#d97706", "#2563eb", "#7c3aed", "#be123c", "#64748b", "#94a3b8"];
 
 function mapCountsToChartData(counts = {}) {
   return Object.entries(counts).map(([status, value]) => ({
     status,
-    name: STATUS_LABELS[status] ?? SCRAP_REASON_LABELS[status] ?? status,
+    name: STATUS_LABELS[status] ?? SCRAP_REASON_LABELS[status] ?? DOWNTIME_REASON_LABELS[status] ?? status,
     value
   }));
 }
@@ -113,6 +124,10 @@ export default function Reports() {
   const operatorShiftPerformanceData = report?.operatorShiftPerformance ?? [];
   const machineShiftPerformanceData = report?.machineShiftPerformance ?? [];
   const scrapReasonData = mapCountsToChartData(report?.scrapReasonCounts);
+  const operationDowntimeReasonData = mapCountsToChartData(report?.operationDowntimeReasonCounts);
+  const operationDowntimeByShift = report?.operationDowntimeByShift ?? [];
+  const operationDowntimeByMachine = report?.operationDowntimeByMachine ?? [];
+  const operationDowntimeByOperation = report?.operationDowntimeByOperation ?? [];
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
     name: reason === "UNKNOWN" ? "Belirtilmemiş" : reason,
@@ -243,6 +258,25 @@ export default function Reports() {
             </ResponsiveContainer>
           ) : (
             <p className="empty-state">Fire nedeni verisi yok.</p>
+          )}
+        </article>
+
+        <article className="panel chart-panel">
+          <h2>Operasyon Duruş Nedenleri</h2>
+          {operationDowntimeReasonData.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={operationDowntimeReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                  {operationDowntimeReasonData.map((entry, index) => (
+                    <Cell key={entry.status} fill={DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Operasyon duruş nedeni verisi yok.</p>
           )}
         </article>
 
@@ -389,6 +423,111 @@ export default function Reports() {
               {!isLoading && machineShiftPerformanceData.length === 0 ? (
                 <tr>
                   <td colSpan="7">Henüz vardiya bazlı makine verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Vardiya Bazlı Duruş Analizi</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Vardiya</th>
+                <th>Duruş Sayısı</th>
+                <th>Nedenler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationDowntimeByShift.map((item) => (
+                <tr key={item.shiftId}>
+                  <td>{item.shiftName}</td>
+                  <td>{item.totalCount}</td>
+                  <td>
+                    {Object.entries(item.reasonCounts)
+                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
+                      .join(", ")}
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && operationDowntimeByShift.length === 0 ? (
+                <tr>
+                  <td colSpan="3">Henüz vardiya bazlı duruş verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Makine Bazlı Duruş Analizi</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Makine</th>
+                <th>Ad</th>
+                <th>Duruş Sayısı</th>
+                <th>Nedenler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationDowntimeByMachine.map((item) => (
+                <tr key={item.machineId}>
+                  <td>{item.machineCode}</td>
+                  <td>{item.machineName}</td>
+                  <td>{item.totalCount}</td>
+                  <td>
+                    {Object.entries(item.reasonCounts)
+                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
+                      .join(", ")}
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && operationDowntimeByMachine.length === 0 ? (
+                <tr>
+                  <td colSpan="4">Henüz makine bazlı duruş verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Operasyon Bazlı Duruş Analizi</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Operasyon</th>
+                <th>Duruş Sayısı</th>
+                <th>Nedenler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationDowntimeByOperation.map((item) => (
+                <tr key={item.operationId}>
+                  <td>{item.orderNo}</td>
+                  <td>{item.productCode}</td>
+                  <td>{item.operationName}</td>
+                  <td>{item.totalCount}</td>
+                  <td>
+                    {Object.entries(item.reasonCounts)
+                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
+                      .join(", ")}
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && operationDowntimeByOperation.length === 0 ? (
+                <tr>
+                  <td colSpan="5">Henüz operasyon bazlı duruş verisi yok.</td>
                 </tr>
               ) : null}
             </tbody>

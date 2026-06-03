@@ -5,8 +5,8 @@ export async function startWorkOrderOperation(operationId) {
   return response.data.data;
 }
 
-export async function pauseWorkOrderOperation(operationId) {
-  const response = await apiClient.post(`/work-order-operations/${operationId}/pause`);
+export async function pauseWorkOrderOperation(operationId, payload) {
+  const response = await apiClient.post(`/work-order-operations/${operationId}/pause`, payload);
   return response.data.data;
 }
 

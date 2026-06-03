@@ -35,12 +35,57 @@ const operationInclude = {
     orderBy: { createdAt: "desc" },
     take: 5
   },
+  downtimes: {
+    include: {
+      shift: true,
+      operator: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      }
+    },
+    orderBy: { startedAt: "desc" },
+    take: 5
+  },
   _count: {
     select: {
       productionLogs: true
     }
   }
 };
+
+function timeToMinutes(time) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function isTimeInShift(nowMinutes, shift) {
+  const startMinutes = timeToMinutes(shift.startTime);
+  const endMinutes = timeToMinutes(shift.endTime);
+
+  if (startMinutes === endMinutes) {
+    return true;
+  }
+
+  if (startMinutes < endMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
+
+  return nowMinutes >= startMinutes || nowMinutes < endMinutes;
+}
+
+async function findActiveShiftId(tx, date = new Date()) {
+  const shifts = await tx.shift.findMany({
+    where: { isActive: true },
+    orderBy: { startTime: "asc" }
+  });
+
+  const nowMinutes = date.getHours() * 60 + date.getMinutes();
+  return shifts.filter((shift) => isTimeInShift(nowMinutes, shift)).at(-1)?.id;
+}
 
 function assertOperatorCanUseOperation(actor, operation) {
   if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
@@ -111,6 +156,21 @@ async function getWorkOrderForEmit(workOrderId, tx = prisma) {
             orderBy: { createdAt: "desc" },
             take: 5
           },
+          downtimes: {
+            include: {
+              shift: true,
+              operator: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true
+                }
+              }
+            },
+            orderBy: { startedAt: "desc" },
+            take: 5
+          },
           _count: {
             select: {
               productionLogs: true
@@ -174,6 +234,14 @@ export async function startOperation(actor, id) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    await tx.operationDowntime.updateMany({
+      where: {
+        workOrderOperationId: id,
+        endedAt: null
+      },
+      data: { endedAt: new Date() }
+    });
+
     const operation = await tx.workOrderOperation.update({
       where: { id },
       data: {
@@ -258,7 +326,7 @@ export async function startOperation(actor, id) {
   return result.operation;
 }
 
-export async function pauseOperation(actor, id) {
+export async function pauseOperation(actor, id, data) {
   const current = await getOperationOrThrow(id);
   assertOperatorCanUseOperation(actor, current);
 
@@ -267,10 +335,35 @@ export async function pauseOperation(actor, id) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const shiftId = await findActiveShiftId(tx);
+
     const operation = await tx.workOrderOperation.update({
       where: { id },
       data: { status: "PAUSED" },
       include: operationInclude
+    });
+
+    const downtime = await tx.operationDowntime.create({
+      data: {
+        workOrderId: current.workOrderId,
+        workOrderOperationId: current.id,
+        machineId: current.machineId,
+        operatorId: current.assignedOperatorId,
+        shiftId,
+        reason: data.reason,
+        note: data.note
+      },
+      include: {
+        shift: true,
+        operator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      }
     });
 
     await tx.workOrder.update({
@@ -298,17 +391,20 @@ export async function pauseOperation(actor, id) {
           orderNo: operation.workOrder.orderNo,
           sequenceNo: operation.sequenceNo,
           previousStatus: current.status,
-          nextStatus: operation.status
+          nextStatus: operation.status,
+          downtimeId: downtime.id,
+          downtimeReason: downtime.reason
         }
       },
       tx
     );
 
     const workOrder = await getWorkOrderForEmit(current.workOrderId, tx);
-    return { operation, workOrder, machine };
+    return { operation, downtime, workOrder, machine };
   });
 
   emitEvent("workOrderOperation:updated", result.operation);
+  emitEvent("operationDowntime:created", result.downtime);
   emitEvent("workOrder:updated", result.workOrder);
   if (result.machine) {
     emitEvent("machine:statusChanged", result.machine);
@@ -341,6 +437,14 @@ export async function completeOperation(actor, id) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    await tx.operationDowntime.updateMany({
+      where: {
+        workOrderOperationId: id,
+        endedAt: null
+      },
+      data: { endedAt: new Date() }
+    });
+
     const operation = await tx.workOrderOperation.update({
       where: { id },
       data: {

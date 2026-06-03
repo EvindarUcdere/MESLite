@@ -16,7 +16,7 @@ export async function start(req, res) {
 }
 
 export async function pause(req, res) {
-  const operation = await workOrderOperationService.pauseOperation(req.user, req.params.id);
+  const operation = await workOrderOperationService.pauseOperation(req.user, req.params.id, req.validated.body);
   res.json({ data: operation });
 }
 
