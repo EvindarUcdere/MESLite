@@ -52,6 +52,24 @@ const DOWNTIME_REASONS = [
 
 const DOWNTIME_REASON_LABELS = Object.fromEntries(DOWNTIME_REASONS.map((reason) => [reason.value, reason.label]));
 
+function minutesBetween(start, end) {
+  if (!start || !end) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
+}
+
+function getOperationTimeMetrics(operation) {
+  const plannedMinutes = operation.routeOperation?.estimatedMinutes ?? 0;
+  const actualMinutes = minutesBetween(operation.startedAt, operation.completedAt ?? new Date());
+  const downtimeMinutes = (operation.downtimes ?? []).reduce((sum, downtime) => sum + minutesBetween(downtime.startedAt, downtime.endedAt ?? operation.completedAt ?? new Date()), 0);
+  const netMinutes = Math.max(actualMinutes - downtimeMinutes, 0);
+  const delayMinutes = plannedMinutes > 0 ? Math.max(netMinutes - plannedMinutes, 0) : 0;
+
+  return { plannedMinutes, actualMinutes, downtimeMinutes, netMinutes, delayMinutes };
+}
+
 const SCRAP_REASONS = [
   { value: "MATERIAL_DEFECT", label: "Malzeme Hatası" },
   { value: "MACHINE_SETUP", label: "Makine Ayarı" },
@@ -765,6 +783,7 @@ export default function WorkOrders() {
                             {workOrder.operations.map((operation, index) => {
                               const previousOperation = workOrder.operations[index - 1];
                               const nextOperation = workOrder.operations[index + 1];
+                              const timeMetrics = getOperationTimeMetrics(operation);
 
                               return (
                                 <div
@@ -786,6 +805,12 @@ export default function WorkOrders() {
                                     <small>
                                       Üretim / Fire: {operation.producedQuantity} / {operation.scrapQuantity}
                                     </small>
+                                    {operation.startedAt ? (
+                                      <small>
+                                        Hedef: {timeMetrics.plannedMinutes || "-"} dk • Gerçek: {timeMetrics.actualMinutes} dk • Duruş: {timeMetrics.downtimeMinutes} dk • Gecikme:{" "}
+                                        {timeMetrics.delayMinutes > 0 ? `+${timeMetrics.delayMinutes} dk` : "Yok"}
+                                      </small>
+                                    ) : null}
                                     <small>Operatör: {operation.assignedOperator?.name ?? "-"}</small>
                                     <small>
                                       Önceki: {previousOperation?.assignedOperator?.name ?? "-"} / Sonraki: {nextOperation?.assignedOperator?.name ?? "-"}

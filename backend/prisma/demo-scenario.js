@@ -219,6 +219,10 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
   return workOrder;
 }
 
+function minutesAgo(baseDate, minutes) {
+  return new Date(baseDate.getTime() - minutes * 60000);
+}
+
 async function main() {
   await resetDemoWorkOrders();
 
@@ -291,6 +295,10 @@ async function main() {
   };
   const { route, routeOperations } = await createRoute({ product, machines });
   const now = new Date();
+  const runStart = minutesAgo(now, 110);
+  const pauseStart = minutesAgo(now, 150);
+  const qualityStart = minutesAgo(now, 260);
+  const reopenStart = minutesAgo(now, 190);
 
   const scenarios = [
     {
@@ -299,7 +307,7 @@ async function main() {
       producedQuantity: 0,
       scrapQuantity: 3,
       status: "IN_PROGRESS",
-      actualStartDate: now,
+      actualStartDate: runStart,
       operations: [
         {
           operationName: "Kesim",
@@ -308,8 +316,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 120,
           scrapQuantity: 1,
-          startedAt: now,
-          completedAt: now
+          startedAt: runStart,
+          completedAt: minutesAgo(now, 70)
         },
         {
           operationName: "Montaj",
@@ -318,7 +326,7 @@ async function main() {
           status: "IN_PROGRESS",
           producedQuantity: 60,
           scrapQuantity: 2,
-          startedAt: now
+          startedAt: minutesAgo(now, 65)
         },
         {
           operationName: "Kalite Kontrol",
@@ -352,7 +360,8 @@ async function main() {
           sequenceNo: 2,
           shiftId: shifts.evening.id,
           reason: "QUALITY_WAITING",
-          note: "Montaj sonrasi kalite onayi bekleniyor."
+          note: "Montaj sonrasi kalite onayi bekleniyor.",
+          startedAt: minutesAgo(now, 30)
         }
       ]
     },
@@ -362,7 +371,7 @@ async function main() {
       producedQuantity: 0,
       scrapQuantity: 4,
       status: "PAUSED",
-      actualStartDate: now,
+      actualStartDate: pauseStart,
       operations: [
         {
           operationName: "Kesim",
@@ -371,8 +380,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 80,
           scrapQuantity: 0,
-          startedAt: now,
-          completedAt: now
+          startedAt: pauseStart,
+          completedAt: minutesAgo(now, 105)
         },
         {
           operationName: "Montaj",
@@ -381,7 +390,7 @@ async function main() {
           status: "PAUSED",
           producedQuantity: 25,
           scrapQuantity: 4,
-          startedAt: now
+          startedAt: minutesAgo(now, 100)
         },
         {
           operationName: "Kalite Kontrol",
@@ -409,7 +418,8 @@ async function main() {
           sequenceNo: 2,
           shiftId: shifts.night.id,
           reason: "MACHINE_FAILURE",
-          note: "Fikstur baglantisi gevsek, bakim ekibi bekleniyor."
+          note: "Fikstur baglantisi gevsek, bakim ekibi bekleniyor.",
+          startedAt: minutesAgo(now, 55)
         }
       ]
     },
@@ -419,7 +429,7 @@ async function main() {
       producedQuantity: 50,
       scrapQuantity: 1,
       status: "COMPLETED",
-      actualStartDate: now,
+      actualStartDate: qualityStart,
       actualEndDate: now,
       operations: [
         {
@@ -429,8 +439,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 50,
           scrapQuantity: 0,
-          startedAt: now,
-          completedAt: now
+          startedAt: qualityStart,
+          completedAt: minutesAgo(now, 215)
         },
         {
           operationName: "Montaj",
@@ -439,8 +449,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 50,
           scrapQuantity: 1,
-          startedAt: now,
-          completedAt: now
+          startedAt: minutesAgo(now, 210),
+          completedAt: minutesAgo(now, 140)
         },
         {
           operationName: "Kalite Kontrol",
@@ -449,8 +459,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 50,
           scrapQuantity: 0,
-          startedAt: now,
-          completedAt: now
+          startedAt: minutesAgo(now, 135),
+          completedAt: minutesAgo(now, 100)
         }
       ],
       logs: [
@@ -472,7 +482,8 @@ async function main() {
           shiftId: shifts.evening.id,
           reason: "QUALITY_WAITING",
           note: "Yuzey cizigi icin numune kontrolu yapildi.",
-          endedAt: now
+          startedAt: minutesAgo(now, 130),
+          endedAt: minutesAgo(now, 115)
         }
       ],
       qualityCheck: {
@@ -490,7 +501,7 @@ async function main() {
       producedQuantity: 0,
       scrapQuantity: 1,
       status: "PAUSED",
-      actualStartDate: now,
+      actualStartDate: reopenStart,
       operations: [
         {
           operationName: "Kesim",
@@ -499,8 +510,8 @@ async function main() {
           status: "COMPLETED",
           producedQuantity: 48,
           scrapQuantity: 1,
-          startedAt: now,
-          completedAt: now
+          startedAt: reopenStart,
+          completedAt: minutesAgo(now, 130)
         },
         {
           operationName: "Montaj",
@@ -509,7 +520,7 @@ async function main() {
           status: "PAUSED",
           producedQuantity: 0,
           scrapQuantity: 0,
-          startedAt: now
+          startedAt: minutesAgo(now, 120)
         },
         {
           operationName: "Kalite Kontrol",
@@ -536,7 +547,9 @@ async function main() {
           sequenceNo: 1,
           shiftId: shifts.night.id,
           reason: "MATERIAL_WAITING",
-          note: "Kesim icin ek malzeme bekleniyor."
+          note: "Kesim icin ek malzeme bekleniyor.",
+          startedAt: minutesAgo(now, 150),
+          endedAt: minutesAgo(now, 130)
         }
       ]
     }

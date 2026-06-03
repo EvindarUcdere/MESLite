@@ -128,6 +128,9 @@ export default function Reports() {
   const operationDowntimeByShift = report?.operationDowntimeByShift ?? [];
   const operationDowntimeByMachine = report?.operationDowntimeByMachine ?? [];
   const operationDowntimeByOperation = report?.operationDowntimeByOperation ?? [];
+  const delayedOperations = report?.delayedOperations ?? [];
+  const operationTimeByMachine = report?.operationTimeByMachine ?? [];
+  const operationTimeByOperator = report?.operationTimeByOperator ?? [];
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
     name: reason === "UNKNOWN" ? "Belirtilmemiş" : reason,
@@ -528,6 +531,133 @@ export default function Reports() {
               {!isLoading && operationDowntimeByOperation.length === 0 ? (
                 <tr>
                   <td colSpan="5">Henüz operasyon bazlı duruş verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>En Çok Geciken Operasyonlar</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Operasyon</th>
+                <th>Makine</th>
+                <th>Operatör</th>
+                <th>Hedef</th>
+                <th>Gerçek</th>
+                <th>Duruş</th>
+                <th>Net</th>
+                <th>Gecikme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {delayedOperations.map((item) => (
+                <tr key={item.operationId}>
+                  <td>{item.orderNo}</td>
+                  <td>{item.productCode}</td>
+                  <td>{item.operationName}</td>
+                  <td>{item.machineCode}</td>
+                  <td>{item.operatorName}</td>
+                  <td>{item.plannedMinutes} dk</td>
+                  <td>{item.actualMinutes} dk</td>
+                  <td>{item.downtimeMinutes} dk</td>
+                  <td>{item.netMinutes} dk</td>
+                  <td>+{item.delayMinutes} dk</td>
+                </tr>
+              ))}
+              {!isLoading && delayedOperations.length === 0 ? (
+                <tr>
+                  <td colSpan="10">Geciken operasyon verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Makine Bazlı Süre Performansı</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Makine</th>
+                <th>Ad</th>
+                <th>Operasyon</th>
+                <th>Tamamlanan</th>
+                <th>Hedef</th>
+                <th>Gerçek</th>
+                <th>Duruş</th>
+                <th>Net</th>
+                <th>Gecikme</th>
+                <th>Ort. Gecikme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationTimeByMachine.map((item) => (
+                <tr key={item.machineId}>
+                  <td>{item.machineCode}</td>
+                  <td>{item.machineName}</td>
+                  <td>{item.operationCount}</td>
+                  <td>{item.completedOperationCount}</td>
+                  <td>{item.plannedMinutes} dk</td>
+                  <td>{item.actualMinutes} dk</td>
+                  <td>{item.downtimeMinutes} dk</td>
+                  <td>{item.netMinutes} dk</td>
+                  <td>{item.delayMinutes} dk</td>
+                  <td>{item.avgDelayMinutes} dk</td>
+                </tr>
+              ))}
+              {!isLoading && operationTimeByMachine.length === 0 ? (
+                <tr>
+                  <td colSpan="10">Makine bazlı süre verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Operatör Bazlı Süre Performansı</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Operatör</th>
+                <th>Operasyon</th>
+                <th>Tamamlanan</th>
+                <th>Hedef</th>
+                <th>Gerçek</th>
+                <th>Duruş</th>
+                <th>Net</th>
+                <th>Gecikme</th>
+                <th>Ort. Gecikme</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationTimeByOperator.map((item) => (
+                <tr key={item.operatorId}>
+                  <td>{item.operatorName}</td>
+                  <td>{item.operationCount}</td>
+                  <td>{item.completedOperationCount}</td>
+                  <td>{item.plannedMinutes} dk</td>
+                  <td>{item.actualMinutes} dk</td>
+                  <td>{item.downtimeMinutes} dk</td>
+                  <td>{item.netMinutes} dk</td>
+                  <td>{item.delayMinutes} dk</td>
+                  <td>{item.avgDelayMinutes} dk</td>
+                </tr>
+              ))}
+              {!isLoading && operationTimeByOperator.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Operatör bazlı süre verisi yok.</td>
                 </tr>
               ) : null}
             </tbody>
