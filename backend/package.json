@@ -11,6 +11,8 @@
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "seed:demo": "node prisma/demo-scenario.js",
+    "reconcile:production": "node prisma/reconcile-production-totals.js",
+    "check:production-consistency": "node prisma/check-production-consistency.js",
     "test:phase2": "node prisma/phase2-acceptance.js",
     "test:phase3:shifts": "node prisma/phase3-shift-acceptance.js",
     "test:phase3:downtimes": "node prisma/phase3-downtime-acceptance.js",

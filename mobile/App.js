@@ -82,6 +82,14 @@ function getRemainingQuantity(workOrder) {
   return Math.max(workOrder.plannedQuantity - workOrder.producedQuantity, 0);
 }
 
+function getOperationRemainingQuantity(operation, workOrder) {
+  if (!operation || !workOrder) {
+    return 0;
+  }
+
+  return Math.max(workOrder.plannedQuantity - operation.producedQuantity, 0);
+}
+
 function getProgressPercent(workOrder) {
   if (!workOrder.plannedQuantity) {
     return 0;
@@ -323,7 +331,7 @@ export default function App() {
       ? productionCandidates.filter((operation) => operation.workOrder.id === selectedWorkOrder.id)
       : productionCandidates;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
-  const selectedProductionRemaining = selectedProductionWorkOrder ? getRemainingQuantity(selectedProductionWorkOrder) : 0;
+  const selectedProductionRemaining = selectedProductionOperation ? getOperationRemainingQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
   const runningWorkOrderCount = activeAssignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
   const productionBlockReason = rawSelectedProductionOperation
