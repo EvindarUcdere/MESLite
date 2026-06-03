@@ -35,7 +35,7 @@ async function main() {
 
   assert(pendingDemo, "QUALITY-PENDING must be listed as waiting for quality result");
   assert(pendingDemo.operation.operationName === "Kalite Kontrol", "Pending item must point to quality control operation");
-  assert(pendingDemo.operation.producedQuantity === 100, "Pending quality operation production quantity must be visible");
+  assert(pendingDemo.operation.producedQuantity === 98, "Pending quality operation production quantity must reflect transferred quantity after scrap");
   assert(!completedDemo, "QUALITY order already has quality result and must not be pending");
 
   console.log({

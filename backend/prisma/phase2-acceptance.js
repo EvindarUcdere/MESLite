@@ -117,12 +117,12 @@ async function main() {
 
   await expectRejects(
     () => completeOperation(operationByName(pauseOrder, "Montaj").assignedOperator, operationByName(pauseOrder, "Montaj").id),
-    "Operation cannot be completed before planned quantity is produced"
+    "Operation cannot be completed before transferable quantity is produced"
   );
 
   assert(qualityOrder.status === "COMPLETED", "QUALITY order must be completed");
-  assert(qualityOrder.producedQuantity === 50, "QUALITY order final produced quantity must equal final operation output");
-  assert(operationByName(qualityOrder, "Kalite Kontrol").producedQuantity === 50, "QUALITY final operation must produce 50");
+  assert(qualityOrder.producedQuantity === 49, "QUALITY order final produced quantity must equal final operation output after scrap transfer");
+  assert(operationByName(qualityOrder, "Kalite Kontrol").producedQuantity === 49, "QUALITY final operation must produce transferred quantity");
   assert(qualityOrder.qualityChecks.length === 1, "QUALITY order must have one quality check");
   assert(qualityOrder.qualityChecks[0].workOrderOperation?.operationName === "Kalite Kontrol", "Quality check must be linked to final operation");
   assert(qualityOrder.qualityChecks[0].defectQuantity === 2, "Quality check defect quantity must be 2");
@@ -191,9 +191,9 @@ async function main() {
     workOrderId: restartedRunOrder.id,
     workOrderOperationId: runMontaj.id,
     machineId: runMontaj.machineId,
-    producedQuantity: 60,
+    producedQuantity: 59,
     scrapQuantity: 0,
-    note: "Acceptance test: montaj planlanan adedi tamamladı."
+    note: "Acceptance test: montaj devredilen adedi tamamladı."
   });
 
   const afterMontajLog = await prisma.workOrder.findUnique({
@@ -201,7 +201,7 @@ async function main() {
     include: { operations: { orderBy: { sequenceNo: "asc" } } }
   });
 
-  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 120, "Montaj production log must increase operation quantity to 120");
+  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 119, "Montaj production log must increase operation quantity to transferred quantity 119");
   assert(afterMontajLog.producedQuantity === 0, "Intermediate Montaj production must not increase final work order quantity");
 
   await completeOperation(runMontaj.assignedOperator, runMontaj.id);

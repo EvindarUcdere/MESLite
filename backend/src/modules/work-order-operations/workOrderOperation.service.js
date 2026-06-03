@@ -102,6 +102,14 @@ function canReopenShortCompletedOperation(actor, operation) {
   );
 }
 
+function getOperationTransferQuantity(operation, previousOperation) {
+  if (!previousOperation) {
+    return operation.workOrder.plannedQuantity;
+  }
+
+  return Math.max(previousOperation.producedQuantity - previousOperation.scrapQuantity, 0);
+}
+
 async function getOperationOrThrow(id) {
   const operation = await prisma.workOrderOperation.findUnique({
     where: { id },
@@ -429,10 +437,19 @@ export async function completeOperation(actor, id) {
     throw new ApiError(400, "At least one production log must be saved before completing an operation");
   }
 
-  if (actor.role === "OPERATOR" && current.producedQuantity < current.workOrder.plannedQuantity) {
+  const previousOperation = await prisma.workOrderOperation.findFirst({
+    where: {
+      workOrderId: current.workOrderId,
+      sequenceNo: { lt: current.sequenceNo }
+    },
+    orderBy: { sequenceNo: "desc" }
+  });
+  const transferQuantity = getOperationTransferQuantity(current, previousOperation);
+
+  if (actor.role === "OPERATOR" && current.producedQuantity < transferQuantity) {
     throw new ApiError(
       400,
-      `Operation cannot be completed before planned quantity is produced (${current.producedQuantity}/${current.workOrder.plannedQuantity})`
+      `Operation cannot be completed before transferable quantity is produced (${current.producedQuantity}/${transferQuantity})`
     );
   }
 
@@ -530,7 +547,8 @@ export async function completeOperation(actor, id) {
           producedQuantity: operation.producedQuantity,
           scrapQuantity: operation.scrapQuantity,
           plannedQuantity: current.workOrder.plannedQuantity,
-          shortCompleted: operation.producedQuantity < current.workOrder.plannedQuantity,
+          transferQuantity,
+          shortCompleted: operation.producedQuantity < transferQuantity,
           nextOperationId: readyOperation?.id,
           workOrderCompleted: isWorkOrderCompleted
         }

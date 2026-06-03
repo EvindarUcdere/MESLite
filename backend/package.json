@@ -19,7 +19,8 @@
     "test:phase3:time": "node prisma/phase3-time-acceptance.js",
     "test:phase3:quality": "node prisma/phase3-quality-traceability-acceptance.js",
     "test:phase3:quality-action": "node prisma/phase3-quality-action-acceptance.js",
-    "test:phase3:quality-pending": "node prisma/phase3-quality-pending-acceptance.js"
+    "test:phase3:quality-pending": "node prisma/phase3-quality-pending-acceptance.js",
+    "test:phase3:transfer": "node prisma/phase3-operation-transfer-acceptance.js"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",

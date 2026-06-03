@@ -87,7 +87,24 @@ function getOperationRemainingQuantity(operation, workOrder) {
     return 0;
   }
 
-  return Math.max(workOrder.plannedQuantity - operation.producedQuantity, 0);
+  return Math.max(getOperationTransferQuantity(operation, workOrder) - operation.producedQuantity, 0);
+}
+
+function getOperationTransferQuantity(operation, workOrder) {
+  if (!operation || !workOrder) {
+    return 0;
+  }
+
+  const operations = workOrder.operations ?? [];
+  const previousOperation = operations
+    .filter((item) => item.sequenceNo < operation.sequenceNo)
+    .sort((first, second) => second.sequenceNo - first.sequenceNo)[0];
+
+  if (!previousOperation) {
+    return workOrder.plannedQuantity;
+  }
+
+  return Math.max(previousOperation.producedQuantity - previousOperation.scrapQuantity, 0);
 }
 
 function getProgressPercent(workOrder) {
@@ -123,7 +140,7 @@ function getWorkOrderStatusLabel(workOrder) {
 }
 
 function isShortCompletedOperation(operation, workOrder) {
-  return Boolean(operation?.status === "COMPLETED" && workOrder?.plannedQuantity > 0 && operation.producedQuantity < workOrder.plannedQuantity);
+  return Boolean(operation?.status === "COMPLETED" && getOperationTransferQuantity(operation, workOrder) > 0 && operation.producedQuantity < getOperationTransferQuantity(operation, workOrder));
 }
 
 function getOperationStageLabel(operation, workOrder) {
@@ -136,7 +153,7 @@ function getOperationStageLabel(operation, workOrder) {
 
 function getOperationStatusLabel(operation, workOrder) {
   if (isShortCompletedOperation(operation, workOrder)) {
-    return `Eksik kapandı (${operation.producedQuantity}/${workOrder.plannedQuantity})`;
+    return `Eksik kapandı (${operation.producedQuantity}/${getOperationTransferQuantity(operation, workOrder)})`;
   }
 
   return OPERATION_STATUS_LABELS[operation.status] ?? operation.status;
@@ -203,10 +220,11 @@ function hasOperationLog(operation) {
 
 function canCompleteOperation(operation, workOrder, user) {
   const isManagerOverride = ["ADMIN", "PRODUCTION_MANAGER"].includes(user?.role);
-  const hasPlannedQuantity = workOrder?.plannedQuantity > 0;
-  const meetsPlannedQuantity = !hasPlannedQuantity || operation.producedQuantity >= workOrder.plannedQuantity;
+  const transferQuantity = getOperationTransferQuantity(operation, workOrder);
+  const hasTransferQuantity = transferQuantity > 0;
+  const meetsTransferQuantity = !hasTransferQuantity || operation.producedQuantity >= transferQuantity;
 
-  return !isClosedWorkOrder(workOrder) && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsPlannedQuantity);
+  return !isClosedWorkOrder(workOrder) && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && (isManagerOverride || meetsTransferQuantity);
 }
 
 function canLogProductionForOperation(operation, userId, workOrder) {
@@ -332,6 +350,7 @@ export default function App() {
       : productionCandidates;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionOperation ? getOperationRemainingQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
+  const selectedProductionTransferQuantity = selectedProductionOperation ? getOperationTransferQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
   const runningWorkOrderCount = activeAssignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
   const productionBlockReason = rawSelectedProductionOperation
@@ -1095,6 +1114,7 @@ export default function App() {
                 const isMine = operation.assignedOperatorId === user.id;
                 const previousOperation = selectedWorkOrder.operations[index - 1];
                 const nextOperation = selectedWorkOrder.operations[index + 1];
+                const operationTransferQuantity = getOperationTransferQuantity(operation, selectedWorkOrder);
 
                 return (
                   <View
@@ -1118,7 +1138,7 @@ export default function App() {
                     </View>
                     <Text style={styles.detailValue}>{getOperationStatusLabel(operation, selectedWorkOrder)}</Text>
                     <Text style={styles.muted}>
-                      Bu adım üretimi: {operation.producedQuantity}/{selectedWorkOrder.plannedQuantity} adet
+                      Bu adım üretimi: {operation.producedQuantity}/{operationTransferQuantity} adet
                     </Text>
                     <Text style={styles.muted}>Operatör: {operation.assignedOperator?.name ?? "-"}</Text>
                     <Text style={styles.muted}>
@@ -1207,9 +1227,9 @@ export default function App() {
                       </View>
                       </>
                     ) : null}
-                    {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity < selectedWorkOrder.plannedQuantity ? (
+                    {isMine && ["IN_PROGRESS", "PAUSED"].includes(operation.status) && hasOperationLog(operation) && operation.producedQuantity < operationTransferQuantity ? (
                       <Text style={styles.error}>
-                        Planlanan adet tamamlanmadan operatör operasyonu kapatamaz. Üretim: {operation.producedQuantity}/{selectedWorkOrder.plannedQuantity}
+                        Devredilen adet tamamlanmadan operatör operasyonu kapatamaz. Üretim: {operation.producedQuantity}/{operationTransferQuantity}
                       </Text>
                     ) : null}
                     {(operation.messages ?? []).slice(0, 2).map((message) => (
@@ -1301,7 +1321,10 @@ export default function App() {
               {selectedProductionWorkOrder.orderNo} - {selectedProductionOperation.operationName}
             </Text>
             <Text style={styles.muted}>
-              {selectedProductionRemaining} adet kaldı, makine: {selectedProductionOperation.machine?.name ?? selectedProductionOperation.machine?.code}
+              Önceki adımdan gelen: {selectedProductionTransferQuantity} adet, kalan: {selectedProductionRemaining} adet
+            </Text>
+            <Text style={styles.muted}>
+              Makine: {selectedProductionOperation.machine?.name ?? selectedProductionOperation.machine?.code}
             </Text>
             <Text style={styles.muted}>
               Operasyon üretim/fire: {selectedProductionOperation.producedQuantity}/{selectedProductionOperation.scrapQuantity}

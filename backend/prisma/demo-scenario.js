@@ -427,7 +427,7 @@ async function main() {
     {
       orderNo: `${demoOrderPrefix}QUALITY`,
       plannedQuantity: 50,
-      producedQuantity: 50,
+      producedQuantity: 49,
       scrapQuantity: 1,
       status: "COMPLETED",
       actualStartDate: qualityStart,
@@ -458,7 +458,7 @@ async function main() {
           machineId: qualityMachine.id,
           assignedOperatorId: qualityOperator.id,
           status: "COMPLETED",
-          producedQuantity: 50,
+          producedQuantity: 49,
           scrapQuantity: 0,
           startedAt: minutesAgo(now, 135),
           completedAt: minutesAgo(now, 100)
@@ -467,7 +467,7 @@ async function main() {
       logs: [
         { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 50, scrapQuantity: 0, note: "Kesim olculeri uygun." },
         { sequenceNo: 2, shiftId: shifts.evening.id, producedQuantity: 50, scrapQuantity: 1, scrapReason: "OPERATOR_ERROR", note: "Bir parca montajda hasar gordu." },
-        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 50, scrapQuantity: 0, note: "Final kalite kontrol tamamlandi." }
+        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 49, scrapQuantity: 0, note: "Final kalite kontrol tamamlandi." }
       ],
       messages: [
         {
@@ -493,13 +493,13 @@ async function main() {
         status: "PARTIAL",
         defectQuantity: 2,
         defectReason: "Yuzey cizigi",
-        note: "Kalan 48 urun sevke uygun."
+        note: "Kalan 47 urun sevke uygun."
       }
     },
     {
       orderNo: `${demoOrderPrefix}QUALITY-PENDING`,
       plannedQuantity: 100,
-      producedQuantity: 100,
+      producedQuantity: 98,
       scrapQuantity: 2,
       status: "COMPLETED",
       actualStartDate: pendingQualityStart,
@@ -530,7 +530,7 @@ async function main() {
           machineId: qualityMachine.id,
           assignedOperatorId: qualityOperator.id,
           status: "COMPLETED",
-          producedQuantity: 100,
+          producedQuantity: 98,
           scrapQuantity: 0,
           startedAt: minutesAgo(now, 50),
           completedAt: minutesAgo(now, 20)
@@ -539,7 +539,7 @@ async function main() {
       logs: [
         { sequenceNo: 1, shiftId: shifts.morning.id, producedQuantity: 100, scrapQuantity: 0, note: "Kesim tam parti tamamlandi." },
         { sequenceNo: 2, shiftId: shifts.evening.id, producedQuantity: 100, scrapQuantity: 2, scrapReason: "PROCESS_DEVIATION", note: "Montajda iki parca yuzey kontrolune ayrildi." },
-        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 100, scrapQuantity: 0, note: "Kalite operasyonu tamamlandi, resmi sonuc bekleniyor." }
+        { sequenceNo: 3, shiftId: shifts.evening.id, producedQuantity: 98, scrapQuantity: 0, note: "Kalite operasyonu tamamlandi, resmi sonuc bekleniyor." }
       ],
       messages: [
         {

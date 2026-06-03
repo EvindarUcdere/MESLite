@@ -50,6 +50,18 @@ async function findShiftIdForLog(tx, explicitShiftId, date = new Date()) {
   return activeShift?.id;
 }
 
+function getOperationTransferQuantity(operation, previousOperation, workOrder) {
+  if (!operation) {
+    return workOrder.plannedQuantity;
+  }
+
+  if (!previousOperation) {
+    return workOrder.plannedQuantity;
+  }
+
+  return Math.max(previousOperation.producedQuantity - previousOperation.scrapQuantity, 0);
+}
+
 export function findProductionLogs() {
   return prisma.productionLog.findMany({
     include: includeRelations,
@@ -119,10 +131,20 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(403, "Operator can only log production for assigned work orders");
     }
 
-    const remainingQuantity = workOrder.plannedQuantity - (operation ? operation.producedQuantity : workOrder.producedQuantity);
+    const previousOperation = operation
+      ? await tx.workOrderOperation.findFirst({
+          where: {
+            workOrderId: operation.workOrderId,
+            sequenceNo: { lt: operation.sequenceNo }
+          },
+          orderBy: { sequenceNo: "desc" }
+        })
+      : null;
+    const transferQuantity = getOperationTransferQuantity(operation, previousOperation, workOrder);
+    const remainingQuantity = operation ? transferQuantity - operation.producedQuantity : workOrder.plannedQuantity - workOrder.producedQuantity;
 
-    if (data.producedQuantity > remainingQuantity) {
-      throw new ApiError(400, `Produced quantity exceeds remaining planned quantity (${remainingQuantity})`);
+    if (data.producedQuantity > Math.max(remainingQuantity, 0)) {
+      throw new ApiError(400, `Produced quantity exceeds transferable remaining quantity (${Math.max(remainingQuantity, 0)})`);
     }
 
     const operatorId = actor.role === "OPERATOR" ? actor.id : operation?.assignedOperatorId ?? workOrder.assignedOperatorId;
@@ -258,7 +280,9 @@ export async function createProductionLog(actor, data) {
           scrapQuantity: data.scrapQuantity,
           scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
           hasNote: Boolean(data.note?.trim()),
-          criticalAlert: Boolean(data.isCriticalAlert)
+          criticalAlert: Boolean(data.isCriticalAlert),
+          transferQuantity,
+          remainingQuantity
         }
       },
       tx
@@ -345,8 +369,7 @@ export async function updateProductionLog(actor, id, data) {
     where: { id: current.workOrderId },
     include: {
       operations: {
-        orderBy: { sequenceNo: "desc" },
-        take: 1
+        orderBy: { sequenceNo: "asc" }
       }
     }
   });
@@ -355,7 +378,7 @@ export async function updateProductionLog(actor, id, data) {
     throw new ApiError(404, "Work order not found");
   }
 
-  const finalOperationId = workOrder.operations[0]?.id;
+  const finalOperationId = workOrder.operations.at(-1)?.id;
   const logContributesToWorkOrder = !current.workOrderOperationId || current.workOrderOperationId === finalOperationId;
   const producedDelta = data.producedQuantity === undefined ? 0 : data.producedQuantity - current.producedQuantity;
   const scrapDelta = data.scrapQuantity === undefined ? 0 : data.scrapQuantity - current.scrapQuantity;
@@ -381,8 +404,24 @@ export async function updateProductionLog(actor, id, data) {
     throw new ApiError(400, `Produced quantity exceeds planned quantity (${workOrder.plannedQuantity})`);
   }
 
-  if (nextOperationProducedQuantity !== null && nextOperationProducedQuantity > workOrder.plannedQuantity) {
-    throw new ApiError(400, `Operation produced quantity exceeds planned quantity (${workOrder.plannedQuantity})`);
+  const currentOperationIndex = current.workOrderOperationId ? workOrder.operations.findIndex((operation) => operation.id === current.workOrderOperationId) : -1;
+  const previousOperation = currentOperationIndex > 0 ? workOrder.operations[currentOperationIndex - 1] : null;
+  const operationTransferQuantity =
+    currentOperationIndex >= 0 ? getOperationTransferQuantity(workOrder.operations[currentOperationIndex], previousOperation, workOrder) : workOrder.plannedQuantity;
+
+  if (nextOperationProducedQuantity !== null && nextOperationProducedQuantity > operationTransferQuantity) {
+    throw new ApiError(400, `Operation produced quantity exceeds transferable quantity (${operationTransferQuantity})`);
+  }
+
+  const nextOperation = currentOperationIndex >= 0 ? workOrder.operations[currentOperationIndex + 1] : null;
+  if (nextOperation && (producedDelta !== 0 || scrapDelta !== 0)) {
+    const updatedCurrentProduced = current.workOrderOperation.producedQuantity + producedDelta;
+    const updatedCurrentScrap = current.workOrderOperation.scrapQuantity + scrapDelta;
+    const updatedTransferQuantity = Math.max(updatedCurrentProduced - updatedCurrentScrap, 0);
+
+    if (nextOperation.producedQuantity > updatedTransferQuantity) {
+      throw new ApiError(400, `Next operation already exceeds updated transferable quantity (${updatedTransferQuantity})`);
+    }
   }
 
   const result = await prisma.$transaction(async (tx) => {
