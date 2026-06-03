@@ -1625,6 +1625,138 @@ th {
   font-size: 18px;
 }
 
+.traceability-panel {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.traceability-panel-compact {
+  margin: 0;
+}
+
+.traceability-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.traceability-summary div {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #f7fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.traceability-summary span,
+.traceability-step span {
+  color: #60707d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.traceability-summary strong {
+  color: #17202a;
+  font-size: 18px;
+}
+
+.traceability-risk-box {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #fffaf0;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+}
+
+.traceability-risk-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #92400e;
+  font-weight: 900;
+}
+
+.traceability-risk-list,
+.traceability-route {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.traceability-risk-card,
+.traceability-step {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.traceability-risk-card span {
+  width: max-content;
+  padding: 3px 8px;
+  color: #92400e;
+  background: #fef0c7;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.traceability-risk-card small,
+.traceability-risk-card em,
+.traceability-step p {
+  margin: 0;
+  color: #4e6273;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.traceability-step-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.traceability-step-header span {
+  padding: 3px 8px;
+  background: #edf2f7;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.traceability-signal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.traceability-signal-row span {
+  padding: 3px 8px;
+  color: #155e75;
+  background: #cffafe;
+  border-radius: 999px;
+}
+
+.impact-high {
+  border-color: #f97066;
+  background: #fff6f5;
+}
+
+.impact-medium {
+  border-color: #fdb022;
+  background: #fffbeb;
+}
+
+.traceability-table-row td {
+  background: #f8fafc;
+  border-top: 0;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1648,6 +1780,10 @@ th {
   .flow-control-summary,
   .flow-risk-row {
     grid-template-columns: 1fr;
+  }
+
+  .traceability-step-header {
+    display: grid;
   }
 
   .flow-risk-row em {

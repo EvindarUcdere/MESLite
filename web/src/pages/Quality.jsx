@@ -1,5 +1,5 @@
-import { ClipboardCheck, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ClipboardCheck, Plus } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
 
@@ -17,6 +17,20 @@ const SCRAP_REASON_LABELS = {
   QUALITY_REJECT: "Kalite Reddi",
   OTHER: "Diğer",
   UNKNOWN: "Belirtilmemiş"
+};
+
+const IMPACT_LABELS = {
+  HIGH: "Yuksek risk",
+  MEDIUM: "Izlenmeli",
+  LOW: "Normal",
+  NEUTRAL: "Kontrol sonrasi"
+};
+
+const RELATION_LABELS = {
+  BEFORE_CHECK: "Kalite oncesi",
+  CHECKED_OPERATION: "Kontrol noktasi",
+  AFTER_CHECK: "Kalite sonrasi",
+  UNKNOWN: "Bilinmiyor"
 };
 
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
@@ -46,6 +60,154 @@ function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
+function getSelectedWorkOrderTrace(workOrder) {
+  if (!workOrder) {
+    return null;
+  }
+
+  const operations = workOrder.operations ?? [];
+  const suspectOperations = operations
+    .map((operation) => ({
+      id: operation.id,
+      sequenceNo: operation.sequenceNo,
+      operationName: operation.operationName,
+      impactLevel: operation.scrapQuantity > 0 || (operation.downtimes ?? []).length > 0 ? "MEDIUM" : "LOW",
+      machine: operation.machine,
+      assignedOperator: operation.assignedOperator,
+      signals: [
+        ...(operation.scrapQuantity > 0 ? [{ label: "Fire kaydi", detail: `${operation.scrapQuantity} fire` }] : []),
+        ...((operation.downtimes ?? []).length > 0 ? [{ label: "Durus kaydi", detail: `${operation.downtimes.length} durus` }] : []),
+        ...((operation.messages ?? [])
+          .filter((message) => ["QUALITY_ALERT", "STOPPAGE", "WARNING"].includes(message.severity))
+          .slice(0, 1)
+          .map((message) => ({
+            label: message.severity,
+            detail: message.message
+          })))
+      ]
+    }))
+    .filter((operation) => operation.signals.length > 0);
+
+  return {
+    totals: {
+      operationCount: operations.length,
+      suspectOperationCount: suspectOperations.length,
+      totalDowntimeMinutes: operations.reduce((sum, operation) => sum + (operation.downtimes ?? []).length, 0),
+      totalDelayMinutes: 0
+    },
+    suspectOperations,
+    routeOperations: operations.map((operation) => ({
+      id: operation.id,
+      sequenceNo: operation.sequenceNo,
+      operationName: operation.operationName,
+      status: operation.status,
+      relationToQuality: "UNKNOWN",
+      machine: operation.machine,
+      assignedOperator: operation.assignedOperator,
+      producedQuantity: operation.producedQuantity,
+      scrapQuantity: operation.scrapQuantity,
+      metrics: {
+        plannedMinutes: operation.routeOperation?.estimatedMinutes ?? 0,
+        actualMinutes: 0,
+        downtimeMinutes: 0,
+        netMinutes: 0,
+        delayMinutes: 0
+      },
+      signals: [],
+      impactLevel: "LOW"
+    }))
+  };
+}
+
+function TraceabilityPanel({ traceability, compact = false }) {
+  if (!traceability) {
+    return null;
+  }
+
+  return (
+    <div className={`traceability-panel ${compact ? "traceability-panel-compact" : ""}`}>
+      <div className="traceability-summary">
+        <div>
+          <span>Operasyon</span>
+          <strong>{traceability.totals.operationCount}</strong>
+        </div>
+        <div>
+          <span>Riskli Adim</span>
+          <strong>{traceability.totals.suspectOperationCount}</strong>
+        </div>
+        <div>
+          <span>Toplam Durus</span>
+          <strong>{traceability.totals.totalDowntimeMinutes} dk</strong>
+        </div>
+        <div>
+          <span>Gecikme</span>
+          <strong>{traceability.totals.totalDelayMinutes} dk</strong>
+        </div>
+      </div>
+
+      {traceability.suspectOperations.length ? (
+        <div className="traceability-risk-box">
+          <div className="traceability-risk-title">
+            <AlertTriangle size={16} />
+            <span>Incelenmesi gereken adimlar</span>
+          </div>
+          <div className="traceability-risk-list">
+            {traceability.suspectOperations.map((operation) => (
+              <div className={`traceability-risk-card impact-${operation.impactLevel.toLowerCase()}`} key={operation.id}>
+                <strong>
+                  {operation.sequenceNo}. {operation.operationName}
+                </strong>
+                <span>{IMPACT_LABELS[operation.impactLevel] ?? operation.impactLevel}</span>
+                <small>
+                  {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operator yok"}
+                </small>
+                {operation.signals.slice(0, 3).map((signal, index) => (
+                  <em key={`${operation.id}-${signal.type ?? signal.label}-${index}`}>
+                    {signal.label}: {signal.detail}
+                  </em>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="muted-text">Bu kalite kaydi icin belirgin risk sinyali yok.</p>
+      )}
+
+      {!compact ? (
+        <div className="traceability-route">
+          {traceability.routeOperations.map((operation) => (
+            <div className={`traceability-step impact-${operation.impactLevel.toLowerCase()}`} key={operation.id}>
+              <div className="traceability-step-header">
+                <strong>
+                  {operation.sequenceNo}. {operation.operationName}
+                </strong>
+                <span>{RELATION_LABELS[operation.relationToQuality] ?? operation.relationToQuality}</span>
+              </div>
+              <p>
+                {operation.status} / Uretim {operation.producedQuantity} / Fire {operation.scrapQuantity}
+              </p>
+              <p>
+                {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operator yok"}
+              </p>
+              <p>
+                Hedef {operation.metrics.plannedMinutes} dk - Net {operation.metrics.netMinutes} dk - Gecikme {operation.metrics.delayMinutes} dk
+              </p>
+              {operation.signals.length ? (
+                <div className="traceability-signal-row">
+                  {operation.signals.slice(0, 4).map((signal, index) => (
+                    <span key={`${operation.id}-${signal.type ?? signal.label}-${index}`}>{signal.label}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function Quality() {
   const [workOrders, setWorkOrders] = useState([]);
   const [qualityChecks, setQualityChecks] = useState([]);
@@ -72,6 +234,7 @@ export default function Quality() {
   );
   const selectedOperation = operationCandidates.find((operation) => operation.id === form.workOrderOperationId);
   const selectedProductionLogs = selectedWorkOrder?.productionLogs ?? [];
+  const selectedTraceability = getSelectedWorkOrderTrace(selectedWorkOrder);
 
   async function loadData() {
     setError("");
@@ -289,6 +452,7 @@ export default function Quality() {
                   <p className="muted-text">Kalite kararı için son saha kayıtları, operasyon adımları, fire nedenleri, notlar ve görseller.</p>
                 </div>
               </div>
+              <TraceabilityPanel traceability={selectedTraceability} />
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -359,19 +523,28 @@ export default function Quality() {
             </thead>
             <tbody>
               {qualityChecks.map((check) => (
-                <tr key={check.id}>
-                  <td>{check.workOrder.orderNo}</td>
-                  <td>{check.workOrder.product.name}</td>
-                  <td>{check.workOrderOperation ? `${check.workOrderOperation.sequenceNo}. ${check.workOrderOperation.operationName}` : "-"}</td>
-                  <td>
-                    <span className={`status-pill quality-${check.status.toLowerCase()}`}>{QUALITY_LABELS[check.status] ?? check.status}</span>
-                  </td>
-                  <td>{check.defectQuantity}</td>
-                  <td>{check.defectReason ?? "-"}</td>
-                  <td>{check.note ? <span className="note-chip">{check.note}</span> : "-"}</td>
-                  <td>{check.checkedBy.name}</td>
-                  <td>{formatDate(check.checkedAt)}</td>
-                </tr>
+                <Fragment key={check.id}>
+                  <tr>
+                    <td>{check.workOrder.orderNo}</td>
+                    <td>{check.workOrder.product.name}</td>
+                    <td>{check.workOrderOperation ? `${check.workOrderOperation.sequenceNo}. ${check.workOrderOperation.operationName}` : "-"}</td>
+                    <td>
+                      <span className={`status-pill quality-${check.status.toLowerCase()}`}>{QUALITY_LABELS[check.status] ?? check.status}</span>
+                    </td>
+                    <td>{check.defectQuantity}</td>
+                    <td>{check.defectReason ?? "-"}</td>
+                    <td>{check.note ? <span className="note-chip">{check.note}</span> : "-"}</td>
+                    <td>{check.checkedBy.name}</td>
+                    <td>{formatDate(check.checkedAt)}</td>
+                  </tr>
+                  {check.traceability ? (
+                    <tr className="traceability-table-row">
+                      <td colSpan="9">
+                        <TraceabilityPanel traceability={check.traceability} compact />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
               {!isLoading && qualityChecks.length === 0 ? (
                 <tr>

@@ -40,6 +40,7 @@ docs/     Architecture and implementation notes
 - `docs/phase-3-shift-reporting.md`: Phase 3 shift-based production reporting notes
 - `docs/phase-3-downtime-tracking.md`: Phase 3 operation downtime reason tracking notes
 - `docs/phase-3-operation-time-tracking.md`: Phase 3 operation time and delay tracking notes
+- `docs/phase-3-quality-traceability.md`: Phase 3 quality traceability and root-cause context notes
 - `docs/e2e-demo-scenario.md`: repeatable demo data and acceptance test scenario
 
 ## Local Development
