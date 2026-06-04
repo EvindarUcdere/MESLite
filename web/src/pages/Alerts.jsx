@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { getProductionAlerts, updateProductionAlert } from "../api/productionAlerts.api.js";
+import { decideProductionAlertQualityAction, getProductionAlerts, updateProductionAlert } from "../api/productionAlerts.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 import { hasRole, ROLES } from "../utils/roles.js";
@@ -22,6 +22,12 @@ const ALERT_EVENT_LABELS = {
   ASSIGNED: "Atandı",
   RESOLVED: "Çözüldü",
   COMMENT: "Yorum"
+};
+
+const QUALITY_ACTION_LABELS = {
+  REWORK_OPERATION: "Operasyona geri gönder",
+  SCRAP: "Hurdaya ayır",
+  CONDITIONAL_ACCEPT: "Şartlı kabul"
 };
 
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
@@ -53,6 +59,7 @@ export default function Alerts() {
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [severityFilter, setSeverityFilter] = useState("ALL");
   const [resolutionNotes, setResolutionNotes] = useState({});
+  const [qualityActions, setQualityActions] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -96,6 +103,21 @@ export default function Alerts() {
     setResolutionNotes((current) => ({ ...current, [alertId]: value }));
   }
 
+  function getQualityActionForm(alert) {
+    const firstOperationId = alert.workOrder.operations?.[0]?.id ?? "";
+    return qualityActions[alert.id] ?? { decision: "REWORK_OPERATION", reworkOperationId: firstOperationId, note: "" };
+  }
+
+  function updateQualityAction(alert, patch) {
+    setQualityActions((current) => ({
+      ...current,
+      [alert.id]: {
+        ...getQualityActionForm(alert),
+        ...patch
+      }
+    }));
+  }
+
   async function handleStatusChange(alertId, status) {
     const resolutionNote = resolutionNotes[alertId]?.trim();
 
@@ -120,12 +142,42 @@ export default function Alerts() {
     }
   }
 
+  async function handleQualityAction(alert) {
+    const form = getQualityActionForm(alert);
+    const note = form.note.trim();
+
+    if (!note) {
+      setError("Kalite aksiyonu için karar notu girin.");
+      return;
+    }
+
+    if (form.decision === "REWORK_OPERATION" && !form.reworkOperationId) {
+      setError("Geri işleme için hedef operasyon seçin.");
+      return;
+    }
+
+    try {
+      await decideProductionAlertQualityAction(alert.id, {
+        decision: form.decision,
+        note,
+        ...(form.decision === "REWORK_OPERATION" ? { reworkOperationId: form.reworkOperationId } : {})
+      });
+
+      setQualityActions((current) => ({ ...current, [alert.id]: { ...form, note: "" } }));
+      setError("");
+      await loadAlerts();
+    } catch (_error) {
+      setError("Kalite aksiyonu uygulanamadı.");
+    }
+  }
+
   const counters = {
     open: alerts.filter((alert) => alert.status === "OPEN").length,
     review: alerts.filter((alert) => alert.status === "IN_REVIEW").length,
     critical: alerts.filter((alert) => alert.severity === "CRITICAL").length
   };
   const canManageAlerts = hasRole(user, [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.QUALITY_STAFF]);
+  const canDecideQualityActions = hasRole(user, [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER]);
 
   return (
     <div className="page-stack">
@@ -208,7 +260,20 @@ export default function Alerts() {
               <span>{ALERT_SEVERITY_LABELS[alert.severity] ?? alert.severity}</span>
               <span>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</span>
               <span>{alert.createdBy.name}</span>
+              {alert.qualityDecision ? <span>{QUALITY_ACTION_LABELS[alert.qualityDecision] ?? alert.qualityDecision}</span> : null}
             </div>
+            {alert.qualityDecision ? (
+              <div className="quality-action-summary">
+                <strong>Kalite Kararı</strong>
+                <span>{QUALITY_ACTION_LABELS[alert.qualityDecision] ?? alert.qualityDecision}</span>
+                <p>{alert.qualityDecisionNote}</p>
+                {alert.reworkOperation ? (
+                  <small>
+                    Hedef operasyon: {alert.reworkOperation.sequenceNo}. {alert.reworkOperation.operationName}
+                  </small>
+                ) : null}
+              </div>
+            ) : null}
             {alert.productionLog.attachments?.[0] ? (
               <img className="operator-note-image" src={getAttachmentUrl(alert.productionLog.attachments[0])} alt="Uyarı görseli" />
             ) : null}
@@ -224,6 +289,52 @@ export default function Alerts() {
                 </div>
               ))}
             </div>
+            {canDecideQualityActions && alert.status !== "RESOLVED" && alert.title.toLocaleLowerCase("tr-TR").includes("kalite") ? (
+              <div className="quality-action-panel">
+                <div>
+                  <strong>Kalite Aksiyon Kararı</strong>
+                  <span>Uygunsuzluk üretim akışında nasıl ele alınacak?</span>
+                </div>
+                <div className="quality-action-grid">
+                  <label>
+                    Karar
+                    <select value={getQualityActionForm(alert).decision} onChange={(event) => updateQualityAction(alert, { decision: event.target.value })}>
+                      {Object.entries(QUALITY_ACTION_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {getQualityActionForm(alert).decision === "REWORK_OPERATION" ? (
+                    <label>
+                      Hedef operasyon
+                      <select
+                        value={getQualityActionForm(alert).reworkOperationId}
+                        onChange={(event) => updateQualityAction(alert, { reworkOperationId: event.target.value })}
+                      >
+                        {(alert.workOrder.operations ?? []).map((operation) => (
+                          <option key={operation.id} value={operation.id}>
+                            {operation.sequenceNo}. {operation.operationName} - {operation.assignedOperator?.name ?? "Operatör yok"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  <label>
+                    Karar notu
+                    <input
+                      value={getQualityActionForm(alert).note}
+                      onChange={(event) => updateQualityAction(alert, { note: event.target.value })}
+                      placeholder="Örn. Montaj adımı yeniden kontrol edilecek."
+                    />
+                  </label>
+                </div>
+                <button type="button" onClick={() => handleQualityAction(alert)}>
+                  Kararı Uygula
+                </button>
+              </div>
+            ) : null}
             {canManageAlerts && alert.status !== "RESOLVED" ? (
               <>
                 <label className="alert-resolution-field">

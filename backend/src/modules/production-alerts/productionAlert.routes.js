@@ -4,7 +4,7 @@ import { allowRoles } from "../../middlewares/role.middleware.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import * as productionAlertController from "./productionAlert.controller.js";
-import { listProductionAlertsSchema, updateProductionAlertSchema } from "./productionAlert.validation.js";
+import { decideQualityActionSchema, listProductionAlertsSchema, updateProductionAlertSchema } from "./productionAlert.validation.js";
 
 export const productionAlertRoutes = Router();
 
@@ -20,4 +20,10 @@ productionAlertRoutes.patch(
   allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"),
   validate(updateProductionAlertSchema),
   asyncHandler(productionAlertController.update)
+);
+productionAlertRoutes.post(
+  "/:id/quality-action",
+  allowRoles("ADMIN", "PRODUCTION_MANAGER"),
+  validate(decideQualityActionSchema),
+  asyncHandler(productionAlertController.decideQualityAction)
 );

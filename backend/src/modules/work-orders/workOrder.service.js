@@ -2,6 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
+import { createNotification } from "../notifications/notification.service.js";
 
 const workOrderInclude = {
   product: true,
@@ -398,6 +399,47 @@ export async function startWorkOrder(id, actor) {
       },
       tx
     );
+
+    if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && operation?.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+      await createNotification(
+        {
+          recipientId: operation.assignedOperatorId,
+          type: "OPERATION_RESTARTED",
+          title: "Operasyon tekrar başlatıldı",
+          message: `${updated.orderNo} iş emrinde ${operation.operationName} operasyonu yönetici tarafından başlatıldı.`,
+          entityType: "WorkOrderOperation",
+          entityId: operation.id,
+          metadata: {
+            workOrderId: updated.id,
+            orderNo: updated.orderNo,
+            operationName: operation.operationName,
+            previousStatus: targetOperation?.status,
+            startedById: actor.id,
+            startedByName: actor.name
+          }
+        },
+        tx
+      );
+    } else if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && !operation && updated.assignedOperatorId && updated.assignedOperatorId !== actor.id) {
+      await createNotification(
+        {
+          recipientId: updated.assignedOperatorId,
+          type: "WORK_ORDER_RESTARTED",
+          title: "İş emri tekrar başlatıldı",
+          message: `${updated.orderNo} iş emri yönetici tarafından başlatıldı.`,
+          entityType: "WorkOrder",
+          entityId: updated.id,
+          metadata: {
+            workOrderId: updated.id,
+            orderNo: updated.orderNo,
+            previousStatus: current.status,
+            startedById: actor.id,
+            startedByName: actor.name
+          }
+        },
+        tx
+      );
+    }
 
     return { workOrder: updated, operation, machine };
   });

@@ -9,3 +9,8 @@ export async function update(req, res) {
   const alert = await productionAlertService.updateProductionAlert(req.user, req.params.id, req.validated.body);
   res.json({ data: alert });
 }
+
+export async function decideQualityAction(req, res) {
+  const alert = await productionAlertService.decideQualityAction(req.user, req.params.id, req.validated.body);
+  res.json({ data: alert });
+}

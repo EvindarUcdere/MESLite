@@ -1,5 +1,6 @@
 import { Play, Plus, Square, TimerReset } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
@@ -245,6 +246,7 @@ function normalize(value) {
 }
 
 export default function WorkOrders() {
+  const [searchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const [workOrders, setWorkOrders] = useState([]);
   const [search, setSearch] = useState("");
@@ -258,6 +260,7 @@ export default function WorkOrders() {
   const [operationMessages, setOperationMessages] = useState({});
   const [operationDowntimes, setOperationDowntimes] = useState({});
   const [focusedWorkOrderId, setFocusedWorkOrderId] = useState("");
+  const [focusedOperationId, setFocusedOperationId] = useState("");
   const workOrderRowRefs = useRef(new Map());
   const [form, setForm] = useState({
     orderNo: "",
@@ -383,6 +386,18 @@ export default function WorkOrders() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const workOrderId = searchParams.get("workOrderId");
+    const operationId = searchParams.get("operationId");
+
+    if (!workOrders.length || !workOrderId) {
+      return;
+    }
+
+    focusWorkOrder(workOrderId);
+    setFocusedOperationId(operationId ?? "");
+  }, [searchParams, workOrders]);
 
   useSocket({
     "workOrder:updated": () => loadData(),
@@ -809,7 +824,7 @@ export default function WorkOrders() {
                                   key={operation.id}
                                   className={`work-order-operation-chip operation-${operation.status.toLowerCase().replace("_", "-")} ${
                                     isShortCompletedOperation(operation, workOrder) ? "operation-short-completed" : ""
-                                  }`}
+                                  } ${focusedOperationId === operation.id ? "focused-operation-chip" : ""}`}
                                 >
                                   <span>{operation.sequenceNo}</span>
                                   <div>

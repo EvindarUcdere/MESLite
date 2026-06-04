@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../api/notifications.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
@@ -6,6 +7,12 @@ import { useAuthStore } from "../store/authStore.js";
 const TYPE_LABELS = {
   OPERATION_HANDOFF: "Operasyon Devri",
   OPERATION_MESSAGE: "Operasyon Mesajı",
+  OPERATION_RESTARTED: "Operasyon Başlatıldı",
+  OPERATION_REOPENED: "Operasyon Yeniden Açıldı",
+  WORK_ORDER_RESTARTED: "İş Emri Başlatıldı",
+  OPERATOR_FIELD_MESSAGE: "Saha Mesajı",
+  QUALITY_NONCONFORMITY: "Kalite Uygunsuzluğu",
+  QUALITY_REWORK_ASSIGNED: "Kalite Geri İşleme",
   CRITICAL_PRODUCTION_ALERT: "Kritik Uyarı"
 };
 
@@ -22,7 +29,32 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function getNotificationTarget(notification) {
+  if (notification.entityType === "WorkOrderOperation") {
+    const params = new URLSearchParams();
+
+    if (notification.metadata?.workOrderId) {
+      params.set("workOrderId", notification.metadata.workOrderId);
+    }
+
+    params.set("operationId", notification.entityId);
+    return { label: "Operasyona git", path: `/work-orders?${params.toString()}` };
+  }
+
+  if (notification.entityType === "WorkOrder") {
+    const workOrderId = notification.metadata?.workOrderId ?? notification.entityId;
+    return { label: "İş emrine git", path: `/work-orders?workOrderId=${workOrderId}` };
+  }
+
+  if (notification.entityType === "ProductionAlert") {
+    return { label: "Uyarıya git", path: "/alerts" };
+  }
+
+  return null;
+}
+
 export default function Notifications() {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -85,12 +117,23 @@ export default function Notifications() {
     setUnreadCount(response.meta.unreadCount);
   }
 
+  async function handleOpenNotification(notification) {
+    if (!notification.readAt) {
+      await handleMarkRead(notification.id);
+    }
+
+    const target = getNotificationTarget(notification);
+    if (target) {
+      navigate(target.path);
+    }
+  }
+
   return (
     <div className="page-stack">
       <header className="page-header">
         <div>
           <h1>Bildirim Merkezi</h1>
-          <p>Size atanan operasyonları, gelen mesajları ve kritik üretim uyarılarını takip edin.</p>
+          <p>Size atanan operasyonları, saha mesajlarını ve kritik üretim uyarılarını takip edin.</p>
         </div>
         <button className="primary-button" type="button" onClick={handleMarkAllRead} disabled={!unreadCount}>
           Tümünü Okundu Yap
@@ -120,6 +163,8 @@ export default function Notifications() {
             { value: "ALL", label: "Tümü" },
             { value: "UNREAD", label: "Okunmamış" },
             { value: "OPERATION_HANDOFF", label: "Operasyon Devri" },
+            { value: "OPERATION_RESTARTED", label: "Tekrar Başlatılan" },
+            { value: "OPERATOR_FIELD_MESSAGE", label: "Saha Mesajları" },
             { value: "OPERATION_MESSAGE", label: "Mesajlar" },
             { value: "CRITICAL_PRODUCTION_ALERT", label: "Kritik Uyarılar" }
           ].map((option) => (
@@ -131,25 +176,36 @@ export default function Notifications() {
       </section>
 
       <section className="notification-list">
-        {filteredNotifications.map((notification) => (
-          <article key={notification.id} className={`notification-card ${notification.readAt ? "" : "notification-unread"}`}>
-            <div>
-              <div className="notification-heading">
-                <strong>{notification.title}</strong>
-                <span>{TYPE_LABELS[notification.type] ?? notification.type}</span>
+        {filteredNotifications.map((notification) => {
+          const target = getNotificationTarget(notification);
+
+          return (
+            <article key={notification.id} className={`notification-card ${notification.readAt ? "" : "notification-unread"}`}>
+              <div>
+                <div className="notification-heading">
+                  <strong>{notification.title}</strong>
+                  <span>{TYPE_LABELS[notification.type] ?? notification.type}</span>
+                </div>
+                <p>{notification.message}</p>
+                <small>{formatDateTime(notification.createdAt)}</small>
               </div>
-              <p>{notification.message}</p>
-              <small>{formatDateTime(notification.createdAt)}</small>
-            </div>
-            {!notification.readAt ? (
-              <button type="button" onClick={() => handleMarkRead(notification.id)}>
-                Okundu
-              </button>
-            ) : (
-              <span className="read-state">Okundu</span>
-            )}
-          </article>
-        ))}
+              <div className="notification-actions">
+                {target ? (
+                  <button type="button" onClick={() => handleOpenNotification(notification)}>
+                    {target.label}
+                  </button>
+                ) : null}
+                {!notification.readAt ? (
+                  <button type="button" onClick={() => handleMarkRead(notification.id)}>
+                    Okundu
+                  </button>
+                ) : (
+                  <span className="read-state">Okundu</span>
+                )}
+              </div>
+            </article>
+          );
+        })}
         {!isLoading && filteredNotifications.length === 0 ? <p className="empty-state">Bu filtrede bildirim yok.</p> : null}
       </section>
     </div>

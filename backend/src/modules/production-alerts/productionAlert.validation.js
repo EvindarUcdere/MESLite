@@ -21,3 +21,19 @@ export const updateProductionAlertSchema = z.object({
     }
   })
 });
+
+export const decideQualityActionSchema = z.object({
+  body: z.object({
+    decision: z.enum(["REWORK_OPERATION", "SCRAP", "CONDITIONAL_ACCEPT"]),
+    reworkOperationId: z.string().uuid().nullable().optional(),
+    note: z.string().trim().min(3, "Quality action note is required")
+  }).superRefine((body, ctx) => {
+    if (body.decision === "REWORK_OPERATION" && !body.reworkOperationId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Rework operation is required for rework action",
+        path: ["reworkOperationId"]
+      });
+    }
+  })
+});

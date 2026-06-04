@@ -37,8 +37,26 @@ async function cleanupTempWorkOrder() {
       entityId: { in: temp.operations.map((operation) => operation.id) }
     }
   });
+  await prisma.operationMessage.deleteMany({
+    where: {
+      workOrderOperationId: { in: temp.operations.map((operation) => operation.id) }
+    }
+  });
+  await prisma.productionAlertEvent.deleteMany({
+    where: {
+      alert: { workOrderId: temp.id }
+    }
+  });
+  await prisma.productionAlert.deleteMany({ where: { workOrderId: temp.id } });
+  await prisma.productionLogAttachment.deleteMany({
+    where: {
+      productionLog: { workOrderId: temp.id }
+    }
+  });
   await prisma.productionLog.deleteMany({ where: { workOrderId: temp.id } });
+  await prisma.qualityCheck.deleteMany({ where: { workOrderId: temp.id } });
   await prisma.operationDowntime.deleteMany({ where: { workOrderId: temp.id } });
+  await prisma.workOrderOperation.deleteMany({ where: { workOrderId: temp.id } });
   await prisma.workOrder.delete({ where: { id: temp.id } });
 }
 

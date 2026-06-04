@@ -71,6 +71,12 @@ enum AlertEventType {
   COMMENT
 }
 
+enum QualityActionDecision {
+  REWORK_OPERATION
+  SCRAP
+  CONDITIONAL_ACCEPT
+}
+
 enum ScrapReason {
   MATERIAL_DEFECT
   MACHINE_SETUP
@@ -253,6 +259,7 @@ model WorkOrderOperation {
   productionLogs     ProductionLog[]
   qualityChecks      QualityCheck[]
   downtimes          OperationDowntime[]
+  qualityReworkAlerts ProductionAlert[]        @relation("QualityReworkOperation")
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
@@ -341,6 +348,9 @@ model ProductionAlert {
   severity        AlertSeverity          @default(WARNING)
   status          AlertStatus            @default(OPEN)
   resolutionNote  String?
+  qualityDecision QualityActionDecision?
+  qualityDecisionNote String?
+  reworkOperationId String?
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
   resolvedAt      DateTime?
@@ -349,6 +359,7 @@ model ProductionAlert {
   createdBy       User                   @relation("CreatedAlerts", fields: [createdById], references: [id])
   assignedTo      User?                  @relation("AssignedAlerts", fields: [assignedToId], references: [id])
   resolvedBy      User?                  @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
+  reworkOperation WorkOrderOperation?    @relation("QualityReworkOperation", fields: [reworkOperationId], references: [id])
   events          ProductionAlertEvent[]
 }
 

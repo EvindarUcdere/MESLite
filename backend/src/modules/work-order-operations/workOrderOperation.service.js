@@ -2,7 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
-import { createNotification } from "../notifications/notification.service.js";
+import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
 
 const operationInclude = {
   workOrder: {
@@ -320,6 +320,28 @@ export async function startOperation(actor, id) {
       tx
     );
 
+    if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor.role) && operation.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+      await createNotification(
+        {
+          recipientId: operation.assignedOperatorId,
+          type: isReopeningShortCompletedOperation ? "OPERATION_REOPENED" : "OPERATION_RESTARTED",
+          title: isReopeningShortCompletedOperation ? "Operasyon yeniden açıldı" : "Operasyon tekrar başlatıldı",
+          message: `${operation.workOrder.orderNo} iş emrinde ${operation.operationName} operasyonu yönetici tarafından başlatıldı.`,
+          entityType: "WorkOrderOperation",
+          entityId: operation.id,
+          metadata: {
+            workOrderId: current.workOrderId,
+            orderNo: operation.workOrder.orderNo,
+            operationName: operation.operationName,
+            previousStatus: current.status,
+            startedById: actor.id,
+            startedByName: actor.name
+          }
+        },
+        tx
+      );
+    }
+
     const fullWorkOrder = await getWorkOrderForEmit(current.workOrderId, tx);
     return { operation, resetOperations, workOrder: fullWorkOrder ?? workOrder, machine };
   });
@@ -614,6 +636,24 @@ export async function createOperationMessage(actor, id, data) {
       recipientId: operation.assignedOperatorId,
       type: "OPERATION_MESSAGE",
       title: "Operasyon mesajı geldi",
+      message: `${operation.workOrder.orderNo} / ${operation.operationName}: ${message.message}`,
+      entityType: "WorkOrderOperation",
+      entityId: operation.id,
+      metadata: {
+        workOrderId: operation.workOrderId,
+        orderNo: operation.workOrder.orderNo,
+        operationName: operation.operationName,
+        severity: message.severity,
+        senderId: actor.id,
+        senderName: actor.name
+      }
+    });
+  }
+
+  if (actor.role === "OPERATOR") {
+    await createNotificationsForRoles(["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"], {
+      type: "OPERATOR_FIELD_MESSAGE",
+      title: "Operatörden saha mesajı",
       message: `${operation.workOrder.orderNo} / ${operation.operationName}: ${message.message}`,
       entityType: "WorkOrderOperation",
       entityId: operation.id,

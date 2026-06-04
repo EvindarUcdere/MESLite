@@ -517,6 +517,14 @@ body {
   border-radius: 8px;
 }
 
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
 .notification-unread {
   border-color: #256f6c;
   background: #f0fdfa;
@@ -880,6 +888,72 @@ body {
   color: #33424d;
   font-size: 13px;
   font-weight: 500;
+}
+
+.quality-action-summary,
+.quality-action-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(37, 111, 108, 0.28);
+  border-radius: 6px;
+  background: rgba(217, 242, 232, 0.55);
+}
+
+.quality-action-summary strong,
+.quality-action-panel strong {
+  font-size: 13px;
+}
+
+.quality-action-summary span,
+.quality-action-panel span,
+.quality-action-summary small {
+  color: #526575;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quality-action-summary p {
+  margin: 0;
+  color: #17202a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quality-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.quality-action-grid label {
+  display: grid;
+  gap: 6px;
+  color: #33424d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quality-action-grid select,
+.quality-action-grid input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.quality-action-panel button {
+  width: fit-content;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #287b78;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .alert-resolution-field {
@@ -1333,6 +1407,12 @@ th {
   border: 2px solid #dbe3ea;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.focused-operation-chip {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
 .work-order-operation-chip > span {
