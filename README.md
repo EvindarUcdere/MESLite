@@ -390,6 +390,7 @@ The tests focus on backend business rules because factory data consistency is mo
 - `docs/phase-3-shift-reporting.md`: shift-based reporting
 - `docs/phase-3-downtime-tracking.md`: downtime reason tracking
 - `docs/phase-3-quality-action-decision.md`: quality decision workflow
+- `docs/phase-4-deployment-plan.md`: deployment and production demo preparation
 - `docs/e2e-demo-scenario.md`: repeatable demo scenario
 - `docs/demo-data-management.md`: demo reset and cleanup commands
 
@@ -426,9 +427,10 @@ The tests focus on backend business rules because factory data consistency is mo
 
 ### Planned Phase 4
 
-- Real phone push testing with EAS Development Build
-- Deployment to Railway and Vercel
+- Deployment preparation for Railway and Vercel
+- Production env validation and health checks
 - Docker Compose local setup
+- Real phone push testing with EAS Development Build
 - Stronger audit log UI
 - Report filters and export
 - Mobile offline queue
