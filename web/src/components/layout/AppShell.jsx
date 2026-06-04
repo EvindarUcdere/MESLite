@@ -1,5 +1,8 @@
 import { AlertTriangle, BarChart3, Bell, Boxes, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { getNotifications } from "../../api/notifications.api.js";
+import { useSocket } from "../../hooks/useSocket.js";
 import { useAuthStore } from "../../store/authStore.js";
 import { hasRole, ROLES, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
 
@@ -81,8 +84,51 @@ const navigationItems = [
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  async function loadUnreadNotificationCount() {
+    try {
+      const response = await getNotifications({ unreadOnly: true, limit: 1 });
+      setUnreadNotificationCount(response.meta.unreadCount ?? response.data.length);
+    } catch (_error) {
+      setUnreadNotificationCount(0);
+    }
+  }
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotificationCount(0);
+      return;
+    }
+
+    loadUnreadNotificationCount();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) {
+      loadUnreadNotificationCount();
+    }
+  }, [location.pathname, user?.id]);
+
+  useEffect(() => {
+    function handleUnreadCountChanged(event) {
+      setUnreadNotificationCount(Number(event.detail?.unreadCount ?? 0));
+    }
+
+    window.addEventListener("mes-lite:notifications-unread-changed", handleUnreadCountChanged);
+    return () => window.removeEventListener("mes-lite:notifications-unread-changed", handleUnreadCountChanged);
+  }, []);
+
+  useSocket({
+    "notification:created": (notification) => {
+      if (notification.recipientId === user?.id) {
+        setUnreadNotificationCount((current) => current + 1);
+      }
+    }
+  });
 
   function handleLogout() {
     clearSession();
@@ -105,7 +151,10 @@ export function AppShell() {
               return (
                 <NavLink key={item.to} to={item.to} end={item.end}>
                   <Icon size={18} />
-                  {item.label}
+                  <span className="sidebar-link-label">{item.label}</span>
+                  {item.to === "/notifications" && unreadNotificationCount > 0 ? (
+                    <span className="sidebar-notification-badge">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>
+                  ) : null}
                 </NavLink>
               );
             })}

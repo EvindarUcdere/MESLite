@@ -65,10 +65,24 @@ const DOWNTIME_REASON_LABELS = {
 
 const DOWNTIME_REASON_COLORS = ["#dc2626", "#d97706", "#2563eb", "#7c3aed", "#be123c", "#64748b", "#94a3b8"];
 
+const QUALITY_DECISION_LABELS = {
+  REWORK_OPERATION: "Geri İşleme",
+  SCRAP: "Hurda",
+  CONDITIONAL_ACCEPT: "Şartlı Kabul",
+  UNKNOWN: "Karar Yok"
+};
+
+const QUALITY_DECISION_COLORS = {
+  REWORK_OPERATION: "#2563eb",
+  SCRAP: "#dc2626",
+  CONDITIONAL_ACCEPT: "#d97706",
+  UNKNOWN: "#94a3b8"
+};
+
 function mapCountsToChartData(counts = {}) {
   return Object.entries(counts).map(([status, value]) => ({
     status,
-    name: STATUS_LABELS[status] ?? SCRAP_REASON_LABELS[status] ?? DOWNTIME_REASON_LABELS[status] ?? status,
+    name: STATUS_LABELS[status] ?? SCRAP_REASON_LABELS[status] ?? DOWNTIME_REASON_LABELS[status] ?? QUALITY_DECISION_LABELS[status] ?? status,
     value
   }));
 }
@@ -113,11 +127,19 @@ export default function Reports() {
     ["Toplam Üretim", summary.producedQuantity ?? 0],
     ["Fire Oranı", `${summary.scrapRate ?? 0}%`],
     ["Kalite Kontrol", summary.qualityCheckCount ?? 0],
-    ["Hatalı Adet", summary.defectQuantity ?? 0]
+    ["Hatalı Adet", summary.defectQuantity ?? 0],
+    ["Kalite Kararı", summary.qualityDecisionCount ?? 0],
+    ["Geri İşleme", summary.qualityReworkCount ?? 0],
+    ["Hurda Kararı", summary.qualityScrapDecisionCount ?? 0],
+    ["Şartlı Kabul", summary.qualityConditionalAcceptCount ?? 0]
   ];
   const workOrderStatusData = mapCountsToChartData(report?.workOrderStatusCounts);
   const machineStatusData = mapCountsToChartData(report?.machineStatusCounts);
   const qualityStatusData = mapCountsToChartData(report?.qualityStatusCounts);
+  const qualityDecisionData = mapCountsToChartData(report?.qualityDecisionCounts);
+  const qualityDecisionByOperation = report?.qualityDecisionByOperation ?? [];
+  const qualityDecisionByMachine = report?.qualityDecisionByMachine ?? [];
+  const recentQualityDecisions = report?.recentQualityDecisions ?? [];
   const machinePerformanceData = report?.machinePerformance ?? [];
   const productPerformanceData = report?.productPerformance ?? [];
   const shiftPerformanceData = report?.shiftPerformance ?? [];
@@ -246,6 +268,25 @@ export default function Reports() {
         </article>
 
         <article className="panel chart-panel">
+          <h2>Kalite Kararları</h2>
+          {qualityDecisionData.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={qualityDecisionData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
+                  {qualityDecisionData.map((entry) => (
+                    <Cell key={entry.status} fill={QUALITY_DECISION_COLORS[entry.status] ?? "#64748b"} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Kalite karar verisi yok.</p>
+          )}
+        </article>
+
+        <article className="panel chart-panel">
           <h2>Fire Nedenleri</h2>
           {scrapReasonData.length ? (
             <ResponsiveContainer width="100%" height={260}>
@@ -320,6 +361,127 @@ export default function Reports() {
             <p className="empty-state">Makine durum verisi yok.</p>
           )}
         </article>
+      </section>
+
+      <section className="panel">
+        <h2>Operasyon Bazlı Kalite Kararları</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Operasyon</th>
+                <th>Makine</th>
+                <th>Toplam</th>
+                <th>Geri İşleme</th>
+                <th>Hurda</th>
+                <th>Şartlı Kabul</th>
+                <th>Kritik</th>
+              </tr>
+            </thead>
+            <tbody>
+              {qualityDecisionByOperation.map((item) => (
+                <tr key={item.operationId}>
+                  <td>{item.orderNo}</td>
+                  <td>{item.productCode}</td>
+                  <td>{item.operationName}</td>
+                  <td>{item.machineCode}</td>
+                  <td>{item.totalCount}</td>
+                  <td>{item.reworkCount}</td>
+                  <td>{item.scrapCount}</td>
+                  <td>{item.conditionalAcceptCount}</td>
+                  <td>{item.criticalCount}</td>
+                </tr>
+              ))}
+              {!isLoading && qualityDecisionByOperation.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Henüz operasyon bazlı kalite karar verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Makine Bazlı Kalite Kararları</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Makine</th>
+                <th>Ad</th>
+                <th>Toplam</th>
+                <th>Geri İşleme</th>
+                <th>Hurda</th>
+                <th>Şartlı Kabul</th>
+                <th>Kritik</th>
+              </tr>
+            </thead>
+            <tbody>
+              {qualityDecisionByMachine.map((item) => (
+                <tr key={item.machineId}>
+                  <td>{item.machineCode}</td>
+                  <td>{item.machineName}</td>
+                  <td>{item.totalCount}</td>
+                  <td>{item.reworkCount}</td>
+                  <td>{item.scrapCount}</td>
+                  <td>{item.conditionalAcceptCount}</td>
+                  <td>{item.criticalCount}</td>
+                </tr>
+              ))}
+              {!isLoading && qualityDecisionByMachine.length === 0 ? (
+                <tr>
+                  <td colSpan="7">Henüz makine bazlı kalite karar verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>Son Kalite Kararları</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>İş Emri</th>
+                <th>Ürün</th>
+                <th>Karar</th>
+                <th>Operasyon</th>
+                <th>Makine</th>
+                <th>Operatör</th>
+                <th>Not</th>
+                <th>Zaman</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentQualityDecisions.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.orderNo}</td>
+                  <td>{item.productCode}</td>
+                  <td>{QUALITY_DECISION_LABELS[item.decision] ?? item.decision}</td>
+                  <td>{item.operationName}</td>
+                  <td>{item.machineCode}</td>
+                  <td>{item.operatorName}</td>
+                  <td>{item.note ?? "-"}</td>
+                  <td>
+                    {item.updatedAt
+                      ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.updatedAt))
+                      : "-"}
+                  </td>
+                </tr>
+              ))}
+              {!isLoading && recentQualityDecisions.length === 0 ? (
+                <tr>
+                  <td colSpan="8">Henüz kalite karar kaydı yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel">

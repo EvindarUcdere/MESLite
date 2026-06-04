@@ -9,6 +9,7 @@ import { productionAlertRoutes } from "../modules/production-alerts/productionAl
 import { productionLogRoutes } from "../modules/production-logs/productionLog.routes.js";
 import { productRouteRoutes } from "../modules/product-routes/productRoute.routes.js";
 import { productRoutes } from "../modules/products/product.routes.js";
+import { pushTokenRoutes } from "../modules/push-tokens/pushToken.routes.js";
 import { qualityCheckRoutes } from "../modules/quality-checks/qualityCheck.routes.js";
 import { reportRoutes } from "../modules/reports/report.routes.js";
 import { shiftRoutes } from "../modules/shifts/shift.routes.js";
@@ -28,6 +29,7 @@ apiRoutes.use("/production-alerts", productionAlertRoutes);
 apiRoutes.use("/production-logs", productionLogRoutes);
 apiRoutes.use("/product-routes", productRouteRoutes);
 apiRoutes.use("/products", productRoutes);
+apiRoutes.use("/push-tokens", pushTokenRoutes);
 apiRoutes.use("/quality-checks", qualityCheckRoutes);
 apiRoutes.use("/reports", reportRoutes);
 apiRoutes.use("/shifts", shiftRoutes);

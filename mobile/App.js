@@ -1,9 +1,10 @@
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
+import { ActivityIndicator, AppState, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
+import { registerPushToken } from "./src/api/pushTokens.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
@@ -23,6 +24,30 @@ const OPERATION_STATUS_LABELS = {
   PAUSED: "Durakladı",
   COMPLETED: "Tamamlandı"
 };
+
+let nativeNotificationsModulePromise = null;
+
+async function getNativeNotificationsModule() {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
+  if (!nativeNotificationsModulePromise) {
+    nativeNotificationsModulePromise = import("expo-notifications").then((module) => {
+      module.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false
+        })
+      });
+
+      return module;
+    });
+  }
+
+  return nativeNotificationsModulePromise;
+}
 
 const OPERATION_STAGE_LABELS = {
   WAITING: "Sırada",
@@ -289,6 +314,88 @@ function playNotificationSound() {
   }
 }
 
+async function ensureSystemNotificationPermission() {
+  if (Platform.OS === "web") {
+    if (!("Notification" in globalThis)) {
+      return false;
+    }
+
+    if (globalThis.Notification.permission === "granted") {
+      return true;
+    }
+
+    if (globalThis.Notification.permission === "denied") {
+      return false;
+    }
+
+    const permission = await globalThis.Notification.requestPermission();
+    return permission === "granted";
+  }
+
+  const Notifications = await getNativeNotificationsModule();
+  if (!Notifications) {
+    return false;
+  }
+
+  const current = await Notifications.getPermissionsAsync();
+  if (current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+    return true;
+  }
+
+  const requested = await Notifications.requestPermissionsAsync();
+  return requested.granted || requested.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+}
+
+async function showSystemNotification({ title, body }) {
+  const hasPermission = await ensureSystemNotificationPermission();
+
+  if (!hasPermission) {
+    return;
+  }
+
+  if (Platform.OS === "web") {
+    new globalThis.Notification(title, { body });
+    return;
+  }
+
+  const Notifications = await getNativeNotificationsModule();
+  if (!Notifications) {
+    return;
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      sound: true
+    },
+    trigger: null
+  });
+}
+
+async function getExpoPushTokenForDevice() {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
+  const Notifications = await getNativeNotificationsModule();
+  if (!Notifications) {
+    return null;
+  }
+
+  const hasPermission = await ensureSystemNotificationPermission();
+  if (!hasPermission) {
+    return null;
+  }
+
+  try {
+    const tokenResult = await Notifications.getExpoPushTokenAsync();
+    return tokenResult.data;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function getOperationMessageWorkOrderId(message) {
   return message?.workOrderOperation?.workOrder?.id ?? message?.workOrderOperation?.workOrderId ?? null;
 }
@@ -322,6 +429,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const selectedWorkOrderIdRef = useRef("");
+  const appStateRef = useRef(AppState.currentState);
 
   const assignedWorkOrders = useMemo(
     () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
@@ -371,6 +479,22 @@ export default function App() {
     selectedWorkOrderIdRef.current = selectedWorkOrderId;
   }, [selectedWorkOrderId]);
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      appStateRef.current = nextState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      ensureSystemNotificationPermission().catch(() => {});
+    }
+  }, [user?.id]);
+
   async function clearExpiredSession() {
     await logout();
     setUser(null);
@@ -414,6 +538,24 @@ export default function App() {
     }
   }
 
+  async function registerDevicePushToken() {
+    try {
+      const token = await getExpoPushTokenForDevice();
+
+      if (!token) {
+        return;
+      }
+
+      await registerPushToken({
+        token,
+        platform: Platform.OS,
+        deviceName: Platform.OS === "web" ? "Web" : "Mobile"
+      });
+    } catch (_error) {
+      // Push token registration should never block production work.
+    }
+  }
+
   async function handleMarkNotificationRead(notificationId) {
     try {
       const response = await markNotificationRead(notificationId);
@@ -448,6 +590,7 @@ export default function App() {
           setUser(session.user);
           await loadWorkOrders();
           await loadNotifications();
+          await registerDevicePushToken();
         }
       } catch (_error) {
         if (isMounted) {
@@ -533,6 +676,14 @@ export default function App() {
       setSuccessMessage(notification.title);
       setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]);
       setUnreadNotificationCount((current) => current + 1);
+
+      const isAppInBackground = Platform.OS === "web" ? globalThis.document?.hidden : appStateRef.current !== "active";
+      if (isAppInBackground) {
+        showSystemNotification({
+          title: notification.title,
+          body: notification.message
+        }).catch(() => {});
+      }
     };
 
     socket.on("connect", () => {
@@ -560,6 +711,7 @@ export default function App() {
       setUser(session.user);
       await loadWorkOrders();
       await loadNotifications();
+      await registerDevicePushToken();
     } catch (loginError) {
       setError(getErrorMessage(loginError, "Giriş yapılamadı."));
     } finally {

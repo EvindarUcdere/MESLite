@@ -138,7 +138,7 @@ async function createRoute({ product, machines }) {
   return { route, routeOperations };
 }
 
-async function createDemoWorkOrder({ admin, product, route, routeOperations, operators, machines, scenario }) {
+async function createDemoWorkOrder({ admin, manager, product, route, routeOperations, operators, machines, scenario }) {
   const workOrder = await prisma.workOrder.create({
     data: {
       orderNo: scenario.orderNo,
@@ -171,9 +171,10 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
     }
   });
 
+  const createdLogsBySequence = {};
   for (const log of scenario.logs) {
     const operation = workOrder.operations[log.sequenceNo - 1];
-    await prisma.productionLog.create({
+    const productionLog = await prisma.productionLog.create({
       data: {
         workOrderId: workOrder.id,
         workOrderOperationId: operation.id,
@@ -186,6 +187,7 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
         note: log.note
       }
     });
+    createdLogsBySequence[log.sequenceNo] = productionLog;
   }
 
   for (const message of scenario.messages) {
@@ -229,6 +231,49 @@ async function createDemoWorkOrder({ admin, product, route, routeOperations, ope
         defectReason: scenario.qualityCheck.defectReason,
         note: scenario.qualityCheck.note
       }
+    });
+  }
+
+  if (scenario.qualityDecision) {
+    const sourceLog = createdLogsBySequence[scenario.qualityDecision.sourceSequenceNo] ?? Object.values(createdLogsBySequence).at(-1);
+    const reworkOperation = scenario.qualityDecision.reworkSequenceNo ? workOrder.operations[scenario.qualityDecision.reworkSequenceNo - 1] : null;
+    const alert = await prisma.productionAlert.create({
+      data: {
+        productionLogId: sourceLog.id,
+        workOrderId: workOrder.id,
+        createdById: scenario.qualityDecision.createdById,
+        assignedToId: manager.id,
+        resolvedById: scenario.qualityDecision.decision === "REWORK_OPERATION" ? null : manager.id,
+        title: `Kalite uygunsuzlugu - ${workOrder.orderNo}`,
+        message: scenario.qualityDecision.message,
+        severity: scenario.qualityDecision.severity,
+        status: scenario.qualityDecision.decision === "REWORK_OPERATION" ? "IN_REVIEW" : "RESOLVED",
+        resolutionNote: scenario.qualityDecision.decision === "REWORK_OPERATION" ? null : scenario.qualityDecision.note,
+        qualityDecision: scenario.qualityDecision.decision,
+        qualityDecisionNote: scenario.qualityDecision.note,
+        reworkOperationId: reworkOperation?.id,
+        resolvedAt: scenario.qualityDecision.decision === "REWORK_OPERATION" ? null : new Date()
+      }
+    });
+
+    await prisma.productionAlertEvent.createMany({
+      data: [
+        {
+          alertId: alert.id,
+          actorId: scenario.qualityDecision.createdById,
+          type: "CREATED",
+          toStatus: "OPEN",
+          note: scenario.qualityDecision.message
+        },
+        {
+          alertId: alert.id,
+          actorId: manager.id,
+          type: scenario.qualityDecision.decision === "REWORK_OPERATION" ? "COMMENT" : "RESOLVED",
+          fromStatus: "OPEN",
+          toStatus: scenario.qualityDecision.decision === "REWORK_OPERATION" ? "IN_REVIEW" : "RESOLVED",
+          note: `Kalite karari: ${scenario.qualityDecision.decision}. ${scenario.qualityDecision.note}`
+        }
+      ]
     });
   }
 
@@ -443,7 +488,16 @@ async function main() {
           note: "Fikstur baglantisi gevsek, bakim ekibi bekleniyor.",
           startedAt: minutesAgo(now, 55)
         }
-      ]
+      ],
+      qualityDecision: {
+        sourceSequenceNo: 2,
+        reworkSequenceNo: 2,
+        createdById: qualityStaff.id,
+        decision: "REWORK_OPERATION",
+        severity: "CRITICAL",
+        message: "Montaj fikstur problemi sonrasi parcalar tekrar isleme alinmali.",
+        note: "Montaj fiksturu sabitlendikten sonra 25 adet yeniden kontrol edilecek."
+      }
     },
     {
       orderNo: `${demoOrderPrefix}QUALITY`,
@@ -515,6 +569,14 @@ async function main() {
         defectQuantity: 2,
         defectReason: "Yuzey cizigi",
         note: "Kalan 47 urun sevke uygun."
+      },
+      qualityDecision: {
+        sourceSequenceNo: 3,
+        createdById: qualityStaff.id,
+        decision: "CONDITIONAL_ACCEPT",
+        severity: "WARNING",
+        message: "Final kontrolde yuzey cizigi tespit edildi.",
+        note: "2 urun ayrildi, kalan parti sartli kabul ile sevke uygun."
       }
     },
     {
@@ -628,7 +690,15 @@ async function main() {
           startedAt: minutesAgo(now, 150),
           endedAt: minutesAgo(now, 130)
         }
-      ]
+      ],
+      qualityDecision: {
+        sourceSequenceNo: 1,
+        createdById: qualityStaff.id,
+        decision: "SCRAP",
+        severity: "WARNING",
+        message: "Kesim operasyonunda eksik ve hatali parca ayrildi.",
+        note: "1 parca hurdaya ayrildi, kalan uretim yeniden planlanacak."
+      }
     }
   ];
 
@@ -637,6 +707,7 @@ async function main() {
     createdOrders.push(
       await createDemoWorkOrder({
         admin,
+        manager,
         product,
         route,
         routeOperations,

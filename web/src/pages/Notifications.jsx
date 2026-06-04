@@ -108,6 +108,7 @@ export default function Notifications() {
       current.map((notification) => (notification.id === notificationId ? { ...notification, readAt: notification.readAt ?? new Date().toISOString() } : notification))
     );
     setUnreadCount(response.meta.unreadCount);
+    window.dispatchEvent(new CustomEvent("mes-lite:notifications-unread-changed", { detail: { unreadCount: response.meta.unreadCount } }));
   }
 
   async function handleMarkAllRead() {
@@ -115,6 +116,7 @@ export default function Notifications() {
     const now = new Date().toISOString();
     setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt ?? now })));
     setUnreadCount(response.meta.unreadCount);
+    window.dispatchEvent(new CustomEvent("mes-lite:notifications-unread-changed", { detail: { unreadCount: response.meta.unreadCount } }));
   }
 
   async function handleOpenNotification(notification) {

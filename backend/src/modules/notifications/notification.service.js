@@ -1,5 +1,6 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { sendPushNotificationToUser } from "../push-tokens/pushToken.service.js";
 
 const includeRecipient = {
   recipient: {
@@ -79,6 +80,7 @@ export async function createNotification(
   });
 
   emitEvent("notification:created", notification);
+  void sendPushNotificationToUser(recipientId, notification);
   return notification;
 }
 

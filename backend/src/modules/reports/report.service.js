@@ -107,8 +107,39 @@ function sortByProducedThenScrap(items) {
   });
 }
 
+function addQualityDecisionMetric(map, key, base, alert) {
+  if (!map[key]) {
+    map[key] = {
+      ...base,
+      totalCount: 0,
+      reworkCount: 0,
+      scrapCount: 0,
+      conditionalAcceptCount: 0,
+      criticalCount: 0
+    };
+  }
+
+  map[key].totalCount += 1;
+
+  if (alert.qualityDecision === "REWORK_OPERATION") {
+    map[key].reworkCount += 1;
+  }
+
+  if (alert.qualityDecision === "SCRAP") {
+    map[key].scrapCount += 1;
+  }
+
+  if (alert.qualityDecision === "CONDITIONAL_ACCEPT") {
+    map[key].conditionalAcceptCount += 1;
+  }
+
+  if (alert.severity === "CRITICAL") {
+    map[key].criticalCount += 1;
+  }
+}
+
 export async function getOverviewReport() {
-  const [workOrders, productionLogs, qualityChecks, machines, machineStatusLogs, operationDowntimes, workOrderOperations] = await Promise.all([
+  const [workOrders, productionLogs, qualityChecks, productionAlerts, machines, machineStatusLogs, operationDowntimes, workOrderOperations] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         product: true,
@@ -133,11 +164,50 @@ export async function getOverviewReport() {
     prisma.qualityCheck.findMany({
       include: {
         workOrder: { include: { product: true } },
+        workOrderOperation: {
+          include: {
+            machine: true
+          }
+        },
         checkedBy: {
           select: { id: true, name: true, email: true, role: true }
         }
       },
       orderBy: { checkedAt: "desc" }
+    }),
+    prisma.productionAlert.findMany({
+      where: {
+        qualityDecision: {
+          not: null
+        }
+      },
+      include: {
+        workOrder: { include: { product: true } },
+        productionLog: {
+          include: {
+            machine: true,
+            workOrderOperation: true,
+            operator: {
+              select: { id: true, name: true, email: true, role: true }
+            }
+          }
+        },
+        reworkOperation: {
+          include: {
+            machine: true,
+            assignedOperator: {
+              select: { id: true, name: true, email: true, role: true }
+            }
+          }
+        },
+        createdBy: {
+          select: { id: true, name: true, email: true, role: true }
+        },
+        resolvedBy: {
+          select: { id: true, name: true, email: true, role: true }
+        }
+      },
+      orderBy: { updatedAt: "desc" }
     }),
     prisma.machine.findMany({ include: { productionLine: true } }),
     prisma.machineStatusLog.findMany({
@@ -181,6 +251,10 @@ export async function getOverviewReport() {
   const producedQuantity = productionLogs.reduce((sum, log) => sum + log.producedQuantity, 0);
   const scrapQuantity = productionLogs.reduce((sum, log) => sum + log.scrapQuantity, 0);
   const defectQuantity = qualityChecks.reduce((sum, check) => sum + check.defectQuantity, 0);
+  const qualityDecisionCounts = countBy(productionAlerts, "qualityDecision");
+  const qualityReworkCount = qualityDecisionCounts.REWORK_OPERATION ?? 0;
+  const qualityScrapDecisionCount = qualityDecisionCounts.SCRAP ?? 0;
+  const qualityConditionalAcceptCount = qualityDecisionCounts.CONDITIONAL_ACCEPT ?? 0;
 
   const machinePerformanceMap = productionLogs.reduce((acc, log) => {
     const machineId = log.machineId;
@@ -228,6 +302,8 @@ export async function getOverviewReport() {
   const downtimeByOperationMap = {};
   const timeByMachineMap = {};
   const timeByOperatorMap = {};
+  const qualityDecisionByOperationMap = {};
+  const qualityDecisionByMachineMap = {};
   const now = new Date();
 
   productionLogs.forEach((log) => {
@@ -365,6 +441,57 @@ export async function getOverviewReport() {
   const operationTimeByMachine = Object.values(timeByMachineMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
   const operationTimeByOperator = Object.values(timeByOperatorMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
 
+  productionAlerts.forEach((alert) => {
+    const operation = alert.reworkOperation ?? alert.productionLog.workOrderOperation;
+    const machine = alert.reworkOperation?.machine ?? alert.productionLog.machine;
+    const operationKey = operation?.id ?? "UNASSIGNED";
+    const machineKey = machine?.id ?? "UNASSIGNED";
+
+    addQualityDecisionMetric(
+      qualityDecisionByOperationMap,
+      operationKey,
+      {
+        operationId: operationKey,
+        operationName: operation?.operationName ?? "Operasyon Yok",
+        orderNo: alert.workOrder.orderNo,
+        productCode: alert.workOrder.product.code,
+        productName: alert.workOrder.product.name,
+        machineCode: machine?.code ?? "Makine Yok",
+        machineName: machine?.name ?? "Makine Yok"
+      },
+      alert
+    );
+
+    addQualityDecisionMetric(
+      qualityDecisionByMachineMap,
+      machineKey,
+      {
+        machineId: machineKey,
+        machineCode: machine?.code ?? "Makine Yok",
+        machineName: machine?.name ?? "Makine Yok"
+      },
+      alert
+    );
+  });
+
+  const qualityDecisionByOperation = Object.values(qualityDecisionByOperationMap).sort((first, second) => second.totalCount - first.totalCount).slice(0, 10);
+  const qualityDecisionByMachine = Object.values(qualityDecisionByMachineMap).sort((first, second) => second.totalCount - first.totalCount).slice(0, 10);
+  const recentQualityDecisions = productionAlerts.slice(0, 10).map((alert) => ({
+    id: alert.id,
+    orderNo: alert.workOrder.orderNo,
+    productCode: alert.workOrder.product.code,
+    productName: alert.workOrder.product.name,
+    decision: alert.qualityDecision,
+    note: alert.qualityDecisionNote,
+    severity: alert.severity,
+    status: alert.status,
+    operationName: alert.reworkOperation?.operationName ?? alert.productionLog.workOrderOperation?.operationName ?? "-",
+    machineCode: alert.reworkOperation?.machine?.code ?? alert.productionLog.machine?.code ?? "-",
+    operatorName: alert.reworkOperation?.assignedOperator?.name ?? alert.productionLog.operator?.name ?? "-",
+    decidedByName: alert.resolvedBy?.name ?? alert.createdBy?.name ?? "-",
+    updatedAt: alert.updatedAt
+  }));
+
   const machinePerformance = Object.values(machinePerformanceMap).map((item) => ({
     ...item,
     scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
@@ -409,7 +536,11 @@ export async function getOverviewReport() {
       scrapQuantity,
       scrapRate: scrapRate(producedQuantity, scrapQuantity),
       qualityCheckCount: qualityChecks.length,
-      defectQuantity
+      defectQuantity,
+      qualityDecisionCount: productionAlerts.length,
+      qualityReworkCount,
+      qualityScrapDecisionCount,
+      qualityConditionalAcceptCount
     },
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
@@ -424,6 +555,10 @@ export async function getOverviewReport() {
     operationTimeByMachine,
     operationTimeByOperator,
     qualityStatusCounts: countBy(qualityChecks, "status"),
+    qualityDecisionCounts,
+    qualityDecisionByOperation,
+    qualityDecisionByMachine,
+    recentQualityDecisions,
     machinePerformance,
     productPerformance,
     shiftPerformance,
