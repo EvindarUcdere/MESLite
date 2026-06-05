@@ -198,6 +198,30 @@ export async function createWorkOrder(userId, data) {
   });
 
   emitEvent("workOrder:updated", result);
+
+  const firstOperation = result.operations?.find((operation) => operation.sequenceNo === 1) ?? result.operations?.[0];
+  const recipientId = firstOperation?.assignedOperatorId ?? result.assignedOperatorId;
+
+  if (recipientId && recipientId !== userId) {
+    await createNotification({
+      recipientId,
+      type: firstOperation ? "OPERATION_ASSIGNED" : "WORK_ORDER_ASSIGNED",
+      title: firstOperation ? "Yeni operasyon atandi" : "Yeni is emri atandi",
+      message: firstOperation
+        ? `${result.orderNo} is emrinde ${firstOperation.operationName} operasyonu size atandi.`
+        : `${result.orderNo} is emri size atandi.`,
+      entityType: firstOperation ? "WorkOrderOperation" : "WorkOrder",
+      entityId: firstOperation?.id ?? result.id,
+      metadata: {
+        workOrderId: result.id,
+        orderNo: result.orderNo,
+        operationId: firstOperation?.id,
+        operationName: firstOperation?.operationName,
+        assignedById: userId
+      }
+    });
+  }
+
   return result;
 }
 
@@ -230,6 +254,24 @@ export async function updateWorkOrderStatus(actor, id, status) {
   });
 
   emitEvent("workOrder:updated", workOrder);
+
+  if (operatorId !== actor?.id) {
+    await createNotification({
+      recipientId: operatorId,
+      type: "WORK_ORDER_ASSIGNED",
+      title: "Is emri size atandi",
+      message: `${workOrder.orderNo} is emri size atandi.`,
+      entityType: "WorkOrder",
+      entityId: workOrder.id,
+      metadata: {
+        workOrderId: workOrder.id,
+        orderNo: workOrder.orderNo,
+        assignedById: actor?.id,
+        assignedByName: actor?.name
+      }
+    });
+  }
+
   return workOrder;
 }
 
@@ -401,11 +443,12 @@ export async function startWorkOrder(id, actor) {
     );
 
     if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && operation?.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+      const isRestart = targetOperation?.status === "PAUSED";
       await createNotification(
         {
           recipientId: operation.assignedOperatorId,
-          type: "OPERATION_RESTARTED",
-          title: "Operasyon tekrar başlatıldı",
+          type: isRestart ? "OPERATION_RESTARTED" : "OPERATION_STARTED",
+          title: isRestart ? "Operasyon tekrar başlatıldı" : "Operasyon başlatıldı",
           message: `${updated.orderNo} iş emrinde ${operation.operationName} operasyonu yönetici tarafından başlatıldı.`,
           entityType: "WorkOrderOperation",
           entityId: operation.id,
@@ -421,11 +464,12 @@ export async function startWorkOrder(id, actor) {
         tx
       );
     } else if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && !operation && updated.assignedOperatorId && updated.assignedOperatorId !== actor.id) {
+      const isRestart = current.status === "PAUSED";
       await createNotification(
         {
           recipientId: updated.assignedOperatorId,
-          type: "WORK_ORDER_RESTARTED",
-          title: "İş emri tekrar başlatıldı",
+          type: isRestart ? "WORK_ORDER_RESTARTED" : "WORK_ORDER_STARTED",
+          title: isRestart ? "İş emri tekrar başlatıldı" : "İş emri başlatıldı",
           message: `${updated.orderNo} iş emri yönetici tarafından başlatıldı.`,
           entityType: "WorkOrder",
           entityId: updated.id,

@@ -484,12 +484,17 @@ export default function App() {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       appStateRef.current = nextState;
+
+      if (nextState === "active" && user) {
+        loadNotifications();
+        loadWorkOrders({ preserveMessage: true });
+      }
     });
 
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
@@ -679,6 +684,14 @@ export default function App() {
       setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]);
       setUnreadNotificationCount((current) => current + 1);
 
+      const workOrderId = notification.metadata?.workOrderId ?? (notification.entityType === "WorkOrder" ? notification.entityId : null);
+      if (workOrderId && selectedWorkOrderIdRef.current !== workOrderId) {
+        setNotificationCounts((current) => ({
+          ...current,
+          [workOrderId]: (current[workOrderId] ?? 0) + 1
+        }));
+      }
+
       const isAppInBackground = Platform.OS === "web" ? globalThis.document?.hidden : appStateRef.current !== "active";
       if (isAppInBackground) {
         showSystemNotification({
@@ -696,8 +709,20 @@ export default function App() {
     socket.on("notification:created", handleNotificationCreated);
     socket.on("workOrder:updated", refreshWorkOrders);
     socket.on("production:logged", refreshWorkOrders);
+    socket.on("connect_error", () => {
+      loadNotifications();
+      refreshWorkOrders({ preserveMessage: true });
+    });
+
+    const syncInterval = setInterval(() => {
+      if (appStateRef.current === "active") {
+        loadNotifications();
+        refreshWorkOrders({ preserveMessage: true });
+      }
+    }, 15000);
 
     return () => {
+      clearInterval(syncInterval);
       socket.emit("leave:dashboard");
       socket.disconnect();
     };
