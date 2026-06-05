@@ -392,6 +392,7 @@ The tests focus on backend business rules because factory data consistency is mo
 - `docs/phase-3-quality-action-decision.md`: quality decision workflow
 - `docs/phase-4-deployment-plan.md`: deployment and production demo preparation
 - `docs/phase-4-production-env-checklist.md`: Railway, Vercel and mobile production env checklist
+- `docs/phase-4-mobile-build-plan.md`: Expo/EAS mobile APK build plan
 - `docs/e2e-demo-scenario.md`: repeatable demo scenario
 - `docs/demo-data-management.md`: demo reset and cleanup commands
 

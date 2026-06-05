@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import Constants from "expo-constants";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
@@ -389,7 +390,8 @@ async function getExpoPushTokenForDevice() {
   }
 
   try {
-    const tokenResult = await Notifications.getExpoPushTokenAsync();
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+    const tokenResult = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
     return tokenResult.data;
   } catch (_error) {
     return null;

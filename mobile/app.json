@@ -5,6 +5,39 @@
     "scheme": "meslite",
     "version": "0.1.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic"
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.meslite.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.meslite.mobile",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Operatorler uretim kaydina gorsel kanit eklemek icin kamerayi kullanir.",
+        "NSPhotoLibraryUsageDescription": "Operatorler uretim kaydina galeriden gorsel kanit ekler."
+      }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Operatorler uretim kaydina galeriden gorsel kanit ekler.",
+          "cameraPermission": "Operatorler uretim kaydina gorsel kanit eklemek icin kamerayi kullanir."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "extra": {
+      "apiUrl": "https://meslite-production.up.railway.app/api",
+      "eas": {
+        "projectId": ""
+      }
+    }
   }
 }
