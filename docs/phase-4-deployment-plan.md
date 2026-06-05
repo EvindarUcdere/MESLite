@@ -109,6 +109,12 @@ Kullanici Vercel'de /reports sayfasini yenilediginde 404 almak yerine React uygu
 
 ## Gerekli Production Env Degerleri
 
+Detayli env listesi ve guvenlik notlari icin:
+
+```text
+docs/phase-4-production-env-checklist.md
+```
+
 ### Railway Backend
 
 ```text
