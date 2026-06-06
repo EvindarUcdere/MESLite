@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
+import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
@@ -28,6 +28,8 @@ const OPERATION_STATUS_LABELS = {
 
 let nativeNotificationsModulePromise = null;
 
+const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION"];
+
 async function getNativeNotificationsModule() {
   if (Platform.OS === "web") {
     return null;
@@ -38,10 +40,22 @@ async function getNativeNotificationsModule() {
       module.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
           shouldPlaySound: true,
           shouldSetBadge: false
         })
       });
+
+      if (Platform.OS === "android") {
+        module.setNotificationChannelAsync("default", {
+          name: "MES Lite Bildirimleri",
+          importance: module.AndroidImportance.HIGH,
+          vibrationPattern: [0, 250, 120, 250],
+          lightColor: "#2d7d76",
+          sound: "default"
+        }).catch(() => {});
+      }
 
       return module;
     });
@@ -368,7 +382,7 @@ async function showSystemNotification({ title, body }) {
     content: {
       title,
       body,
-      sound: true
+      sound: "default"
     },
     trigger: null
   });
@@ -692,13 +706,10 @@ export default function App() {
         }));
       }
 
-      const isAppInBackground = Platform.OS === "web" ? globalThis.document?.hidden : appStateRef.current !== "active";
-      if (isAppInBackground) {
-        showSystemNotification({
-          title: notification.title,
-          body: notification.message
-        }).catch(() => {});
-      }
+      showSystemNotification({
+        title: notification.title,
+        body: notification.message
+      }).catch(() => {});
     };
 
     socket.on("connect", () => {
@@ -956,6 +967,41 @@ export default function App() {
     setSelectedOperationId(nextProductionOperation?.id ?? "");
   }
 
+  function moveMobileView(direction) {
+    setActiveMobileView((currentView) => {
+      const currentIndex = MOBILE_VIEW_ORDER.indexOf(currentView);
+      const nextIndex = Math.min(Math.max(currentIndex + direction, 0), MOBILE_VIEW_ORDER.length - 1);
+      const nextView = MOBILE_VIEW_ORDER[nextIndex];
+
+      if (nextView === "DETAIL" && !selectedWorkOrder) {
+        return currentView;
+      }
+
+      if (nextView === "PRODUCTION" && !selectedProductionOperation) {
+        return currentView;
+      }
+
+      return nextView;
+    });
+  }
+
+  const mobileViewPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gestureState) => Math.abs(gestureState.dx) > 28 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.4,
+        onPanResponderRelease: (_event, gestureState) => {
+          if (gestureState.dx < -70) {
+            moveMobileView(1);
+          }
+
+          if (gestureState.dx > 70) {
+            moveMobileView(-1);
+          }
+        }
+      }),
+    [selectedWorkOrder?.id, selectedProductionOperation?.id]
+  );
+
   async function pickImageFromGallery() {
     setError("");
 
@@ -1121,6 +1167,7 @@ export default function App() {
         </View>
       </View>
 
+      <View {...mobileViewPanResponder.panHandlers}>
       {activeMobileView === "WORKS" ? (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
@@ -1598,6 +1645,7 @@ export default function App() {
       </View>
       ) : null}
 
+      </View>
     </ScrollView>
   );
 }
