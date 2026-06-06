@@ -587,11 +587,17 @@ export default function App() {
 
   async function registerDevicePushToken() {
     try {
+      setPushStatus("Telefon bildirimi hazirlaniyor...");
       const token = await getExpoPushTokenForDevice();
 
       if (!token) {
-        setPushStatus("Telefon bildirimi icin push token alinamadi. Bildirim iznini ve APK kurulumunu kontrol edin.");
-        return;
+        const hasPermission = await ensureSystemNotificationPermission();
+        setPushStatus(
+          hasPermission
+            ? "Push token alinamadi. Fiziksel telefon, Google Play servisleri ve EAS APK kurulumunu kontrol edin."
+            : "Bildirim izni verilmedi. Android ayarlarindan MES Lite bildirim iznini acin."
+        );
+        return false;
       }
 
       await registerPushToken({
@@ -600,8 +606,10 @@ export default function App() {
         deviceName: Platform.OS === "web" ? "Web" : "Mobile"
       });
       setPushStatus("Telefon bildirimi aktif. Push token backend'e kaydedildi.");
+      return true;
     } catch (_error) {
       setPushStatus("Telefon bildirimi kaydedilemedi. Baglanti veya cihaz bildirim iznini kontrol edin.");
+      return false;
     }
   }
 
@@ -614,9 +622,20 @@ export default function App() {
     try {
       const tokens = await getMyPushTokens();
       const activeTokens = tokens.filter((token) => token.isActive);
-      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli).` : "Aktif telefon bildirimi yok. Bildirim izni verip tekrar giris yapin.");
+      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli).` : "Aktif telefon bildirimi yok. Bildirimleri Aktiflestir butonuna basin.");
     } catch (_error) {
       setPushStatus("Bildirim durumu okunamadi.");
+    }
+  }
+
+  async function handleEnablePushNotifications() {
+    setError("");
+    setSuccessMessage("");
+    const registered = await registerDevicePushToken();
+    await loadPushStatus();
+
+    if (registered) {
+      setSuccessMessage("Telefon bildirimi aktiflestirildi. Simdi Test Bildirimi ile kontrol edebilirsiniz.");
     }
   }
 
@@ -625,6 +644,7 @@ export default function App() {
     setSuccessMessage("");
 
     try {
+      await registerDevicePushToken();
       const result = await sendPushTestNotification();
       const sentCount = result?.push?.sent ?? 0;
       setSuccessMessage(
@@ -1208,6 +1228,9 @@ export default function App() {
           <View style={styles.pushActionRow}>
             <Pressable style={styles.inlineButton} onPress={loadPushStatus} disabled={isSubmitting}>
               <Text style={styles.inlineButtonText}>Durumu Yenile</Text>
+            </Pressable>
+            <Pressable style={styles.inlineButton} onPress={handleEnablePushNotifications} disabled={isSubmitting || Platform.OS === "web"}>
+              <Text style={styles.inlineButtonText}>Bildirimleri Aktifleştir</Text>
             </Pressable>
             <Pressable style={styles.inlineButton} onPress={handleSendPushTest} disabled={isSubmitting || Platform.OS === "web"}>
               <Text style={styles.inlineButtonText}>Test Bildirimi</Text>
