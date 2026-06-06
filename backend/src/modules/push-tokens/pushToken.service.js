@@ -136,6 +136,7 @@ export async function sendPushNotificationToUser(userId, notification) {
   }
 
   let disabled = 0;
+  const tickets = [];
   for (const batch of chunk(expoMessages, 100)) {
     try {
       const response = await fetch(EXPO_PUSH_URL, {
@@ -150,6 +151,15 @@ export async function sendPushNotificationToUser(userId, notification) {
 
       const payload = await response.json();
       const results = Array.isArray(payload.data) ? payload.data : [];
+      tickets.push(...results);
+      console.log(
+        "Expo push response",
+        JSON.stringify({
+          notificationId: notification.id,
+          sent: batch.length,
+          tickets: results
+        })
+      );
       const disabledTokens = results
         .map((result, index) => ({ result, token: batch[index]?.to }))
         .filter(({ result }) => result?.status === "error" && result?.details?.error === "DeviceNotRegistered")
@@ -165,8 +175,9 @@ export async function sendPushNotificationToUser(userId, notification) {
       }
     } catch (error) {
       console.warn("Expo push notification failed", error.message);
+      tickets.push({ status: "error", message: error.message });
     }
   }
 
-  return { sent: expoMessages.length, disabled };
+  return { sent: expoMessages.length, disabled, tickets };
 }

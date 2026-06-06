@@ -422,13 +422,18 @@ async function getExpoPushTokenForDevice() {
     return null;
   }
 
-  try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    const tokenResult = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    return tokenResult.data;
-  } catch (_error) {
-    return null;
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  const tokenResult = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+  console.log("Expo Push Token:", tokenResult.data);
+  return tokenResult.data;
+}
+
+function maskPushToken(token) {
+  if (!token) {
+    return "-";
   }
+
+  return `${token.slice(0, 22)}...${token.slice(-6)}`;
 }
 
 function getOperationMessageWorkOrderId(message) {
@@ -605,10 +610,11 @@ export default function App() {
         platform: Platform.OS,
         deviceName: Platform.OS === "web" ? "Web" : "Mobile"
       });
-      setPushStatus("Telefon bildirimi aktif. Push token backend'e kaydedildi.");
+      setPushStatus(`Telefon bildirimi aktif. Token: ${maskPushToken(token)}`);
       return true;
-    } catch (_error) {
-      setPushStatus("Telefon bildirimi kaydedilemedi. Baglanti veya cihaz bildirim iznini kontrol edin.");
+    } catch (pushError) {
+      console.log("Expo Push Token error:", pushError?.message ?? pushError);
+      setPushStatus(`Telefon bildirimi kaydedilemedi: ${pushError?.message ?? "Bilinmeyen hata"}`);
       return false;
     }
   }
@@ -622,7 +628,7 @@ export default function App() {
     try {
       const tokens = await getMyPushTokens();
       const activeTokens = tokens.filter((token) => token.isActive);
-      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli).` : "Aktif telefon bildirimi yok. Bildirimleri Aktiflestir butonuna basin.");
+      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli). Son kayit: ${formatDateTime(activeTokens[0].lastSeenAt)}` : "Aktif telefon bildirimi yok. Bildirimleri Aktiflestir butonuna basin.");
     } catch (_error) {
       setPushStatus("Bildirim durumu okunamadi.");
     }
@@ -647,9 +653,11 @@ export default function App() {
       await registerDevicePushToken();
       const result = await sendPushTestNotification();
       const sentCount = result?.push?.sent ?? 0;
+      const firstTicket = result?.push?.tickets?.[0];
+      const ticketStatus = firstTicket?.status ? ` Expo cevabi: ${firstTicket.status}${firstTicket.message ? ` - ${firstTicket.message}` : ""}` : "";
       setSuccessMessage(
         sentCount > 0
-          ? `Test bildirimi ${sentCount} cihaza gonderildi. Uygulamayi arka plana alip bildirim cubugunu kontrol edin.`
+          ? `Test bildirimi ${sentCount} cihaza gonderildi.${ticketStatus} Uygulamayi arka plana alip bildirim cubugunu kontrol edin.`
           : "Test bildirimi olusturuldu ama aktif telefon push token bulunamadi. Bildirim iznini verip tekrar giris yapin."
       );
       await loadNotifications();
