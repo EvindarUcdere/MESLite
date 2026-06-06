@@ -5,7 +5,7 @@ import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, 
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
-import { registerPushToken } from "./src/api/pushTokens.api";
+import { getMyPushTokens, registerPushToken, sendPushTestNotification } from "./src/api/pushTokens.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
@@ -459,6 +459,7 @@ export default function App() {
   const [notificationCounts, setNotificationCounts] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [pushStatus, setPushStatus] = useState("Bildirim durumu kontrol edilmedi.");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -589,6 +590,7 @@ export default function App() {
       const token = await getExpoPushTokenForDevice();
 
       if (!token) {
+        setPushStatus("Telefon bildirimi icin push token alinamadi. Bildirim iznini ve APK kurulumunu kontrol edin.");
         return;
       }
 
@@ -597,8 +599,43 @@ export default function App() {
         platform: Platform.OS,
         deviceName: Platform.OS === "web" ? "Web" : "Mobile"
       });
+      setPushStatus("Telefon bildirimi aktif. Push token backend'e kaydedildi.");
     } catch (_error) {
-      // Push token registration should never block production work.
+      setPushStatus("Telefon bildirimi kaydedilemedi. Baglanti veya cihaz bildirim iznini kontrol edin.");
+    }
+  }
+
+  async function loadPushStatus() {
+    if (Platform.OS === "web") {
+      setPushStatus("Web testinde telefon push bildirimi kullanilmaz. APK ile fiziksel telefonda test edin.");
+      return;
+    }
+
+    try {
+      const tokens = await getMyPushTokens();
+      const activeTokens = tokens.filter((token) => token.isActive);
+      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli).` : "Aktif telefon bildirimi yok. Bildirim izni verip tekrar giris yapin.");
+    } catch (_error) {
+      setPushStatus("Bildirim durumu okunamadi.");
+    }
+  }
+
+  async function handleSendPushTest() {
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const result = await sendPushTestNotification();
+      const sentCount = result?.push?.sent ?? 0;
+      setSuccessMessage(
+        sentCount > 0
+          ? `Test bildirimi ${sentCount} cihaza gonderildi. Uygulamayi arka plana alip bildirim cubugunu kontrol edin.`
+          : "Test bildirimi olusturuldu ama aktif telefon push token bulunamadi. Bildirim iznini verip tekrar giris yapin."
+      );
+      await loadNotifications();
+      await loadPushStatus();
+    } catch (_error) {
+      setError("Test bildirimi gonderilemedi. Push token kaydi veya backend baglantisini kontrol edin.");
     }
   }
 
@@ -639,6 +676,7 @@ export default function App() {
           await loadWorkOrders();
           await loadNotifications();
           await registerDevicePushToken();
+          await loadPushStatus();
         }
       } catch (_error) {
         if (isMounted) {
@@ -781,6 +819,7 @@ export default function App() {
       await loadWorkOrders();
       await loadNotifications();
       await registerDevicePushToken();
+      await loadPushStatus();
     } catch (loginError) {
       setError(getErrorMessage(loginError, "Giriş yapılamadı."));
     } finally {
@@ -1163,20 +1202,34 @@ export default function App() {
             <Text style={styles.inlineButtonText}>Tümünü Okundu Yap</Text>
           </Pressable>
         </View>
-        {notifications.slice(0, 4).map((notification) => (
-          <View key={notification.id} style={[styles.mobileNotificationCard, !notification.readAt ? styles.mobileNotificationUnread : null]}>
-            <View style={styles.mobileNotificationText}>
-              <Text style={styles.detailValue}>{notification.title}</Text>
-              <Text style={styles.muted}>{notification.message}</Text>
-              <Text style={styles.detailLabel}>{formatDateTime(notification.createdAt)}</Text>
-            </View>
-            {!notification.readAt ? (
-              <Pressable style={styles.inlineButton} onPress={() => handleMarkNotificationRead(notification.id)} disabled={isSubmitting}>
-                <Text style={styles.inlineButtonText}>Okundu</Text>
-              </Pressable>
-            ) : null}
+        <View style={styles.pushStatusBox}>
+          <Text style={styles.detailLabel}>Telefon bildirimi</Text>
+          <Text style={styles.muted}>{pushStatus}</Text>
+          <View style={styles.pushActionRow}>
+            <Pressable style={styles.inlineButton} onPress={loadPushStatus} disabled={isSubmitting}>
+              <Text style={styles.inlineButtonText}>Durumu Yenile</Text>
+            </Pressable>
+            <Pressable style={styles.inlineButton} onPress={handleSendPushTest} disabled={isSubmitting || Platform.OS === "web"}>
+              <Text style={styles.inlineButtonText}>Test Bildirimi</Text>
+            </Pressable>
           </View>
-        ))}
+        </View>
+        <ScrollView style={styles.notificationListScroll} nestedScrollEnabled>
+          {notifications.map((notification) => (
+            <View key={notification.id} style={[styles.mobileNotificationCard, !notification.readAt ? styles.mobileNotificationUnread : null]}>
+              <View style={styles.mobileNotificationText}>
+                <Text style={styles.detailValue}>{notification.title}</Text>
+                <Text style={styles.muted}>{notification.message}</Text>
+                <Text style={styles.detailLabel}>{formatDateTime(notification.createdAt)}</Text>
+              </View>
+              {!notification.readAt ? (
+                <Pressable style={styles.inlineButton} onPress={() => handleMarkNotificationRead(notification.id)} disabled={isSubmitting}>
+                  <Text style={styles.inlineButtonText}>Okundu</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ))}
+        </ScrollView>
         {!notifications.length ? <Text style={styles.muted}>Henüz bildirim yok.</Text> : null}
       </View>
 
@@ -2056,6 +2109,22 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10
+  },
+  notificationListScroll: {
+    maxHeight: 280
+  },
+  pushStatusBox: {
+    gap: 6,
+    padding: 10,
+    backgroundColor: "#f8fafc",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  pushActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
   },
   mobileNotificationCard: {
     flexDirection: "row",

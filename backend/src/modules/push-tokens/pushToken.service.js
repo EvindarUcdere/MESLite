@@ -1,4 +1,5 @@
 import { prisma } from "../../config/db.js";
+import { emitEvent } from "../../config/socket.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const NOTIFICATION_CHANNEL_ID = "mes-lite-alerts-v2";
@@ -41,6 +42,55 @@ export async function deactivatePushToken(userId, token) {
     where: { userId, token },
     data: { isActive: false }
   });
+}
+
+export function findPushTokensForUser(userId) {
+  return prisma.pushToken.findMany({
+    where: { userId },
+    orderBy: { lastSeenAt: "desc" },
+    select: {
+      id: true,
+      platform: true,
+      deviceName: true,
+      isActive: true,
+      lastSeenAt: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  });
+}
+
+export async function createPushTestNotification(user) {
+  const notification = await prisma.notification.create({
+    data: {
+      recipientId: user.id,
+      type: "PUSH_TEST",
+      title: "MES Lite test bildirimi",
+      message: "Bu bildirim telefon bildirim cubugunda sesli olarak gorunmeli.",
+      entityType: "User",
+      entityId: user.id,
+      metadata: {
+        test: true,
+        requestedById: user.id,
+        requestedByName: user.name
+      }
+    },
+    include: {
+      recipient: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true
+        }
+      }
+    }
+  });
+
+  emitEvent("notification:created", notification);
+  const push = await sendPushNotificationToUser(user.id, notification);
+
+  return { notification, push };
 }
 
 export async function sendPushNotificationToUser(userId, notification) {
