@@ -1,6 +1,7 @@
 import { prisma } from "../../config/db.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const NOTIFICATION_CHANNEL_ID = "mes-lite-alerts-v2";
 
 function isExpoPushToken(token) {
   return typeof token === "string" && (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
@@ -49,16 +50,28 @@ export async function sendPushNotificationToUser(userId, notification) {
       isActive: true
     }
   });
+  let unreadCount = 1;
+  try {
+    unreadCount = await prisma.notification.count({
+      where: {
+        recipientId: userId,
+        readAt: null
+      }
+    });
+  } catch (_error) {
+    unreadCount = 1;
+  }
 
   const expoMessages = tokens
     .filter((entry) => isExpoPushToken(entry.token))
     .map((entry) => ({
       to: entry.token,
       sound: "default",
-      channelId: "default",
+      channelId: NOTIFICATION_CHANNEL_ID,
       priority: "high",
       title: notification.title,
       body: notification.message,
+      badge: unreadCount,
       data: {
         notificationId: notification.id,
         type: notification.type,

@@ -29,6 +29,7 @@ const OPERATION_STATUS_LABELS = {
 let nativeNotificationsModulePromise = null;
 
 const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION"];
+const NOTIFICATION_CHANNEL_ID = "mes-lite-alerts-v2";
 
 async function getNativeNotificationsModule() {
   if (Platform.OS === "web") {
@@ -43,12 +44,12 @@ async function getNativeNotificationsModule() {
           shouldShowBanner: true,
           shouldShowList: true,
           shouldPlaySound: true,
-          shouldSetBadge: false
+          shouldSetBadge: true
         })
       });
 
       if (Platform.OS === "android") {
-        module.setNotificationChannelAsync("default", {
+        module.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
           name: "MES Lite Bildirimleri",
           importance: module.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 120, 250],
@@ -361,7 +362,7 @@ async function ensureSystemNotificationPermission() {
   return requested.granted || requested.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 }
 
-async function showSystemNotification({ title, body }) {
+async function showSystemNotification({ title, body, badge = 1 }) {
   const hasPermission = await ensureSystemNotificationPermission();
 
   if (!hasPermission) {
@@ -382,11 +383,28 @@ async function showSystemNotification({ title, body }) {
     content: {
       title,
       body,
+      channelId: NOTIFICATION_CHANNEL_ID,
+      badge,
+      color: "#2d7d76",
+      vibrate: [0, 250, 120, 250],
       sound: "default",
       priority: Notifications.AndroidNotificationPriority?.HIGH
     },
     trigger: null
   });
+}
+
+async function updateAppBadgeCount(count) {
+  if (Platform.OS === "web") {
+    return;
+  }
+
+  const Notifications = await getNativeNotificationsModule();
+  if (!Notifications) {
+    return;
+  }
+
+  await Notifications.setBadgeCountAsync(Math.max(count, 0)).catch(() => {});
 }
 
 async function getExpoPushTokenForDevice() {
@@ -447,6 +465,7 @@ export default function App() {
   const [successMessage, setSuccessMessage] = useState("");
   const selectedWorkOrderIdRef = useRef("");
   const appStateRef = useRef(AppState.currentState);
+  const unreadNotificationCountRef = useRef(0);
 
   const assignedWorkOrders = useMemo(
     () => workOrders.filter((workOrder) => operatorHasOperation(workOrder, user?.id)),
@@ -495,6 +514,10 @@ export default function App() {
   useEffect(() => {
     selectedWorkOrderIdRef.current = selectedWorkOrderId;
   }, [selectedWorkOrderId]);
+
+  useEffect(() => {
+    unreadNotificationCountRef.current = unreadNotificationCount;
+  }, [unreadNotificationCount]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -553,6 +576,7 @@ export default function App() {
       const response = await getNotifications({ limit: 50 });
       setNotifications(response.data);
       setUnreadNotificationCount(response.meta.unreadCount);
+      updateAppBadgeCount(response.meta.unreadCount);
     } catch (notificationError) {
       if (isUnauthorizedError(notificationError)) {
         await clearExpiredSession();
@@ -585,6 +609,7 @@ export default function App() {
         current.map((notification) => (notification.id === notificationId ? { ...notification, readAt: notification.readAt ?? new Date().toISOString() } : notification))
       );
       setUnreadNotificationCount(response.meta.unreadCount);
+      updateAppBadgeCount(response.meta.unreadCount);
     } catch (_error) {
       setError("Bildirim okundu olarak işaretlenemedi.");
     }
@@ -596,6 +621,7 @@ export default function App() {
       const now = new Date().toISOString();
       setNotifications((current) => current.map((notification) => ({ ...notification, readAt: notification.readAt ?? now })));
       setUnreadNotificationCount(response.meta.unreadCount);
+      updateAppBadgeCount(response.meta.unreadCount);
     } catch (_error) {
       setError("Bildirimler okundu olarak işaretlenemedi.");
     }
@@ -697,7 +723,10 @@ export default function App() {
       playNotificationSound();
       setSuccessMessage(notification.title);
       setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]);
-      setUnreadNotificationCount((current) => current + 1);
+      const nextUnreadCount = unreadNotificationCountRef.current + 1;
+      unreadNotificationCountRef.current = nextUnreadCount;
+      setUnreadNotificationCount(nextUnreadCount);
+      updateAppBadgeCount(nextUnreadCount);
 
       const workOrderId = notification.metadata?.workOrderId ?? (notification.entityType === "WorkOrder" ? notification.entityId : null);
       if (workOrderId && selectedWorkOrderIdRef.current !== workOrderId) {
@@ -709,7 +738,8 @@ export default function App() {
 
       showSystemNotification({
         title: notification.title,
-        body: notification.message
+        body: notification.message,
+        badge: nextUnreadCount
       }).catch(() => {});
     };
 

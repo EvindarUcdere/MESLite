@@ -212,6 +212,19 @@ Gercek push davranisi icin:
 - Backend push token'i `push_tokens` tablosuna kaydetmeli.
 - Backend notification olustururken Expo Push API'ye istek atabilmeli.
 
+## Bildirim Test Checklist
+
+Bildirim degisikliginden sonra mutlaka en yeni EAS APK kurulmalidir. Eski APK'lar onceki Android notification channel ayarlarina takilabilir.
+
+1. En yeni APK'yi telefona kur.
+2. Android uygulama ayarlarindan MES Lite bildirim iznini ac.
+3. Operator ile bir kez giris yap; boylece Expo push token backend'e kaydedilir.
+4. Uygulamayi arka plana al veya kapat.
+5. Web panelden ayni operatore atanmis is emri olustur/baslat/tekrar baslat.
+6. Beklenen sonuc: Android bildirim cubugunda MES Lite bildirimi gorunur, varsayilan ses/titresim calar ve destekleyen launcher'larda uygulama rozeti artar.
+
+Not: Android uygulama rozeti telefonun launcher destegine baglidir. Launcher badge desteklemiyorsa bildirim cubugu yine ana takip noktasi olarak calisir.
+
 ## Kisa Mulakat Anlatimi
 
 Mobil tarafi sadece webde calisan bir React Native ekran olarak birakmadim. EAS build profilleriyle Android preview APK uretilebilir hale getirdim. Production API URL'i build-time env olarak veriliyor, native izinler app config'te tanimli ve monorepo bagimlilik cozumu Metro config ile duzenlendi. Boylece operator uygulamasi gercek telefonda test edilebilir bir saha uygulamasi seviyesine yaklasti.
