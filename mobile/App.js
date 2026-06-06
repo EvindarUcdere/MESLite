@@ -382,7 +382,8 @@ async function showSystemNotification({ title, body }) {
     content: {
       title,
       body,
-      sound: "default"
+      sound: "default",
+      priority: Notifications.AndroidNotificationPriority?.HIGH
     },
     trigger: null
   });
@@ -977,7 +978,7 @@ export default function App() {
         return currentView;
       }
 
-      if (nextView === "PRODUCTION" && !selectedProductionOperation) {
+      if (nextView === "PRODUCTION" && !selectedWorkOrder) {
         return currentView;
       }
 

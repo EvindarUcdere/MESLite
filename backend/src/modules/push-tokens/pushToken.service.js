@@ -55,6 +55,8 @@ export async function sendPushNotificationToUser(userId, notification) {
     .map((entry) => ({
       to: entry.token,
       sound: "default",
+      channelId: "default",
+      priority: "high",
       title: notification.title,
       body: notification.message,
       data: {
