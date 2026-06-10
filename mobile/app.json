@@ -47,7 +47,7 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#2d7d76",
-          "defaultChannel": "mes-lite-alerts-v2"
+          "defaultChannel": "default"
         }
       ]
     ],

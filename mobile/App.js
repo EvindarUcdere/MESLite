@@ -29,7 +29,7 @@ const OPERATION_STATUS_LABELS = {
 let nativeNotificationsModulePromise = null;
 
 const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION"];
-const NOTIFICATION_CHANNEL_ID = "mes-lite-alerts-v2";
+const NOTIFICATION_CHANNEL_ID = "default";
 
 async function getNativeNotificationsModule() {
   if (Platform.OS === "web") {
@@ -423,7 +423,11 @@ async function getExpoPushTokenForDevice() {
   }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  const tokenResult = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+  if (!projectId) {
+    throw new Error("EAS projectId bulunamadi. app.json extra.eas.projectId kontrol edilmeli.");
+  }
+
+  const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
   console.log("Expo Push Token:", tokenResult.data);
   return tokenResult.data;
 }
@@ -613,8 +617,9 @@ export default function App() {
       setPushStatus(`Telefon bildirimi aktif. Token: ${maskPushToken(token)}`);
       return true;
     } catch (pushError) {
-      console.log("Expo Push Token error:", pushError?.message ?? pushError);
-      setPushStatus(`Telefon bildirimi kaydedilemedi: ${pushError?.message ?? "Bilinmeyen hata"}`);
+      const errorMessage = pushError?.message ?? "Bilinmeyen hata";
+      console.log("Expo Push Token error:", errorMessage, pushError);
+      setPushStatus(`Telefon bildirimi kaydedilemedi: ${errorMessage}`);
       return false;
     }
   }
@@ -664,6 +669,26 @@ export default function App() {
       await loadPushStatus();
     } catch (_error) {
       setError("Test bildirimi gonderilemedi. Push token kaydi veya backend baglantisini kontrol edin.");
+    }
+  }
+
+  async function handleLocalBadgeTest() {
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const nextBadgeCount = Math.max(unreadNotificationCount, 1);
+      await updateAppBadgeCount(nextBadgeCount);
+      await showSystemNotification({
+        title: "MES Lite rozet testi",
+        body: `Bu yerel test bildirimi ikon rozetini ${nextBadgeCount} olarak guncellemeyi dener.`,
+        badge: nextBadgeCount
+      });
+      setSuccessMessage(
+        "Rozet testi olusturuldu. Uygulamayi arka plana alip telefon bildirim cubugunu ve uygulama ikonunu kontrol edin."
+      );
+    } catch (badgeError) {
+      setError(`Rozet testi basarisiz: ${badgeError?.message ?? "Bilinmeyen hata"}`);
     }
   }
 
@@ -1242,6 +1267,9 @@ export default function App() {
             </Pressable>
             <Pressable style={styles.inlineButton} onPress={handleSendPushTest} disabled={isSubmitting || Platform.OS === "web"}>
               <Text style={styles.inlineButtonText}>Test Bildirimi</Text>
+            </Pressable>
+            <Pressable style={styles.inlineButton} onPress={handleLocalBadgeTest} disabled={isSubmitting || Platform.OS === "web"}>
+              <Text style={styles.inlineButtonText}>Rozet Testi</Text>
             </Pressable>
           </View>
         </View>

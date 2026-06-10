@@ -2,7 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-const NOTIFICATION_CHANNEL_ID = "mes-lite-alerts-v2";
+const NOTIFICATION_CHANNEL_ID = "default";
 
 function isExpoPushToken(token) {
   return typeof token === "string" && (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
