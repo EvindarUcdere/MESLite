@@ -6,6 +6,7 @@ import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { getMyPushTokens, registerPushToken, sendPushTestNotification } from "./src/api/pushTokens.api";
+import { getShiftAssignments } from "./src/api/shiftPlanning.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
@@ -28,7 +29,7 @@ const OPERATION_STATUS_LABELS = {
 
 let nativeNotificationsModulePromise = null;
 
-const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION"];
+const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION", "CALENDAR"];
 const NOTIFICATION_CHANNEL_ID = "default";
 
 async function getNativeNotificationsModule() {
@@ -79,6 +80,13 @@ const MESSAGE_SEVERITIES = [
   { value: "QUALITY_ALERT", label: "Kalite" },
   { value: "STOPPAGE", label: "Duruş" }
 ];
+
+const SHIFT_STATUS_LABELS = {
+  PLANNED: "Vardiya",
+  CONFIRMED: "Onayli",
+  ABSENT: "Gelmedi",
+  LEAVE: "Izin"
+};
 
 const DOWNTIME_REASONS = [
   { value: "MACHINE_FAILURE", label: "Makine Arızası" },
@@ -249,6 +257,31 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function getNextMonth(month) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthIndex, 1)).toISOString().slice(0, 7);
+}
+
+function getPreviousMonth(month) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthIndex - 2, 1)).toISOString().slice(0, 7);
+}
+
+function formatMonthLabel(month) {
+  return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(`${month}-01T00:00:00`));
+}
+
+function formatShiftDay(value) {
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    weekday: "short"
+  }).format(new Date(`${value}T00:00:00`));
 }
 
 function canStartOperation(operation, workOrder) {
@@ -491,6 +524,8 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [pushStatus, setPushStatus] = useState("Bildirim durumu kontrol edilmedi.");
+  const [shiftMonth, setShiftMonth] = useState(getCurrentMonth());
+  const [shiftAssignments, setShiftAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -543,6 +578,10 @@ export default function App() {
           : ""
     : "Üretim girişi için bir operasyon seçin.";
 
+  const plannedShiftCount = shiftAssignments.filter((assignment) => ["PLANNED", "CONFIRMED"].includes(assignment.status)).length;
+  const leaveShiftCount = shiftAssignments.filter((assignment) => assignment.status === "LEAVE").length;
+  const absentShiftCount = shiftAssignments.filter((assignment) => assignment.status === "ABSENT").length;
+
   useEffect(() => {
     selectedWorkOrderIdRef.current = selectedWorkOrderId;
   }, [selectedWorkOrderId]);
@@ -558,6 +597,7 @@ export default function App() {
       if (nextState === "active" && user) {
         loadNotifications();
         loadWorkOrders({ preserveMessage: true });
+        loadShiftCalendar();
       }
     });
 
@@ -565,6 +605,12 @@ export default function App() {
       subscription.remove();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadShiftCalendar(shiftMonth);
+    }
+  }, [user?.id, shiftMonth]);
 
   useEffect(() => {
     if (user) {
@@ -577,6 +623,7 @@ export default function App() {
     setUser(null);
     setWorkOrders([]);
     setNotifications([]);
+    setShiftAssignments([]);
     setUnreadNotificationCount(0);
     setSelectedWorkOrderId("");
     setSelectedOperationId("");
@@ -611,6 +658,24 @@ export default function App() {
       updateAppBadgeCount(response.meta.unreadCount);
     } catch (notificationError) {
       if (isUnauthorizedError(notificationError)) {
+        await clearExpiredSession();
+      }
+    }
+  }
+
+  async function loadShiftCalendar(targetMonth = shiftMonth, operatorId = user?.id) {
+    if (!operatorId) {
+      return;
+    }
+
+    try {
+      const data = await getShiftAssignments({
+        month: targetMonth,
+        operatorId
+      });
+      setShiftAssignments(data);
+    } catch (shiftError) {
+      if (isUnauthorizedError(shiftError)) {
         await clearExpiredSession();
       }
     }
@@ -869,12 +934,14 @@ export default function App() {
     socket.on("connect_error", () => {
       loadNotifications();
       refreshWorkOrders({ preserveMessage: true });
+      loadShiftCalendar();
     });
 
     const syncInterval = setInterval(() => {
       if (appStateRef.current === "active") {
         loadNotifications();
         refreshWorkOrders({ preserveMessage: true });
+        loadShiftCalendar();
       }
     }, 15000);
 
@@ -895,6 +962,7 @@ export default function App() {
       setUser(session.user);
       await loadWorkOrders();
       await loadNotifications();
+      await loadShiftCalendar(shiftMonth, session.user.id);
       await registerDevicePushToken();
       await loadPushStatus();
     } catch (loginError) {
@@ -1321,7 +1389,8 @@ export default function App() {
           {[
             { value: "WORKS", label: "İşler" },
             { value: "DETAIL", label: "Detay" },
-            { value: "PRODUCTION", label: "Üretim" }
+            { value: "PRODUCTION", label: "Üretim" },
+            { value: "CALENDAR", label: "Takvim" }
           ].map((tab) => (
             <Pressable
               key={tab.value}
@@ -1679,6 +1748,72 @@ export default function App() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>İş Emri Detayı</Text>
           <Text style={styles.muted}>Detay görmek için İşler sekmesinden bir iş emri seçin.</Text>
+        </View>
+      ) : null}
+
+      {activeMobileView === "CALENDAR" ? (
+        <View style={styles.card}>
+          <View style={styles.calendarHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Vardiya Takvimim</Text>
+              <Text style={styles.muted}>{formatMonthLabel(shiftMonth)}</Text>
+            </View>
+            <View style={styles.calendarMonthActions}>
+              <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getPreviousMonth(shiftMonth))} disabled={isSubmitting}>
+                <Text style={styles.inlineButtonText}>Onceki</Text>
+              </Pressable>
+              <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getCurrentMonth())} disabled={isSubmitting}>
+                <Text style={styles.inlineButtonText}>Bugun</Text>
+              </Pressable>
+              <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getNextMonth(shiftMonth))} disabled={isSubmitting}>
+                <Text style={styles.inlineButtonText}>Sonraki</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.shiftSummaryRow}>
+            <View style={styles.shiftSummaryBox}>
+              <Text style={styles.summaryValue}>{plannedShiftCount}</Text>
+              <Text style={styles.detailLabel}>Planli</Text>
+            </View>
+            <View style={styles.shiftSummaryBox}>
+              <Text style={styles.summaryValue}>{leaveShiftCount}</Text>
+              <Text style={styles.detailLabel}>Izin</Text>
+            </View>
+            <View style={styles.shiftSummaryBox}>
+              <Text style={styles.summaryValue}>{absentShiftCount}</Text>
+              <Text style={styles.detailLabel}>Gelmedi</Text>
+            </View>
+          </View>
+
+          <View style={styles.shiftCalendarList}>
+            {shiftAssignments.map((assignment) => {
+              const workDate = assignment.workDate?.slice(0, 10);
+              const shiftText = assignment.shift
+                ? `${assignment.shift.name} (${assignment.shift.startTime}-${assignment.shift.endTime})`
+                : "Vardiya atanmamis";
+
+              return (
+                <View
+                  key={assignment.id}
+                  style={[
+                    styles.shiftCalendarCard,
+                    assignment.status === "LEAVE" ? styles.shiftCalendarLeave : null,
+                    assignment.status === "ABSENT" ? styles.shiftCalendarAbsent : null
+                  ]}
+                >
+                  <View style={styles.shiftCalendarText}>
+                    <Text style={styles.detailValue}>{workDate ? formatShiftDay(workDate) : "-"}</Text>
+                    <Text style={styles.muted}>{shiftText}</Text>
+                    {assignment.note ? <Text style={styles.detailLabel}>{assignment.note}</Text> : null}
+                  </View>
+                  <Text style={styles.statusBadge}>{SHIFT_STATUS_LABELS[assignment.status] ?? assignment.status}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {!shiftAssignments.length ? <Text style={styles.muted}>Bu ay icin vardiya plani bulunmuyor.</Text> : null}
         </View>
       ) : null}
 
@@ -2208,6 +2343,59 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  calendarMonthActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  shiftSummaryRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  shiftSummaryBox: {
+    flex: 1,
+    minHeight: 58,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+    backgroundColor: "#f8fbfc",
+    borderColor: "#e6edf2",
+    borderRadius: 6,
+    borderWidth: 1
+  },
+  shiftCalendarList: {
+    gap: 8
+  },
+  shiftCalendarCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: 10,
+    backgroundColor: "#f0fdfa",
+    borderColor: "#b9eadb",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  shiftCalendarLeave: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa"
+  },
+  shiftCalendarAbsent: {
+    backgroundColor: "#fee2e2",
+    borderColor: "#fecaca"
+  },
+  shiftCalendarText: {
+    flex: 1,
+    gap: 3
   },
   mobileNotificationCard: {
     flexDirection: "row",
