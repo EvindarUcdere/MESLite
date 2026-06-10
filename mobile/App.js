@@ -432,6 +432,28 @@ async function getExpoPushTokenForDevice() {
   return tokenResult.data;
 }
 
+async function getNativeDevicePushTokenDiagnostic() {
+  if (Platform.OS === "web") {
+    return "web";
+  }
+
+  const Notifications = await getNativeNotificationsModule();
+  if (!Notifications?.getDevicePushTokenAsync) {
+    return "native-token-api-yok";
+  }
+
+  try {
+    const tokenResult = await Notifications.getDevicePushTokenAsync();
+    const tokenValue = typeof tokenResult?.data === "string" ? tokenResult.data : JSON.stringify(tokenResult?.data ?? "");
+    console.log("Native Device Push Token:", tokenResult);
+    return tokenValue ? `${tokenResult?.type ?? "native"}:${maskPushToken(tokenValue)}` : "native-token-bos";
+  } catch (nativeTokenError) {
+    const errorMessage = nativeTokenError?.message ?? "Bilinmeyen native token hatasi";
+    console.log("Native Device Push Token error:", errorMessage, nativeTokenError);
+    return `native-token-hatasi: ${errorMessage}`;
+  }
+}
+
 function maskPushToken(token) {
   if (!token) {
     return "-";
@@ -597,13 +619,15 @@ export default function App() {
   async function registerDevicePushToken() {
     try {
       setPushStatus("Telefon bildirimi hazirlaniyor...");
+      const nativeTokenDiagnostic = await getNativeDevicePushTokenDiagnostic();
+      setPushStatus(`Native cihaz token durumu: ${nativeTokenDiagnostic}. Expo push token aliniyor...`);
       const token = await getExpoPushTokenForDevice();
 
       if (!token) {
         const hasPermission = await ensureSystemNotificationPermission();
         setPushStatus(
           hasPermission
-            ? "Push token alinamadi. Fiziksel telefon, Google Play servisleri ve EAS APK kurulumunu kontrol edin."
+            ? `Push token alinamadi. Native token: ${nativeTokenDiagnostic}. Google Play servisleri, FCM ve EAS APK kurulumunu kontrol edin.`
             : "Bildirim izni verilmedi. Android ayarlarindan MES Lite bildirim iznini acin."
         );
         return false;
@@ -619,7 +643,7 @@ export default function App() {
     } catch (pushError) {
       const errorMessage = pushError?.message ?? "Bilinmeyen hata";
       console.log("Expo Push Token error:", errorMessage, pushError);
-      setPushStatus(`Telefon bildirimi kaydedilemedi: ${errorMessage}`);
+      setPushStatus(`Telefon bildirimi kaydedilemedi: ${errorMessage}. Rozet testi calisiyorsa sorun FCM/EAS push token tarafindadir.`);
       return false;
     }
   }
