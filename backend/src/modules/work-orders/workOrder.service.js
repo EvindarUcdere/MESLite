@@ -118,6 +118,88 @@ export function findWorkOrderById(id) {
   });
 }
 
+function parseDateOnly(value) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export async function findAvailableOperators({ workDate, shiftId, machineId }) {
+  const date = parseDateOnly(workDate);
+  const operators = await prisma.user.findMany({
+    where: {
+      role: "OPERATOR",
+      isActive: true
+    },
+    include: {
+      shiftAssignments: {
+        where: {
+          workDate: date,
+          ...(shiftId ? { shiftId } : {}),
+          status: {
+            in: ["PLANNED", "CONFIRMED"]
+          }
+        },
+        include: {
+          shift: true
+        }
+      },
+      machineSkills: {
+        where: {
+          ...(machineId ? { machineId } : {}),
+          isActive: true
+        },
+        include: {
+          machine: true
+        }
+      },
+      assignedOperations: {
+        where: {
+          status: {
+            in: ["READY", "IN_PROGRESS", "PAUSED"]
+          },
+          workOrder: {
+            status: {
+              in: ["PLANNED", "IN_PROGRESS", "PAUSED"]
+            }
+          }
+        },
+        select: {
+          id: true,
+          operationName: true,
+          workOrder: {
+            select: {
+              id: true,
+              orderNo: true,
+              plannedStartDate: true
+            }
+          }
+        }
+      }
+    },
+    orderBy: {
+      name: "asc"
+    }
+  });
+
+  return operators.map((operator) => {
+    const hasShiftAssignment = operator.shiftAssignments.length > 0;
+    const hasMachineSkill = !machineId || operator.machineSkills.length > 0;
+    const activeOperationCount = operator.assignedOperations.length;
+
+    return {
+      id: operator.id,
+      name: operator.name,
+      email: operator.email,
+      isAvailable: hasShiftAssignment && hasMachineSkill,
+      hasShiftAssignment,
+      hasMachineSkill,
+      activeOperationCount,
+      shiftAssignments: operator.shiftAssignments,
+      machineSkills: operator.machineSkills,
+      activeOperations: operator.assignedOperations
+    };
+  });
+}
+
 export async function createWorkOrder(userId, data) {
   const result = await prisma.$transaction(async (tx) => {
     let route = null;
@@ -145,6 +227,8 @@ export async function createWorkOrder(userId, data) {
       }
     }
 
+    const assignmentMap = new Map((data.operationAssignments ?? []).map((assignment) => [assignment.routeOperationId, assignment]));
+
     const workOrder = await tx.workOrder.create({
       data: {
         orderNo: data.orderNo,
@@ -161,15 +245,19 @@ export async function createWorkOrder(userId, data) {
 
     if (route) {
       await tx.workOrderOperation.createMany({
-        data: route.operations.map((operation, index) => ({
-          workOrderId: workOrder.id,
-          routeOperationId: operation.id,
-          machineId: operation.defaultMachineId ?? data.machineId,
-          assignedOperatorId: data.assignedOperatorId,
-          sequenceNo: operation.sequenceNo,
-          operationName: operation.operationName,
-          status: index === 0 ? "READY" : "WAITING"
-        }))
+        data: route.operations.map((operation, index) => {
+          const assignment = assignmentMap.get(operation.id);
+
+          return {
+            workOrderId: workOrder.id,
+            routeOperationId: operation.id,
+            machineId: assignment?.machineId ?? operation.defaultMachineId ?? data.machineId,
+            assignedOperatorId: assignment?.assignedOperatorId ?? data.assignedOperatorId,
+            sequenceNo: operation.sequenceNo,
+            operationName: operation.operationName,
+            status: index === 0 ? "READY" : "WAITING"
+          };
+        })
       });
     }
 

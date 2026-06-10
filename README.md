@@ -4,6 +4,42 @@ MES Lite is a realistic factory production tracking MVP built for portfolio, int
 
 The project is not only a CRUD dashboard. It models a real production flow where a work order moves through multiple operations, operators enter production data from mobile, managers monitor the process from web, quality decisions are tracked, and realtime notifications keep both sides synchronized.
 
+## Live Demo
+
+| Target | URL |
+| --- | --- |
+| Web dashboard | `https://mes-lite-web.vercel.app` |
+| Backend health | `https://meslite-production.up.railway.app/health` |
+| Swagger API docs | `https://meslite-production.up.railway.app/api/docs` |
+| Android preview APK | `https://expo.dev/artifacts/eas/udS1MUwJXDSZiTTSCaYdQV.apk` |
+
+Production deployment stack:
+
+- Backend and PostgreSQL run on Railway.
+- Web dashboard runs on Vercel.
+- Mobile operator app is built with Expo EAS as an Android internal distribution APK.
+
+Current mobile note:
+
+```text
+Local Android notifications, sound and badge diagnostics work.
+Realtime in-app notifications work through Socket.io.
+Background push token registration is being diagnosed on the EAS/Firebase FCM side.
+```
+
+## Portfolio Highlights
+
+MES Lite was designed to show backend-heavy product thinking, not only screen implementation:
+
+- Critical production rules live in the backend service layer, not only in React state.
+- PostgreSQL is treated as the source of truth.
+- Socket.io is used after database commits, so realtime updates do not replace persistence.
+- Operation-level production quantities prevent inflated work order totals.
+- Scrap in one operation reduces the transferable quantity for the next operation.
+- Quality failures are tracked as decisions, not just labels.
+- Shift, machine, operator, downtime and quality metrics are reportable.
+- Web and mobile clients share the same backend contracts.
+
 ## Turkce Kisa Ozet
 
 MES Lite, fabrika uretim sureclerini takip etmek icin gelistirilen gercekci bir MVP projesidir. Sistem; is emirlerini rota ve operasyon adimlariyla takip eder, operatorlerin mobil uygulama uzerinden uretim, fire, durus ve not bilgisi girmesini saglar, uretim yoneticisinin web panelden sureci anlik izlemesine imkan verir.
@@ -259,6 +295,22 @@ Admin123!
 
 These credentials are for local demo data only.
 
+## Demo Walkthrough
+
+A repeatable demo can be presented with this story:
+
+1. Login to the web dashboard as admin or production manager.
+2. Create or inspect a route-based work order.
+3. Assign operation steps to operators and machines.
+4. Login to the mobile app as an operator.
+5. Start the assigned operation, enter produced quantity, scrap quantity, downtime reason, note and visual evidence.
+6. Complete the operation and verify that the next operation becomes ready.
+7. Open the web dashboard and inspect realtime updates, operation messages and notifications.
+8. Enter a quality check and, if needed, create a rework, scrap or conditional acceptance decision.
+9. Review reports for shift, downtime, machine, operator and quality decision metrics.
+
+The same scenario is documented in `docs/e2e-demo-scenario.md` and backed by acceptance tests.
+
 ## Project Structure
 
 ```text
@@ -427,16 +479,24 @@ The tests focus on backend business rules because factory data consistency is mo
 - Mobile push token infrastructure
 - Production consistency checks
 
-### Planned Phase 4
+### Phase 4
 
-- Deployment preparation for Railway and Vercel
-- Production env validation and health checks
+- Railway backend and PostgreSQL deployment
+- Vercel web deployment
+- Expo EAS Android preview APK build
+- Production environment variable separation
+- Production health checks and Swagger validation
+- README and demo documentation for portfolio presentation
+- Mobile notification diagnostics for Android push setup
+
+Future Phase 4+ candidates:
+
 - Docker Compose local setup
-- Real phone push testing with EAS Development Build
 - Stronger audit log UI
 - Report filters and export
 - Mobile offline queue
 - Role-specific UI polishing
+- Final Firebase/FCM push credential hardening
 
 ## Interview-Level Technical Summary
 

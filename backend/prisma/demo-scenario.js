@@ -289,6 +289,128 @@ function minutesAgo(baseDate, minutes) {
   return new Date(baseDate.getTime() - minutes * 60000);
 }
 
+function dateOnlyFromOffset(offsetDays = 0) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
+async function seedShiftPlanning({ operators, machines, shifts }) {
+  const groups = [
+    {
+      name: "E2E Kesim Ekibi",
+      description: "Kesim operasyonlari icin demo ekip",
+      operatorIds: [operators.cuttingOperator.id]
+    },
+    {
+      name: "E2E Montaj Ekibi",
+      description: "Montaj operasyonlari icin demo ekip",
+      operatorIds: [operators.assemblyOperator.id]
+    },
+    {
+      name: "E2E Kalite Ekibi",
+      description: "Kalite kontrol operasyonlari icin demo ekip",
+      operatorIds: [operators.qualityOperator.id]
+    }
+  ];
+
+  const createdGroups = {};
+  for (const groupInput of groups) {
+    const group = await prisma.operatorGroup.upsert({
+      where: { name: groupInput.name },
+      update: {
+        description: groupInput.description,
+        isActive: true
+      },
+      create: {
+        name: groupInput.name,
+        description: groupInput.description
+      }
+    });
+
+    await prisma.operatorGroupMember.deleteMany({ where: { groupId: group.id } });
+    await prisma.operatorGroupMember.createMany({
+      data: groupInput.operatorIds.map((operatorId) => ({ groupId: group.id, operatorId })),
+      skipDuplicates: true
+    });
+
+    createdGroups[groupInput.name] = group;
+  }
+
+  const templates = [
+    { name: "E2E 6 Gun Sabah", pattern: "SIX_DAYS", shiftId: shifts.morning.id, groupId: createdGroups["E2E Kesim Ekibi"].id },
+    { name: "E2E 6 Gun Aksam", pattern: "SIX_DAYS", shiftId: shifts.evening.id, groupId: createdGroups["E2E Montaj Ekibi"].id },
+    { name: "E2E 4 Gun Calis 2 Gun Izin", pattern: "FOUR_ON_TWO_OFF", shiftId: shifts.evening.id, groupId: createdGroups["E2E Kalite Ekibi"].id }
+  ];
+
+  for (const template of templates) {
+    await prisma.shiftTemplate.upsert({
+      where: { name: template.name },
+      update: {
+        pattern: template.pattern,
+        shiftId: template.shiftId,
+        groupId: template.groupId,
+        isActive: true
+      },
+      create: {
+        ...template,
+        description: "E2E demo vardiya sablonu"
+      }
+    });
+  }
+
+  const plans = [
+    { operator: operators.cuttingOperator, machine: machines.cutting, shift: shifts.morning, level: "CERTIFIED" },
+    { operator: operators.assemblyOperator, machine: machines.assembly, shift: shifts.evening, level: "ADVANCED" },
+    { operator: operators.qualityOperator, machine: machines.quality, shift: shifts.evening, level: "CERTIFIED" }
+  ];
+
+  for (const plan of plans) {
+    await prisma.operatorMachineSkill.upsert({
+      where: {
+        operatorId_machineId: {
+          operatorId: plan.operator.id,
+          machineId: plan.machine.id
+        }
+      },
+      update: {
+        level: plan.level,
+        isActive: true
+      },
+      create: {
+        operatorId: plan.operator.id,
+        machineId: plan.machine.id,
+        level: plan.level,
+        note: "E2E demo yetkinligi"
+      }
+    });
+
+    for (let offset = 0; offset < 14; offset += 1) {
+      const workDate = dateOnlyFromOffset(offset);
+      await prisma.shiftAssignment.upsert({
+        where: {
+          operatorId_workDate: {
+            operatorId: plan.operator.id,
+            workDate
+          }
+        },
+        update: {
+          shiftId: plan.shift.id,
+          status: "CONFIRMED"
+        },
+        create: {
+          operatorId: plan.operator.id,
+          shiftId: plan.shift.id,
+          workDate,
+          status: "CONFIRMED",
+          note: "E2E demo aylik plan"
+        }
+      });
+    }
+  }
+}
+
 async function main() {
   await resetDemoWorkOrders();
 
@@ -360,6 +482,11 @@ async function main() {
     night: nightShift
   };
   const { route, routeOperations } = await createRoute({ product, machines });
+  await seedShiftPlanning({
+    operators: { cuttingOperator, assemblyOperator, qualityOperator },
+    machines,
+    shifts
+  });
   const now = new Date();
   const runStart = minutesAgo(now, 110);
   const pauseStart = minutesAgo(now, 150);

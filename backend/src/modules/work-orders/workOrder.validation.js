@@ -9,7 +9,24 @@ export const createWorkOrderSchema = z.object({
     assignedOperatorId: z.string().uuid().optional(),
     plannedQuantity: z.number().int().positive(),
     plannedStartDate: z.string().datetime().optional(),
-    plannedEndDate: z.string().datetime().optional()
+    plannedEndDate: z.string().datetime().optional(),
+    operationAssignments: z
+      .array(
+        z.object({
+          routeOperationId: z.string().uuid(),
+          machineId: z.string().uuid().optional(),
+          assignedOperatorId: z.string().uuid().optional()
+        })
+      )
+      .optional()
+  })
+});
+
+export const availableOperatorsSchema = z.object({
+  query: z.object({
+    workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    shiftId: z.string().uuid().optional(),
+    machineId: z.string().uuid().optional()
   })
 });
 

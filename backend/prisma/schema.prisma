@@ -96,6 +96,26 @@ enum DowntimeReason {
   OTHER
 }
 
+enum ShiftAssignmentStatus {
+  PLANNED
+  CONFIRMED
+  ABSENT
+  LEAVE
+}
+
+enum MachineSkillLevel {
+  BASIC
+  ADVANCED
+  CERTIFIED
+}
+
+enum ShiftTemplatePattern {
+  WEEKDAYS
+  SIX_DAYS
+  EVERY_DAY
+  FOUR_ON_TWO_OFF
+}
+
 model User {
   id                 String                 @id @default(uuid())
   name               String
@@ -120,6 +140,9 @@ model User {
   auditLogs          AuditLog[]
   notifications      Notification[]
   pushTokens         PushToken[]
+  shiftAssignments   ShiftAssignment[]
+  machineSkills      OperatorMachineSkill[]
+  operatorGroups     OperatorGroupMember[]
 }
 
 model Product {
@@ -161,6 +184,7 @@ model Machine {
   operationDowntimes     OperationDowntime[]
   machineStatusLogs      MachineStatusLog[]
   defaultRouteOperations RouteOperation[]
+  operatorSkills         OperatorMachineSkill[]
 }
 
 model ProductRoute {
@@ -205,6 +229,91 @@ model Shift {
   isActive           Boolean             @default(true)
   productionLogs     ProductionLog[]
   operationDowntimes OperationDowntime[]
+  assignments        ShiftAssignment[]
+  templates          ShiftTemplate[]
+}
+
+model OperatorGroup {
+  id          String                @id @default(uuid())
+  name        String                @unique
+  description String?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  members     OperatorGroupMember[]
+  templates   ShiftTemplate[]
+
+  @@map("operator_groups")
+}
+
+model OperatorGroupMember {
+  id         String        @id @default(uuid())
+  groupId    String
+  operatorId String
+  createdAt  DateTime      @default(now())
+  group      OperatorGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  operator   User          @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, operatorId])
+  @@index([operatorId])
+  @@map("operator_group_members")
+}
+
+model ShiftTemplate {
+  id          String               @id @default(uuid())
+  name        String               @unique
+  description String?
+  pattern     ShiftTemplatePattern @default(WEEKDAYS)
+  shiftId     String
+  groupId     String?
+  startOffset Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  shift       Shift                @relation(fields: [shiftId], references: [id])
+  group       OperatorGroup?       @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([shiftId])
+  @@index([groupId])
+  @@map("shift_templates")
+}
+
+model ShiftAssignment {
+  id         String                 @id @default(uuid())
+  operatorId String
+  shiftId    String
+  workDate   DateTime               @db.Date
+  startTime  String?
+  endTime    String?
+  status     ShiftAssignmentStatus  @default(PLANNED)
+  note       String?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  operator   User                   @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  shift      Shift                  @relation(fields: [shiftId], references: [id])
+
+  @@unique([operatorId, workDate])
+  @@index([shiftId, workDate])
+  @@index([workDate])
+  @@map("shift_assignments")
+}
+
+model OperatorMachineSkill {
+  id         String            @id @default(uuid())
+  operatorId String
+  machineId  String
+  level      MachineSkillLevel @default(BASIC)
+  isActive   Boolean           @default(true)
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  operator   User              @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  machine    Machine           @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([operatorId, machineId])
+  @@index([machineId, isActive])
+  @@index([operatorId, isActive])
+  @@map("operator_machine_skills")
 }
 
 model WorkOrder {

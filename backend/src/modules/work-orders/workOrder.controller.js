@@ -10,6 +10,11 @@ export async function detail(req, res) {
   res.json({ data: workOrder });
 }
 
+export async function availableOperators(req, res) {
+  const operators = await workOrderService.findAvailableOperators(req.validated.query);
+  res.json({ data: operators });
+}
+
 export async function create(req, res) {
   const workOrder = await workOrderService.createWorkOrder(req.user.id, req.validated.body);
   res.status(201).json({ data: workOrder });

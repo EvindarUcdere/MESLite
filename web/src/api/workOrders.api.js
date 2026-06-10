@@ -10,6 +10,11 @@ export async function createWorkOrder(payload) {
   return response.data.data;
 }
 
+export async function getAvailableOperators(params) {
+  const response = await apiClient.get("/work-orders/available-operators", { params });
+  return response.data.data;
+}
+
 export async function assignOperator(workOrderId, operatorId) {
   const response = await apiClient.patch(`/work-orders/${workOrderId}/assign-operator`, { operatorId });
   return response.data.data;

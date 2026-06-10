@@ -28,7 +28,7 @@ async function main() {
     }
   });
 
-  await prisma.user.upsert({
+  const operator = await prisma.user.upsert({
     where: { email: "operator@meslite.local" },
     update: {},
     create: {
@@ -70,7 +70,7 @@ async function main() {
     }
   });
 
-  await prisma.machine.upsert({
+  const machine = await prisma.machine.upsert({
     where: { code: "MCH-001" },
     update: {},
     create: {
@@ -80,13 +80,55 @@ async function main() {
     }
   });
 
-  await prisma.shift.upsert({
+  const shift = await prisma.shift.upsert({
     where: { name: "Day Shift" },
     update: {},
     create: {
       name: "Day Shift",
       startTime: "08:00",
       endTime: "16:00"
+    }
+  });
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  await prisma.shiftAssignment.upsert({
+    where: {
+      operatorId_workDate: {
+        operatorId: operator.id,
+        workDate: today
+      }
+    },
+    update: {
+      shiftId: shift.id,
+      status: "CONFIRMED"
+    },
+    create: {
+      operatorId: operator.id,
+      shiftId: shift.id,
+      workDate: today,
+      status: "CONFIRMED",
+      note: "Demo vardiya ataması"
+    }
+  });
+
+  await prisma.operatorMachineSkill.upsert({
+    where: {
+      operatorId_machineId: {
+        operatorId: operator.id,
+        machineId: machine.id
+      }
+    },
+    update: {
+      level: "CERTIFIED",
+      isActive: true
+    },
+    create: {
+      operatorId: operator.id,
+      machineId: machine.id,
+      level: "CERTIFIED",
+      note: "Demo makine yetkinliği"
     }
   });
 

@@ -4,8 +4,9 @@ import { useSearchParams } from "react-router-dom";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
+import { getShifts } from "../api/shiftPlanning.api.js";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
-import { completeWorkOrder, createWorkOrder, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
+import { completeWorkOrder, createWorkOrder, getAvailableOperators, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -254,6 +255,8 @@ export default function WorkOrders() {
   const [routes, setRoutes] = useState([]);
   const [machines, setMachines] = useState([]);
   const [operators, setOperators] = useState([]);
+  const [shifts, setShifts] = useState([]);
+  const [availableOperatorsByOperation, setAvailableOperatorsByOperation] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -268,8 +271,11 @@ export default function WorkOrders() {
     routeId: "",
     machineId: "",
     assignedOperatorId: "",
+    workDate: new Date().toISOString().slice(0, 10),
+    shiftId: "",
     plannedQuantity: 100
   });
+  const [operationAssignments, setOperationAssignments] = useState([]);
   const [productionForm, setProductionForm] = useState({
     workOrderId: "",
     producedQuantity: 10,
@@ -280,6 +286,7 @@ export default function WorkOrders() {
 
   const activeMachines = useMemo(() => machines.filter((machine) => machine.isActive), [machines]);
   const availableRoutes = useMemo(() => routes.filter((route) => route.productId === form.productId && route.isActive), [form.productId, routes]);
+  const selectedRoute = useMemo(() => routes.find((route) => route.id === form.routeId), [form.routeId, routes]);
   const productionCandidates = useMemo(
     () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
@@ -347,12 +354,17 @@ export default function WorkOrders() {
 
   async function loadData() {
     setError("");
-    const [workOrderData, productData, routeData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers()]);
+    const [workOrderData, productData, routeData, machineData, userData, shiftData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers(), getShifts()]);
     setWorkOrders(workOrderData);
     setProducts(productData);
     setRoutes(routeData);
     setMachines(machineData);
     setOperators(userData.filter((user) => user.role === "OPERATOR" && user.isActive));
+    setShifts(shiftData.filter((shift) => shift.isActive));
+    setForm((current) => ({
+      ...current,
+      shiftId: current.shiftId || shiftData.find((shift) => shift.isActive)?.id || ""
+    }));
   }
 
   useEffect(() => {
@@ -360,7 +372,7 @@ export default function WorkOrders() {
 
     async function loadInitialData() {
       try {
-        const [workOrderData, productData, routeData, machineData, userData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers()]);
+        const [workOrderData, productData, routeData, machineData, userData, shiftData] = await Promise.all([getWorkOrders(), getProducts(), getProductRoutes(), getMachines(), getUsers(), getShifts()]);
 
         if (isMounted) {
           setWorkOrders(workOrderData);
@@ -368,6 +380,11 @@ export default function WorkOrders() {
           setRoutes(routeData);
           setMachines(machineData);
           setOperators(userData.filter((user) => user.role === "OPERATOR" && user.isActive));
+          setShifts(shiftData.filter((shift) => shift.isActive));
+          setForm((current) => ({
+            ...current,
+            shiftId: current.shiftId || shiftData.find((shift) => shift.isActive)?.id || ""
+          }));
         }
       } catch (_error) {
         if (isMounted) {
@@ -414,6 +431,67 @@ export default function WorkOrders() {
     }));
   }
 
+  function updateOperationAssignment(routeOperationId, field, value) {
+    setOperationAssignments((current) =>
+      current.map((assignment) => (assignment.routeOperationId === routeOperationId ? { ...assignment, [field]: value } : assignment))
+    );
+  }
+
+  useEffect(() => {
+    if (!selectedRoute) {
+      setOperationAssignments([]);
+      setAvailableOperatorsByOperation({});
+      return;
+    }
+
+    setOperationAssignments(
+      selectedRoute.operations.map((operation) => ({
+        routeOperationId: operation.id,
+        sequenceNo: operation.sequenceNo,
+        operationName: operation.operationName,
+        machineId: operation.defaultMachineId || form.machineId || "",
+        assignedOperatorId: form.assignedOperatorId || ""
+      }))
+    );
+  }, [selectedRoute?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvailableOperators() {
+      if (!form.workDate || !operationAssignments.length) {
+        setAvailableOperatorsByOperation({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        operationAssignments.map(async (assignment) => {
+          if (!assignment.machineId) {
+            return [assignment.routeOperationId, []];
+          }
+
+          const available = await getAvailableOperators({
+            workDate: form.workDate,
+            ...(form.shiftId ? { shiftId: form.shiftId } : {}),
+            machineId: assignment.machineId
+          });
+
+          return [assignment.routeOperationId, available];
+        })
+      );
+
+      if (isMounted) {
+        setAvailableOperatorsByOperation(Object.fromEntries(entries));
+      }
+    }
+
+    loadAvailableOperators().catch(() => setAvailableOperatorsByOperation({}));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [form.workDate, form.shiftId, operationAssignments.map((assignment) => `${assignment.routeOperationId}:${assignment.machineId}`).join("|")]);
+
   function updateProductionForm(field, value) {
     setProductionForm((current) => ({ ...current, [field]: value }));
   }
@@ -428,9 +506,19 @@ export default function WorkOrders() {
         orderNo: form.orderNo,
         productId: form.productId,
         plannedQuantity: Number(form.plannedQuantity),
+        plannedStartDate: form.workDate ? `${form.workDate}T00:00:00.000Z` : undefined,
         ...(form.routeId ? { routeId: form.routeId } : {}),
         ...(form.machineId ? { machineId: form.machineId } : {}),
-        ...(form.assignedOperatorId ? { assignedOperatorId: form.assignedOperatorId } : {})
+        ...(form.assignedOperatorId ? { assignedOperatorId: form.assignedOperatorId } : {}),
+        ...(operationAssignments.length
+          ? {
+              operationAssignments: operationAssignments.map((assignment) => ({
+                routeOperationId: assignment.routeOperationId,
+                ...(assignment.machineId ? { machineId: assignment.machineId } : {}),
+                ...(assignment.assignedOperatorId ? { assignedOperatorId: assignment.assignedOperatorId } : {})
+              }))
+            }
+          : {})
       };
 
       await createWorkOrder(payload);
@@ -440,6 +528,7 @@ export default function WorkOrders() {
         routeId: "",
         plannedQuantity: 100
       }));
+      setOperationAssignments([]);
       await loadData();
     } catch (error) {
       setError(getApiErrorMessage(error, "İş emri oluşturulamadı."));
@@ -692,6 +781,73 @@ export default function WorkOrders() {
             Planlanan Adet
             <input value={form.plannedQuantity} onChange={(event) => updateForm("plannedQuantity", event.target.value)} type="number" min="1" required />
           </label>
+          <label>
+            Plan Tarihi
+            <input value={form.workDate} onChange={(event) => updateForm("workDate", event.target.value)} type="date" required />
+          </label>
+          <label>
+            Vardiya
+            <select value={form.shiftId} onChange={(event) => updateForm("shiftId", event.target.value)}>
+              <option value="">TÃ¼m vardiyalar</option>
+              {shifts.map((shift) => (
+                <option key={shift.id} value={shift.id}>
+                  {shift.name} ({shift.startTime}-{shift.endTime})
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedRoute ? (
+            <div className="operation-assignment-panel">
+              <div>
+                <strong>Operasyon AtamalarÄ±</strong>
+                <p className="muted-text">Liste; seÃ§ilen gÃ¼n, vardiya ve makine yetkinliÄŸine gÃ¶re uygun operatÃ¶rleri gÃ¶sterir.</p>
+              </div>
+              {operationAssignments.map((assignment) => {
+                const availableOperators = availableOperatorsByOperation[assignment.routeOperationId] ?? [];
+                const selectableOperators = availableOperators.filter((operator) => operator.isAvailable);
+
+                return (
+                  <div className="operation-assignment-row" key={assignment.routeOperationId}>
+                    <div>
+                      <strong>
+                        {assignment.sequenceNo}. {assignment.operationName}
+                      </strong>
+                    </div>
+                    <label>
+                      Makine
+                      <select value={assignment.machineId} onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "machineId", event.target.value)}>
+                        <option value="">Makine seÃ§in</option>
+                        {activeMachines.map((machine) => (
+                          <option key={machine.id} value={machine.id}>
+                            {machine.code} - {machine.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Uygun OperatÃ¶r
+                      <select
+                        value={assignment.assignedOperatorId}
+                        onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "assignedOperatorId", event.target.value)}
+                        disabled={!assignment.machineId}
+                      >
+                        <option value="">Sonra ata</option>
+                        {selectableOperators.map((operator) => (
+                          <option key={operator.id} value={operator.id}>
+                            {operator.name}
+                            {operator.activeOperationCount ? ` (${operator.activeOperationCount} aktif iÅŸ)` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {assignment.machineId && !selectableOperators.length ? (
+                      <p className="form-error">Bu gÃ¼n/vardiya/makine iÃ§in uygun operatÃ¶r bulunamadÄ±. Vardiya PlanÄ± ekranÄ±ndan takvim veya yetkinlik ekleyin.</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             <Plus size={18} />
             {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
