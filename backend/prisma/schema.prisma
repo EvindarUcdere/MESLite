@@ -140,6 +140,7 @@ model User {
   auditLogs          AuditLog[]
   notifications      Notification[]
   pushTokens         PushToken[]
+  mobileDebugLogs    MobileDebugLog[]
   shiftAssignments   ShiftAssignment[]
   machineSkills      OperatorMachineSkill[]
   operatorGroups     OperatorGroupMember[]
@@ -561,4 +562,19 @@ model PushToken {
 
   @@index([userId, isActive])
   @@map("push_tokens")
+}
+
+model MobileDebugLog {
+  id        String   @id @default(uuid())
+  userId    String
+  category  String
+  step      String
+  platform  String?
+  payload   Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([category, step, createdAt])
+  @@map("mobile_debug_logs")
 }

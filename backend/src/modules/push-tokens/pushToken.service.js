@@ -18,6 +18,17 @@ function chunk(items, size) {
 
 export async function registerPushToken(userId, data) {
   const token = data.token.trim();
+  console.log(
+    "[push-debug]",
+    "register-token",
+    JSON.stringify({
+      userId,
+      platform: data.platform,
+      deviceName: data.deviceName,
+      isExpoPushToken: isExpoPushToken(token),
+      tokenPreview: `${token.slice(0, 22)}...${token.slice(-6)}`
+    })
+  );
 
   return prisma.pushToken.upsert({
     where: { token },
@@ -100,6 +111,16 @@ export async function sendPushNotificationToUser(userId, notification) {
       isActive: true
     }
   });
+  console.log(
+    "[push-debug]",
+    "send-to-user-token-query",
+    JSON.stringify({
+      userId,
+      notificationId: notification.id,
+      activeTokenCount: tokens.length,
+      expoTokenCount: tokens.filter((entry) => isExpoPushToken(entry.token)).length
+    })
+  );
   let unreadCount = 1;
   try {
     unreadCount = await prisma.notification.count({
@@ -132,6 +153,15 @@ export async function sendPushNotificationToUser(userId, notification) {
     }));
 
   if (!expoMessages.length) {
+    console.log(
+      "[push-debug]",
+      "send-to-user-no-expo-messages",
+      JSON.stringify({
+        userId,
+        notificationId: notification.id,
+        activeTokenCount: tokens.length
+      })
+    );
     return { sent: 0, disabled: 0 };
   }
 

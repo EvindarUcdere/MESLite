@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
+import { createMobileDebugLog } from "./src/api/mobileDebugLogs.api";
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
 import { getMyPushTokens, registerPushToken, sendPushTestNotification } from "./src/api/pushTokens.api";
@@ -28,17 +29,45 @@ const OPERATION_STATUS_LABELS = {
 };
 
 let nativeNotificationsModulePromise = null;
+let pushDebugLogListener = null;
 
 const MOBILE_VIEW_ORDER = ["WORKS", "DETAIL", "PRODUCTION", "CALENDAR"];
 const NOTIFICATION_CHANNEL_ID = "default";
 
+function logPushDebug(step, details = {}) {
+  const payload = {
+    platform: Platform.OS,
+    appOwnership: Constants.appOwnership ?? "unknown",
+    executionEnvironment: Constants.executionEnvironment ?? "unknown",
+    ...details
+  };
+
+  console.log(
+    "[push-debug]",
+    step,
+    JSON.stringify(payload)
+  );
+
+  if (pushDebugLogListener) {
+    pushDebugLogListener({
+      id: `${Date.now()}-${Math.random()}`,
+      time: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      step,
+      payload
+    });
+  }
+}
+
 async function getNativeNotificationsModule() {
   if (Platform.OS === "web") {
+    logPushDebug("native-module-skip-web");
     return null;
   }
 
   if (!nativeNotificationsModulePromise) {
+    logPushDebug("native-module-import-start");
     nativeNotificationsModulePromise = import("expo-notifications").then((module) => {
+      logPushDebug("native-module-import-success");
       module.setNotificationHandler({
         handleNotification: async () => ({
           shouldShowAlert: true,
@@ -50,13 +79,20 @@ async function getNativeNotificationsModule() {
       });
 
       if (Platform.OS === "android") {
+        logPushDebug("android-channel-create-start", { channelId: NOTIFICATION_CHANNEL_ID });
         module.setNotificationChannelAsync(NOTIFICATION_CHANNEL_ID, {
           name: "MES Lite Bildirimleri",
           importance: module.AndroidImportance.HIGH,
           vibrationPattern: [0, 250, 120, 250],
           lightColor: "#2d7d76",
           sound: "default"
-        }).catch(() => {});
+        })
+          .then(() => logPushDebug("android-channel-create-success", { channelId: NOTIFICATION_CHANNEL_ID }))
+          .catch((channelError) =>
+            logPushDebug("android-channel-create-error", {
+              message: channelError?.message ?? "unknown"
+            })
+          );
       }
 
       return module;
@@ -366,32 +402,53 @@ function playNotificationSound() {
 async function ensureSystemNotificationPermission() {
   if (Platform.OS === "web") {
     if (!("Notification" in globalThis)) {
+      logPushDebug("permission-web-api-missing");
       return false;
     }
 
     if (globalThis.Notification.permission === "granted") {
+      logPushDebug("permission-web-already-granted");
       return true;
     }
 
     if (globalThis.Notification.permission === "denied") {
+      logPushDebug("permission-web-denied");
       return false;
     }
 
+    logPushDebug("permission-web-request-start", { current: globalThis.Notification.permission });
     const permission = await globalThis.Notification.requestPermission();
+    logPushDebug("permission-web-request-result", { permission });
     return permission === "granted";
   }
 
   const Notifications = await getNativeNotificationsModule();
   if (!Notifications) {
+    logPushDebug("permission-native-module-missing");
     return false;
   }
 
   const current = await Notifications.getPermissionsAsync();
+  logPushDebug("permission-native-current", {
+    granted: current.granted,
+    status: current.status,
+    canAskAgain: current.canAskAgain,
+    expires: current.expires,
+    iosStatus: current.ios?.status
+  });
   if (current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
     return true;
   }
 
+  logPushDebug("permission-native-request-start");
   const requested = await Notifications.requestPermissionsAsync();
+  logPushDebug("permission-native-request-result", {
+    granted: requested.granted,
+    status: requested.status,
+    canAskAgain: requested.canAskAgain,
+    expires: requested.expires,
+    iosStatus: requested.ios?.status
+  });
   return requested.granted || requested.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
 }
 
@@ -441,47 +498,81 @@ async function updateAppBadgeCount(count) {
 }
 
 async function getExpoPushTokenForDevice() {
+  logPushDebug("expo-token-start");
   if (Platform.OS === "web") {
+    logPushDebug("expo-token-skip-web");
     return null;
   }
 
   const Notifications = await getNativeNotificationsModule();
   if (!Notifications) {
+    logPushDebug("expo-token-native-module-missing");
     return null;
   }
 
   const hasPermission = await ensureSystemNotificationPermission();
+  logPushDebug("expo-token-permission-result", { hasPermission });
   if (!hasPermission) {
     return null;
   }
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  logPushDebug("expo-token-project-id", {
+    hasProjectId: Boolean(projectId),
+    projectIdSource: Constants.expoConfig?.extra?.eas?.projectId ? "expoConfig.extra.eas.projectId" : Constants.easConfig?.projectId ? "easConfig.projectId" : "missing"
+  });
   if (!projectId) {
     throw new Error("EAS projectId bulunamadi. app.json extra.eas.projectId kontrol edilmeli.");
   }
 
-  const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
-  console.log("Expo Push Token:", tokenResult.data);
-  return tokenResult.data;
+  try {
+    logPushDebug("expo-token-request-start");
+    const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
+    logPushDebug("expo-token-request-success", {
+      hasToken: Boolean(tokenResult?.data),
+      tokenPreview: maskPushToken(tokenResult?.data)
+    });
+    console.log("Expo Push Token:", tokenResult.data);
+    return tokenResult.data;
+  } catch (tokenError) {
+    logPushDebug("expo-token-request-error", {
+      message: tokenError?.message ?? "unknown",
+      code: tokenError?.code,
+      stack: tokenError?.stack?.split("\n")?.slice(0, 3)?.join(" | ")
+    });
+    throw tokenError;
+  }
 }
 
 async function getNativeDevicePushTokenDiagnostic() {
   if (Platform.OS === "web") {
+    logPushDebug("native-device-token-skip-web");
     return "web";
   }
 
   const Notifications = await getNativeNotificationsModule();
   if (!Notifications?.getDevicePushTokenAsync) {
+    logPushDebug("native-device-token-api-missing");
     return "native-token-api-yok";
   }
 
   try {
+    logPushDebug("native-device-token-request-start");
     const tokenResult = await Notifications.getDevicePushTokenAsync();
     const tokenValue = typeof tokenResult?.data === "string" ? tokenResult.data : JSON.stringify(tokenResult?.data ?? "");
+    logPushDebug("native-device-token-request-success", {
+      type: tokenResult?.type,
+      hasToken: Boolean(tokenValue),
+      tokenPreview: maskPushToken(tokenValue)
+    });
     console.log("Native Device Push Token:", tokenResult);
     return tokenValue ? `${tokenResult?.type ?? "native"}:${maskPushToken(tokenValue)}` : "native-token-bos";
   } catch (nativeTokenError) {
     const errorMessage = nativeTokenError?.message ?? "Bilinmeyen native token hatasi";
+    logPushDebug("native-device-token-request-error", {
+      message: errorMessage,
+      code: nativeTokenError?.code
+    });
     console.log("Native Device Push Token error:", errorMessage, nativeTokenError);
     return `native-token-hatasi: ${errorMessage}`;
   }
@@ -524,6 +615,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [pushStatus, setPushStatus] = useState("Bildirim durumu kontrol edilmedi.");
+  const [pushDebugLogs, setPushDebugLogs] = useState([]);
   const [shiftMonth, setShiftMonth] = useState(getCurrentMonth());
   const [shiftAssignments, setShiftAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -585,6 +677,24 @@ export default function App() {
   useEffect(() => {
     selectedWorkOrderIdRef.current = selectedWorkOrderId;
   }, [selectedWorkOrderId]);
+
+  useEffect(() => {
+    pushDebugLogListener = (entry) => {
+      setPushDebugLogs((current) => [entry, ...current].slice(0, 30));
+      if (user?.id) {
+        createMobileDebugLog({
+          category: "push",
+          step: entry.step,
+          platform: entry.payload.platform,
+          payload: entry.payload
+        }).catch(() => {});
+      }
+    };
+
+    return () => {
+      pushDebugLogListener = null;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     unreadNotificationCountRef.current = unreadNotificationCount;
@@ -683,13 +793,16 @@ export default function App() {
 
   async function registerDevicePushToken() {
     try {
+      logPushDebug("register-device-start", { userId: user?.id });
       setPushStatus("Telefon bildirimi hazirlaniyor...");
       const nativeTokenDiagnostic = await getNativeDevicePushTokenDiagnostic();
+      logPushDebug("register-device-native-diagnostic", { nativeTokenDiagnostic });
       setPushStatus(`Native cihaz token durumu: ${nativeTokenDiagnostic}. Expo push token aliniyor...`);
       const token = await getExpoPushTokenForDevice();
 
       if (!token) {
         const hasPermission = await ensureSystemNotificationPermission();
+        logPushDebug("register-device-token-empty", { hasPermission, nativeTokenDiagnostic });
         setPushStatus(
           hasPermission
             ? `Push token alinamadi. Native token: ${nativeTokenDiagnostic}. Google Play servisleri, FCM ve EAS APK kurulumunu kontrol edin.`
@@ -698,15 +811,29 @@ export default function App() {
         return false;
       }
 
-      await registerPushToken({
+      logPushDebug("register-device-backend-start", {
+        tokenPreview: maskPushToken(token),
+        platform: Platform.OS
+      });
+      const registeredToken = await registerPushToken({
         token,
         platform: Platform.OS,
         deviceName: Platform.OS === "web" ? "Web" : "Mobile"
+      });
+      logPushDebug("register-device-backend-success", {
+        tokenId: registeredToken?.id,
+        isActive: registeredToken?.isActive,
+        lastSeenAt: registeredToken?.lastSeenAt
       });
       setPushStatus(`Telefon bildirimi aktif. Token: ${maskPushToken(token)}`);
       return true;
     } catch (pushError) {
       const errorMessage = pushError?.message ?? "Bilinmeyen hata";
+      logPushDebug("register-device-error", {
+        message: errorMessage,
+        responseStatus: pushError?.response?.status,
+        responseMessage: pushError?.response?.data?.message
+      });
       console.log("Expo Push Token error:", errorMessage, pushError);
       setPushStatus(`Telefon bildirimi kaydedilemedi: ${errorMessage}. Rozet testi calisiyorsa sorun FCM/EAS push token tarafindadir.`);
       return false;
@@ -720,10 +847,21 @@ export default function App() {
     }
 
     try {
+      logPushDebug("push-status-load-start");
       const tokens = await getMyPushTokens();
       const activeTokens = tokens.filter((token) => token.isActive);
+      logPushDebug("push-status-load-success", {
+        total: tokens.length,
+        active: activeTokens.length,
+        latest: activeTokens[0]?.lastSeenAt
+      });
       setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli). Son kayit: ${formatDateTime(activeTokens[0].lastSeenAt)}` : "Aktif telefon bildirimi yok. Bildirimleri Aktiflestir butonuna basin.");
-    } catch (_error) {
+    } catch (pushStatusError) {
+      logPushDebug("push-status-load-error", {
+        message: pushStatusError?.message,
+        responseStatus: pushStatusError?.response?.status,
+        responseMessage: pushStatusError?.response?.data?.message
+      });
       setPushStatus("Bildirim durumu okunamadi.");
     }
   }
@@ -745,7 +883,13 @@ export default function App() {
 
     try {
       await registerDevicePushToken();
+      logPushDebug("push-test-request-start");
       const result = await sendPushTestNotification();
+      logPushDebug("push-test-request-success", {
+        sent: result?.push?.sent,
+        disabled: result?.push?.disabled,
+        tickets: result?.push?.tickets
+      });
       const sentCount = result?.push?.sent ?? 0;
       const firstTicket = result?.push?.tickets?.[0];
       const ticketStatus = firstTicket?.status ? ` Expo cevabi: ${firstTicket.status}${firstTicket.message ? ` - ${firstTicket.message}` : ""}` : "";
@@ -756,7 +900,12 @@ export default function App() {
       );
       await loadNotifications();
       await loadPushStatus();
-    } catch (_error) {
+    } catch (pushTestError) {
+      logPushDebug("push-test-request-error", {
+        message: pushTestError?.message,
+        responseStatus: pushTestError?.response?.status,
+        responseMessage: pushTestError?.response?.data?.message
+      });
       setError("Test bildirimi gonderilemedi. Push token kaydi veya backend baglantisini kontrol edin.");
     }
   }
@@ -1363,6 +1512,25 @@ export default function App() {
             <Pressable style={styles.inlineButton} onPress={handleLocalBadgeTest} disabled={isSubmitting || Platform.OS === "web"}>
               <Text style={styles.inlineButtonText}>Rozet Testi</Text>
             </Pressable>
+          </View>
+          <View style={styles.pushDebugPanel}>
+            <View style={styles.pushDebugHeader}>
+              <Text style={styles.detailLabel}>Push tanı logları</Text>
+              <Pressable style={styles.debugClearButton} onPress={() => setPushDebugLogs([])} disabled={!pushDebugLogs.length}>
+                <Text style={styles.debugClearButtonText}>Temizle</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.pushDebugList} nestedScrollEnabled>
+              {pushDebugLogs.map((entry) => (
+                <View key={entry.id} style={styles.pushDebugItem}>
+                  <Text style={styles.pushDebugStep}>
+                    {entry.time} - {entry.step}
+                  </Text>
+                  <Text style={styles.pushDebugPayload}>{JSON.stringify(entry.payload)}</Text>
+                </View>
+              ))}
+              {!pushDebugLogs.length ? <Text style={styles.muted}>Henüz push tanı logu yok.</Text> : null}
+            </ScrollView>
           </View>
         </View>
         <ScrollView style={styles.notificationListScroll} nestedScrollEnabled>
@@ -2343,6 +2511,53 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
+  },
+  pushDebugPanel: {
+    gap: 8,
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  pushDebugHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  debugClearButton: {
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    backgroundColor: "#edf1f5",
+    borderRadius: 6
+  },
+  debugClearButtonText: {
+    color: "#33424d",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  pushDebugList: {
+    maxHeight: 180
+  },
+  pushDebugItem: {
+    gap: 3,
+    paddingVertical: 7,
+    borderTopColor: "#edf1f5",
+    borderTopWidth: 1
+  },
+  pushDebugStep: {
+    color: "#17202a",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  pushDebugPayload: {
+    color: "#60707d",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    fontSize: 10,
+    lineHeight: 14
   },
   calendarHeader: {
     flexDirection: "row",
