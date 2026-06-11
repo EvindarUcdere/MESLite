@@ -1,5 +1,6 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { NativeModules, Platform } from "react-native";
 
 function getDevelopmentHost() {
@@ -14,6 +15,10 @@ function getDevelopmentHost() {
 export function getApiBaseUrl() {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  if (Constants.expoConfig?.extra?.apiUrl) {
+    return Constants.expoConfig.extra.apiUrl;
   }
 
   const host = getDevelopmentHost();
