@@ -1,4 +1,4 @@
-import { CalendarDays, Settings, Trash2 } from "lucide-react";
+﻿import { CalendarDays, Settings, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getMachines, getUsers } from "../api/masterData.api.js";
 import {
@@ -17,24 +17,24 @@ import {
 } from "../api/shiftPlanning.api.js";
 
 const STATUS_LABELS = {
-  EMPTY: "Bos",
-  PLANNED: "Planlandi",
-  CONFIRMED: "Onaylandi",
+  EMPTY: "Boş",
+  PLANNED: "Planlandı",
+  CONFIRMED: "Onaylandı",
   ABSENT: "Gelmedi",
-  LEAVE: "Izinli"
+  LEAVE: "İzinli"
 };
 
 const SKILL_LABELS = {
   BASIC: "Temel",
-  ADVANCED: "Ileri",
-  CERTIFIED: "Sertifikali"
+  ADVANCED: "İleri",
+  CERTIFIED: "Sertifikalı"
 };
 
 const TEMPLATE_PATTERN_LABELS = {
-  WEEKDAYS: "Hafta ici",
-  SIX_DAYS: "6 gun calisma",
-  EVERY_DAY: "Her gun",
-  FOUR_ON_TWO_OFF: "4 gun calis / 2 gun izin"
+  WEEKDAYS: "Hafta içi",
+  SIX_DAYS: "6 gün çalışma",
+  EVERY_DAY: "Her gün",
+  FOUR_ON_TWO_OFF: "4 gün çalış / 2 gün izin"
 };
 
 function getCurrentMonth() {
@@ -403,7 +403,7 @@ export default function ShiftPlanning() {
       setSelectedCells([]);
       setCellForm((current) => ({ ...current, status: "PLANNED" }));
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Secili vardiyalar bosaltilamadi."));
+      setError(getApiErrorMessage(submitError, "Seçili vardiyalar boşaltılamadı."));
     } finally {
       setIsSubmitting(false);
     }
@@ -485,7 +485,7 @@ export default function ShiftPlanning() {
       });
       await loadData();
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Makine yetkinligi kaydedilemedi."));
+      setError(getApiErrorMessage(submitError, "Makine yetkinliği kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -499,7 +499,7 @@ export default function ShiftPlanning() {
       await deleteOperatorMachineSkill(skillId);
       await loadData();
     } catch (deleteError) {
-      setError(getApiErrorMessage(deleteError, "Makine yetkinligi silinemedi."));
+      setError(getApiErrorMessage(deleteError, "Makine yetkinliği silinemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -514,7 +514,7 @@ export default function ShiftPlanning() {
       <div className="page-header shift-planning-header">
         <div>
           <h1>Vardiya Plani</h1>
-          <p>Calisanlari satir satir takip edin; her gunu sabah, aksam, gece veya izin olarak dogrudan duzenleyin.</p>
+          <p>Çalışanlari satir satir takip edin; her gunu sabah, aksam, gece veya izin olarak dogrudan duzenleyin.</p>
         </div>
         <div className="roster-toolbar">
           <label>
@@ -539,11 +539,11 @@ export default function ShiftPlanning() {
 
       <section className="summary-grid shift-planning-summary">
         <article>
-          <span>Gorunen Calisan</span>
+          <span>Görünen Çalışan</span>
           <strong>{filteredOperators.length}</strong>
         </article>
         <article>
-          <span>Planli Gun</span>
+          <span>Planlı Gun</span>
           <strong>{assignments.length}</strong>
         </article>
         <article>
@@ -582,19 +582,19 @@ export default function ShiftPlanning() {
           </label>
           <label>
             Not
-            <input value={bulkPlanForm.note} onChange={(event) => updateBulkPlanForm("note", event.target.value)} placeholder="Orn: Haziran ana plan" />
+            <input value={bulkPlanForm.note} onChange={(event) => updateBulkPlanForm("note", event.target.value)} placeholder="Örn: Haziran ana plan" />
           </label>
           <label className="inline-check">
             <input type="checkbox" checked={bulkPlanForm.overwrite} onChange={(event) => updateBulkPlanForm("overwrite", event.target.checked)} />
             Bu ay icin ekibin eski planini yenile
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting || !groups.length || !templates.length}>
-            Sablondan Uret
+            Şablondan Üret
           </button>
         </form>
         {bulkResult ? (
           <p className="success-note">
-            {bulkResult.createdAssignments} yeni vardiya olustu, {bulkResult.skippedAssignments} kayit zaten vardi.
+            {bulkResult.createdAssignments} yeni vardiya oluştu, {bulkResult.skippedAssignments} kayıt zaten vardı.
           </p>
         ) : null}
       </section>
@@ -605,7 +605,7 @@ export default function ShiftPlanning() {
             {getShiftCode(shift)} = {shift.name}
           </span>
         ))}
-        <span className="roster-legend-chip status-leave">I = Izin</span>
+        <span className="roster-legend-chip status-leave">İ = İzin</span>
         <span className="roster-legend-chip status-absent">Gd = Gelmedi</span>
       </div>
 
@@ -613,18 +613,18 @@ export default function ShiftPlanning() {
         <div className="panel roster-table-card">
           <div className="section-title-row">
             <div>
-              <h2>Aylik Vardiya Roster</h2>
-              <p className="muted-text">Hucreye tiklayarak bu ay uzerinde direkt degisiklik yapin.</p>
+              <h2>Aylık Vardiya Roster</h2>
+              <p className="muted-text">Hücreye tıklayarak bu ay üzerinde direkt değişiklik yapın.</p>
             </div>
             <button className="ghost-button compact-action" type="button" onClick={selectVisibleOperatorsMonth}>
-              Gorunenlerin Ayini Sec
+              Görünenlerin Ayını Seç
             </button>
           </div>
           <div className="roster-table-wrap">
             <table className="roster-table">
               <thead>
                 <tr>
-                  <th className="roster-employee-cell">Calisan</th>
+                  <th className="roster-employee-cell">Çalışan</th>
                   {monthDays.map((day) => (
                     <th className={isWeekend(day) ? "is-weekend" : ""} key={day}>
                       <button className="day-select-button" type="button" onClick={() => selectDayForVisibleOperators(day)}>
@@ -645,9 +645,9 @@ export default function ShiftPlanning() {
                       <td className="roster-employee-cell">
                         <strong>{operator.name}</strong>
                         <span>{operatorGroups.map((group) => group.name).join(", ") || "Ekip yok"}</span>
-                        <small>{operatorSkills.length} makine yetkinligi</small>
+                        <small>{operatorSkills.length} makine yetkinliği</small>
                         <button className="mini-link-button" type="button" onClick={() => selectOperatorMonth(operator)}>
-                          Ayi sec
+                          Ayı seç
                         </button>
                       </td>
                       {monthDays.map((day) => {
@@ -678,8 +678,8 @@ export default function ShiftPlanning() {
         <aside className="panel roster-editor">
           <div className="section-title-row">
             <div>
-              <h2>Hucre Duzenle</h2>
-              <p className="muted-text">Secili calisan ve gun icin vardiya/izin degisikligi.</p>
+              <h2>Hücre Düzenle</h2>
+              <p className="muted-text">Seçili çalışan ve gün için vardiya/izin değişikliği.</p>
             </div>
             <Settings size={20} />
           </div>
@@ -689,13 +689,13 @@ export default function ShiftPlanning() {
                 <strong>{selectedOperator.name}</strong>
                 <span>
                   {selectedCells.length > 1
-                    ? `${selectedCells.length} gun secildi`
+                    ? `${selectedCells.length} gün seçildi`
                     : formatLongDate(selectedCell.workDate)}
                 </span>
                 <small>
                   {selectedCells.length > 1
-                    ? "Secili gunlerin tamamına ayni vardiya uygulanacak"
-                    : selectedAssignment ? "Mevcut plan duzenleniyor" : "Yeni vardiya atanacak"}
+                    ? "Seçili günlerin tamamına aynı vardiya uygulanacak"
+                    : selectedAssignment ? "Mevcut plan düzenleniyor" : "Yeni vardiya atanacak"}
                 </small>
               </div>
               {selectedCells.length > 1 ? (
@@ -732,19 +732,19 @@ export default function ShiftPlanning() {
               </label>
               <label>
                 Not
-                <input value={cellForm.note} onChange={(event) => setCellForm((current) => ({ ...current, note: event.target.value }))} placeholder="Izin, degisim veya aciklama" />
+                <input value={cellForm.note} onChange={(event) => setCellForm((current) => ({ ...current, note: event.target.value }))} placeholder="İzin, değişim veya açıklama" />
               </label>
               <button className="primary-button" type="submit" disabled={isSubmitting}>
-                {selectedCells.length > 1 ? `${selectedCells.length} Gune Uygula` : "Degisikligi Kaydet"}
+                {selectedCells.length > 1 ? `${selectedCells.length} Güne Uygula` : "Değişikliği Kaydet"}
               </button>
               {selectedCells.length || selectedAssignment ? (
                 <button className="ghost-button" type="button" disabled={isSubmitting} onClick={handleClearSelectedCells}>
-                  {selectedCells.length > 1 ? "Secili gunleri bosalt" : "Bu gunu bosalt"}
+                  {selectedCells.length > 1 ? "Seçili günleri boşalt" : "Bu günü boşalt"}
                 </button>
               ) : null}
               {selectedCells.length ? (
                 <button className="ghost-button" type="button" disabled={isSubmitting} onClick={clearSelection}>
-                  Secimi Temizle
+                  Seçimi Temizle
                 </button>
               ) : null}
               {cellResult ? (
@@ -764,14 +764,14 @@ export default function ShiftPlanning() {
       </section>
 
       <details className="panel roster-admin-panel">
-        <summary>Plan Ayarlari: ekip, sablon ve makine yetkinligi</summary>
+        <summary>Plan Ayarlari: ekip, sablon ve makine yetkinliği</summary>
         <div className="shift-planning-forms">
           <form className="compact-form" onSubmit={handleGroupSubmit}>
             <h2>Operator Ekibi</h2>
             <div className="form-grid-two">
               <label>
                 Ekip Adi
-                <input value={groupForm.name} onChange={(event) => updateGroupForm("name", event.target.value)} placeholder="Orn: Kesim Ekibi" required />
+                <input value={groupForm.name} onChange={(event) => updateGroupForm("name", event.target.value)} placeholder="Örn: Kesim Ekibi" required />
               </label>
               <label>
                 Aciklama
@@ -796,7 +796,7 @@ export default function ShiftPlanning() {
             <div className="form-grid-two">
               <label>
                 Sablon Adi
-                <input value={templateForm.name} onChange={(event) => updateTemplateForm("name", event.target.value)} placeholder="Orn: 6 gun sabah" required />
+                <input value={templateForm.name} onChange={(event) => updateTemplateForm("name", event.target.value)} placeholder="Örn: 6 gün sabah" required />
               </label>
               <label>
                 Ekip
@@ -901,7 +901,7 @@ export default function ShiftPlanning() {
                     ))}
                   </div>
                 ) : (
-                  <p className="muted-text">Makine yetkinligi yok.</p>
+                  <p className="muted-text">Makine yetkinliği yok.</p>
                 )}
               </article>
             );
@@ -911,3 +911,6 @@ export default function ShiftPlanning() {
     </div>
   );
 }
+
+
+

@@ -1,6 +1,6 @@
-import { Play, Plus, Square, TimerReset } from "lucide-react";
+﻿import { Play, Plus, Square, TimerReset } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
@@ -85,9 +85,49 @@ function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
+function getOperatorAvailabilityLabel(operator) {
+  const notes = [];
+
+  if (!operator.hasShiftAssignment) {
+    notes.push("vardiya yok");
+  }
+
+  if (!operator.hasMachineSkill) {
+    notes.push("yetkinlik yok");
+  }
+
+  if (operator.activeOperationCount) {
+    notes.push(`${operator.activeOperationCount} aktif iş`);
+  }
+
+  return notes.length ? ` (${notes.join(", ")})` : "";
+}
+
+function getStartableOperation(workOrder) {
+  return (workOrder.operations ?? []).find((operation) => operation.status === "PAUSED") ?? (workOrder.operations ?? []).find((operation) => operation.status === "READY");
+}
+
 function getStartBlockReason(workOrder) {
   if (!["PLANNED", "PAUSED"].includes(workOrder.status)) {
     return "Sadece planlanan veya duraklatılan iş emirleri başlatılabilir.";
+  }
+
+  if (workOrder.operations?.length) {
+    const startableOperation = getStartableOperation(workOrder);
+
+    if (!startableOperation) {
+      return "Başlatılabilecek hazır veya duraklatılmış operasyon yok.";
+    }
+
+    if (!startableOperation.machineId) {
+      return "Başlatmak için sıradaki operasyona makine atanmalı.";
+    }
+
+    if (!startableOperation.assignedOperatorId) {
+      return "Başlatmak için sıradaki operasyona operatör atanmalı.";
+    }
+
+    return "";
   }
 
   if (!workOrder.machineId) {
@@ -181,6 +221,28 @@ function getOperationProgress(operations = []) {
     activeOperation,
     remaining,
     total: operations.length
+  };
+}
+
+function getWorkOrderDisplayQuantities(workOrder) {
+  const operations = [...(workOrder.operations ?? [])].sort((first, second) => first.sequenceNo - second.sequenceNo);
+  const latestProcessedOperation = [...operations]
+    .reverse()
+    .find((operation) => operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+  const source = latestProcessedOperation ?? null;
+  const producedQuantity = source ? source.producedQuantity : workOrder.producedQuantity;
+  const scrapQuantity = source ? source.scrapQuantity : workOrder.scrapQuantity;
+  const processedQuantity = producedQuantity + scrapQuantity;
+  const remainingQuantity = Math.max(workOrder.plannedQuantity - processedQuantity, 0);
+  const progressPercent = workOrder.plannedQuantity > 0 ? Math.min(Math.round((processedQuantity / workOrder.plannedQuantity) * 100), 100) : 0;
+
+  return {
+    producedQuantity,
+    scrapQuantity,
+    processedQuantity,
+    remainingQuantity,
+    progressPercent,
+    sourceOperation: source
   };
 }
 
@@ -285,8 +347,11 @@ export default function WorkOrders() {
   });
 
   const activeMachines = useMemo(() => machines.filter((machine) => machine.isActive), [machines]);
+  const selectedProduct = useMemo(() => products.find((product) => product.id === form.productId), [form.productId, products]);
   const availableRoutes = useMemo(() => routes.filter((route) => route.productId === form.productId && route.isActive), [form.productId, routes]);
   const selectedRoute = useMemo(() => routes.find((route) => route.id === form.routeId), [form.routeId, routes]);
+  const hasRouteSelected = Boolean(selectedRoute);
+  const hasMissingOperationAssignment = hasRouteSelected && operationAssignments.some((assignment) => !assignment.machineId || !assignment.assignedOperatorId);
   const productionCandidates = useMemo(
     () => workOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS" && workOrder.machineId && workOrder.assignedOperatorId),
     [workOrders]
@@ -427,7 +492,8 @@ export default function WorkOrders() {
     setForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === "productId" ? { routeId: "" } : {})
+      ...(field === "productId" ? { routeId: "", machineId: "", assignedOperatorId: "" } : {}),
+      ...(field === "routeId" ? { machineId: "", assignedOperatorId: "" } : {})
     }));
   }
 
@@ -449,8 +515,8 @@ export default function WorkOrders() {
         routeOperationId: operation.id,
         sequenceNo: operation.sequenceNo,
         operationName: operation.operationName,
-        machineId: operation.defaultMachineId || form.machineId || "",
-        assignedOperatorId: form.assignedOperatorId || ""
+        machineId: operation.defaultMachineId || "",
+        assignedOperatorId: ""
       }))
     );
   }, [selectedRoute?.id]);
@@ -502,14 +568,22 @@ export default function WorkOrders() {
     setIsSubmitting(true);
 
     try {
+      if (!form.routeId) {
+        setError("İş emri oluşturmak için ürüne bağlı bir rota seçin. Rota yoksa önce Rotalar ekranından tanımlayın.");
+        return;
+      }
+
+      if (hasMissingOperationAssignment) {
+        setError("İş emri oluşturmadan önce her operasyon için makine ve operatör seçin.");
+        return;
+      }
+
       const payload = {
         orderNo: form.orderNo,
         productId: form.productId,
         plannedQuantity: Number(form.plannedQuantity),
         plannedStartDate: form.workDate ? `${form.workDate}T00:00:00.000Z` : undefined,
         ...(form.routeId ? { routeId: form.routeId } : {}),
-        ...(form.machineId ? { machineId: form.machineId } : {}),
-        ...(form.assignedOperatorId ? { assignedOperatorId: form.assignedOperatorId } : {}),
         ...(operationAssignments.length
           ? {
               operationAssignments: operationAssignments.map((assignment) => ({
@@ -746,33 +820,11 @@ export default function WorkOrders() {
           </label>
           <label>
             Rota
-            <select value={form.routeId} onChange={(event) => updateForm("routeId", event.target.value)} disabled={!form.productId}>
-              <option value="">Rota olmadan oluştur</option>
+            <select value={form.routeId} onChange={(event) => updateForm("routeId", event.target.value)} disabled={!form.productId || !availableRoutes.length} required>
+              <option value="">{form.productId && !availableRoutes.length ? "Bu ürün için rota yok" : "Rota seçin"}</option>
               {availableRoutes.map((route) => (
                 <option key={route.id} value={route.id}>
                   {route.name} ({route.operations.length} adım)
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Makine
-            <select value={form.machineId} onChange={(event) => updateForm("machineId", event.target.value)}>
-              <option value="">Sonra ata</option>
-              {activeMachines.map((machine) => (
-                <option key={machine.id} value={machine.id}>
-                  {machine.code} - {machine.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Operatör
-            <select value={form.assignedOperatorId} onChange={(event) => updateForm("assignedOperatorId", event.target.value)}>
-              <option value="">Sonra ata</option>
-              {operators.map((operator) => (
-                <option key={operator.id} value={operator.id}>
-                  {operator.name}
                 </option>
               ))}
             </select>
@@ -788,7 +840,7 @@ export default function WorkOrders() {
           <label>
             Vardiya
             <select value={form.shiftId} onChange={(event) => updateForm("shiftId", event.target.value)}>
-              <option value="">TÃ¼m vardiyalar</option>
+              <option value="">Tüm vardiyalar</option>
               {shifts.map((shift) => (
                 <option key={shift.id} value={shift.id}>
                   {shift.name} ({shift.startTime}-{shift.endTime})
@@ -796,15 +848,36 @@ export default function WorkOrders() {
               ))}
             </select>
           </label>
+          {form.productId ? (
+            <div className={`route-readiness-card ${availableRoutes.length ? "is-ready" : "is-blocked"}`}>
+              <div>
+                <strong>{selectedProduct?.name ?? "Seçili ürün"}</strong>
+                <span>
+                  {availableRoutes.length
+                    ? `${availableRoutes.length} aktif rota bulundu. İş emri operasyon adımları üzerinden planlanacak.`
+                    : "Bu ürüne bağlı aktif rota yok. İş emri oluşturmadan önce rota tanımlayın."}
+                </span>
+              </div>
+              {!availableRoutes.length ? (
+                <Link className="text-link" to="/routes">
+                  Rota tanımla
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
           {selectedRoute ? (
             <div className="operation-assignment-panel">
               <div>
-                <strong>Operasyon AtamalarÄ±</strong>
-                <p className="muted-text">Liste; seÃ§ilen gÃ¼n, vardiya ve makine yetkinliÄŸine gÃ¶re uygun operatÃ¶rleri gÃ¶sterir.</p>
+                <strong>Operasyon Atamaları</strong>
+                <p className="muted-text">Her üretim adımı için makine ve operatör seçin. İş emri bu operasyon akışıyla sahaya iner.</p>
+              </div>
+              <div className={`assignment-summary ${hasMissingOperationAssignment ? "is-warning" : "is-ready"}`}>
+                {hasMissingOperationAssignment ? "Eksik atama var: tüm adımlar tamamlanmadan iş emri oluşturulamaz." : "Tüm operasyon atamaları hazır."}
               </div>
               {operationAssignments.map((assignment) => {
                 const availableOperators = availableOperatorsByOperation[assignment.routeOperationId] ?? [];
                 const selectableOperators = availableOperators.filter((operator) => operator.isAvailable);
+                const fallbackOperators = selectableOperators.length ? selectableOperators : availableOperators;
 
                 return (
                   <div className="operation-assignment-row" key={assignment.routeOperationId}>
@@ -816,7 +889,7 @@ export default function WorkOrders() {
                     <label>
                       Makine
                       <select value={assignment.machineId} onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "machineId", event.target.value)}>
-                        <option value="">Makine seÃ§in</option>
+                        <option value="">Makine seçin</option>
                         {activeMachines.map((machine) => (
                           <option key={machine.id} value={machine.id}>
                             {machine.code} - {machine.name}
@@ -825,30 +898,33 @@ export default function WorkOrders() {
                       </select>
                     </label>
                     <label>
-                      Uygun OperatÃ¶r
+                      Uygun Operatör
                       <select
                         value={assignment.assignedOperatorId}
                         onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "assignedOperatorId", event.target.value)}
                         disabled={!assignment.machineId}
                       >
                         <option value="">Sonra ata</option>
-                        {selectableOperators.map((operator) => (
+                        {fallbackOperators.map((operator) => (
                           <option key={operator.id} value={operator.id}>
                             {operator.name}
-                            {operator.activeOperationCount ? ` (${operator.activeOperationCount} aktif iÅŸ)` : ""}
+                            {getOperatorAvailabilityLabel(operator)}
                           </option>
                         ))}
                       </select>
                     </label>
-                    {assignment.machineId && !selectableOperators.length ? (
-                      <p className="form-error">Bu gÃ¼n/vardiya/makine iÃ§in uygun operatÃ¶r bulunamadÄ±. Vardiya PlanÄ± ekranÄ±ndan takvim veya yetkinlik ekleyin.</p>
+                    {assignment.machineId && availableOperators.length && !selectableOperators.length ? (
+                      <p className="form-warning">Tam uygun operatör yok. Listede vardiya/yetkinlik eksiği olan operatörler açıklamalı gösteriliyor; planı sonra Vardiya Planı ekranından düzeltebilirsiniz.</p>
+                    ) : null}
+                    {assignment.machineId && !availableOperators.length ? (
+                      <p className="form-error">Bu makine için aktif operatör bulunamadı. Kullanıcı ve vardiya planı ekranından operatör/yetkinlik ekleyin.</p>
                     ) : null}
                   </div>
                 );
               })}
             </div>
           ) : null}
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
+          <button className="primary-button" type="submit" disabled={isSubmitting || !form.routeId || hasMissingOperationAssignment}>
             <Plus size={18} />
             {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
           </button>
@@ -890,7 +966,7 @@ export default function WorkOrders() {
             </thead>
             <tbody>
               {filteredWorkOrders.map((workOrder) => {
-                const progress = workOrder.plannedQuantity > 0 ? Math.round((workOrder.producedQuantity / workOrder.plannedQuantity) * 100) : 0;
+                const displayQuantities = getWorkOrderDisplayQuantities(workOrder);
                 const startBlockReason = getStartBlockReason(workOrder);
                 const startDisabled = Boolean(startBlockReason);
                 const pauseDisabled = !canPause(workOrder);
@@ -916,7 +992,7 @@ export default function WorkOrders() {
                         <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</span>
                       </td>
                       <td>
-                        {workOrder.producedQuantity}/{workOrder.plannedQuantity} ({progress}%)
+                        {displayQuantities.producedQuantity}/{workOrder.plannedQuantity} ({displayQuantities.progressPercent}%)
                       </td>
                       <td>{workOrder.machine?.code ?? "-"}</td>
                       <td>{workOrder.assignedOperator?.name ?? "-"}</td>
@@ -1189,3 +1265,4 @@ export default function WorkOrders() {
     </div>
   );
 }
+

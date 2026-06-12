@@ -22,3 +22,9 @@ export async function markAllRead(req, res) {
 
   res.json({ data: { read: true }, meta: { unreadCount: 0 } });
 }
+
+export async function clearAll(req, res) {
+  const result = await notificationService.clearNotificationsForUser(req.user.id);
+
+  res.json({ data: { deletedCount: result.count }, meta: { unreadCount: 0 } });
+}

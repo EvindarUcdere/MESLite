@@ -1,4 +1,4 @@
-import { prisma } from "../../config/db.js";
+﻿import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
@@ -100,6 +100,14 @@ const workOrderInclude = {
     orderBy: { sequenceNo: "asc" }
   }
 };
+
+function isOperator(actor) {
+  return actor?.role === "OPERATOR";
+}
+
+function isBeforePlannedStart(workOrder, date = new Date()) {
+  return Boolean(workOrder.plannedStartDate && date < new Date(workOrder.plannedStartDate));
+}
 
 export function findWorkOrders() {
   return prisma.workOrder.findMany({
@@ -294,10 +302,10 @@ export async function createWorkOrder(userId, data) {
     await createNotification({
       recipientId,
       type: firstOperation ? "OPERATION_ASSIGNED" : "WORK_ORDER_ASSIGNED",
-      title: firstOperation ? "Yeni operasyon atandi" : "Yeni is emri atandi",
+      title: firstOperation ? "Yeni operasyon atandı" : "Yeni iş emri atandı",
       message: firstOperation
-        ? `${result.orderNo} is emrinde ${firstOperation.operationName} operasyonu size atandi.`
-        : `${result.orderNo} is emri size atandi.`,
+        ? `${result.orderNo} iş emrinde ${firstOperation.operationName} operasyonu size atandı.`
+        : `${result.orderNo} iş emri size atandı.`,
       entityType: firstOperation ? "WorkOrderOperation" : "WorkOrder",
       entityId: firstOperation?.id ?? result.id,
       metadata: {
@@ -342,23 +350,6 @@ export async function updateWorkOrderStatus(actor, id, status) {
   });
 
   emitEvent("workOrder:updated", workOrder);
-
-  if (operatorId !== actor?.id) {
-    await createNotification({
-      recipientId: operatorId,
-      type: "WORK_ORDER_ASSIGNED",
-      title: "Is emri size atandi",
-      message: `${workOrder.orderNo} is emri size atandi.`,
-      entityType: "WorkOrder",
-      entityId: workOrder.id,
-      metadata: {
-        workOrderId: workOrder.id,
-        orderNo: workOrder.orderNo,
-        assignedById: actor?.id,
-        assignedByName: actor?.name
-      }
-    });
-  }
 
   return workOrder;
 }
@@ -445,6 +436,10 @@ export async function startWorkOrder(id, actor) {
 
   if (["COMPLETED", "CANCELLED"].includes(current.status)) {
     throw new ApiError(400, "Completed or cancelled work orders cannot be started");
+  }
+
+  if (isOperator(actor) && isBeforePlannedStart(current)) {
+    throw new ApiError(400, "Plan tarihi gelmeden operatör iş emrini başlatamaz");
   }
 
   const hasOperationFlow = current.operations.length > 0;
@@ -750,3 +745,5 @@ export async function completeWorkOrder(actor, id) {
   emitEvent("machine:statusChanged", result.machine);
   return result.workOrder;
 }
+
+

@@ -1,12 +1,12 @@
-import * as ImagePicker from "expo-image-picker";
+﻿import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { createMobileDebugLog } from "./src/api/mobileDebugLogs.api";
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
+import { clearNotifications, getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
-import { getMyPushTokens, registerPushToken, sendPushTestNotification } from "./src/api/pushTokens.api";
+import { getMyPushTokens, registerPushToken } from "./src/api/pushTokens.api";
 import { getShiftAssignments } from "./src/api/shiftPlanning.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
@@ -119,9 +119,9 @@ const MESSAGE_SEVERITIES = [
 
 const SHIFT_STATUS_LABELS = {
   PLANNED: "Vardiya",
-  CONFIRMED: "Onayli",
+  CONFIRMED: "Onaylı",
   ABSENT: "Gelmedi",
-  LEAVE: "Izin"
+  LEAVE: "İzin"
 };
 
 const DOWNTIME_REASONS = [
@@ -164,7 +164,30 @@ function getConnectionMessage(error) {
 }
 
 function getRemainingQuantity(workOrder) {
-  return Math.max(workOrder.plannedQuantity - workOrder.producedQuantity, 0);
+  return getWorkOrderDisplayQuantities(workOrder).remainingQuantity;
+}
+
+function getWorkOrderDisplayQuantities(workOrder) {
+  const operations = [...(workOrder?.operations ?? [])].sort((first, second) => first.sequenceNo - second.sequenceNo);
+  const latestProcessedOperation = [...operations]
+    .reverse()
+    .find((operation) => operation.producedQuantity > 0 || operation.scrapQuantity > 0);
+  const source = latestProcessedOperation ?? null;
+  const plannedQuantity = workOrder?.plannedQuantity ?? 0;
+  const producedQuantity = source ? source.producedQuantity : workOrder?.producedQuantity ?? 0;
+  const scrapQuantity = source ? source.scrapQuantity : workOrder?.scrapQuantity ?? 0;
+  const processedQuantity = producedQuantity + scrapQuantity;
+  const remainingQuantity = Math.max(plannedQuantity - processedQuantity, 0);
+  const progressPercent = plannedQuantity > 0 ? Math.min(Math.round((processedQuantity / plannedQuantity) * 100), 100) : 0;
+
+  return {
+    producedQuantity,
+    scrapQuantity,
+    processedQuantity,
+    remainingQuantity,
+    progressPercent,
+    sourceOperation: source
+  };
 }
 
 function getOperationRemainingQuantity(operation, workOrder) {
@@ -193,11 +216,7 @@ function getOperationTransferQuantity(operation, workOrder) {
 }
 
 function getProgressPercent(workOrder) {
-  if (!workOrder.plannedQuantity) {
-    return 0;
-  }
-
-  return Math.min(Math.round((workOrder.producedQuantity / workOrder.plannedQuantity) * 100), 100);
+  return getWorkOrderDisplayQuantities(workOrder).progressPercent;
 }
 
 function getMachineName(workOrder) {
@@ -353,8 +372,12 @@ function getShiftShortCode(shift) {
   return shift?.name?.trim()?.slice(0, 1)?.toLocaleUpperCase("tr-TR") ?? "-";
 }
 
+function isBeforePlannedStart(workOrder) {
+  return Boolean(workOrder?.plannedStartDate && new Date() < new Date(workOrder.plannedStartDate));
+}
+
 function canStartOperation(operation, workOrder) {
-  return !isClosedWorkOrder(workOrder) && ["READY", "PAUSED"].includes(operation.status);
+  return !isClosedWorkOrder(workOrder) && !isBeforePlannedStart(workOrder) && ["READY", "PAUSED"].includes(operation.status);
 }
 
 function canPauseOperation(operation, workOrder) {
@@ -648,7 +671,6 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [pushStatus, setPushStatus] = useState("Bildirim durumu kontrol edilmedi.");
-  const [pushDebugLogs, setPushDebugLogs] = useState([]);
   const [shiftMonth, setShiftMonth] = useState(getCurrentMonth());
   const [shiftAssignments, setShiftAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -688,6 +710,7 @@ export default function App() {
     selectedWorkOrder && !isClosedWorkOrder(selectedWorkOrder)
       ? productionCandidates.filter((operation) => operation.workOrder.id === selectedWorkOrder.id)
       : productionCandidates;
+  const selectedDisplayQuantities = selectedWorkOrder ? getWorkOrderDisplayQuantities(selectedWorkOrder) : null;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
   const selectedProductionRemaining = selectedProductionOperation ? getOperationRemainingQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
   const selectedProductionTransferQuantity = selectedProductionOperation ? getOperationTransferQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
@@ -714,7 +737,6 @@ export default function App() {
 
   useEffect(() => {
     pushDebugLogListener = (entry) => {
-      setPushDebugLogs((current) => [entry, ...current].slice(0, 30));
       if (user?.id) {
         createMobileDebugLog({
           category: "push",
@@ -900,70 +922,6 @@ export default function App() {
     }
   }
 
-  async function handleEnablePushNotifications() {
-    setError("");
-    setSuccessMessage("");
-    const registered = await registerDevicePushToken();
-    await loadPushStatus();
-
-    if (registered) {
-      setSuccessMessage("Telefon bildirimi aktiflestirildi. Simdi Test Bildirimi ile kontrol edebilirsiniz.");
-    }
-  }
-
-  async function handleSendPushTest() {
-    setError("");
-    setSuccessMessage("");
-
-    try {
-      await registerDevicePushToken();
-      logPushDebug("push-test-request-start");
-      const result = await sendPushTestNotification();
-      logPushDebug("push-test-request-success", {
-        sent: result?.push?.sent,
-        disabled: result?.push?.disabled,
-        tickets: result?.push?.tickets
-      });
-      const sentCount = result?.push?.sent ?? 0;
-      const firstTicket = result?.push?.tickets?.[0];
-      const ticketStatus = firstTicket?.status ? ` Expo cevabi: ${firstTicket.status}${firstTicket.message ? ` - ${firstTicket.message}` : ""}` : "";
-      setSuccessMessage(
-        sentCount > 0
-          ? `Test bildirimi ${sentCount} cihaza gonderildi.${ticketStatus} Uygulamayi arka plana alip bildirim cubugunu kontrol edin.`
-          : "Test bildirimi olusturuldu ama aktif telefon push token bulunamadi. Bildirim iznini verip tekrar giris yapin."
-      );
-      await loadNotifications();
-      await loadPushStatus();
-    } catch (pushTestError) {
-      logPushDebug("push-test-request-error", {
-        message: pushTestError?.message,
-        responseStatus: pushTestError?.response?.status,
-        responseMessage: pushTestError?.response?.data?.message
-      });
-      setError("Test bildirimi gonderilemedi. Push token kaydi veya backend baglantisini kontrol edin.");
-    }
-  }
-
-  async function handleLocalBadgeTest() {
-    setError("");
-    setSuccessMessage("");
-
-    try {
-      const nextBadgeCount = Math.max(unreadNotificationCount, 1);
-      await updateAppBadgeCount(nextBadgeCount);
-      await showSystemNotification({
-        title: "MES Lite rozet testi",
-        body: `Bu yerel test bildirimi ikon rozetini ${nextBadgeCount} olarak guncellemeyi dener.`,
-        badge: nextBadgeCount
-      });
-      setSuccessMessage(
-        "Rozet testi olusturuldu. Uygulamayi arka plana alip telefon bildirim cubugunu ve uygulama ikonunu kontrol edin."
-      );
-    } catch (badgeError) {
-      setError(`Rozet testi basarisiz: ${badgeError?.message ?? "Bilinmeyen hata"}`);
-    }
-  }
-
   async function handleMarkNotificationRead(notificationId) {
     try {
       const response = await markNotificationRead(notificationId);
@@ -986,6 +944,19 @@ export default function App() {
       updateAppBadgeCount(response.meta.unreadCount);
     } catch (_error) {
       setError("Bildirimler okundu olarak işaretlenemedi.");
+    }
+  }
+
+  async function handleClearNotifications() {
+    try {
+      const response = await clearNotifications();
+      setNotifications([]);
+      setUnreadNotificationCount(response.meta.unreadCount);
+      setNotificationCounts({});
+      updateAppBadgeCount(response.meta.unreadCount);
+      setSuccessMessage("Bildirimler temizlendi.");
+    } catch (_error) {
+      setError("Bildirimler temizlenemedi.");
     }
   }
 
@@ -1526,46 +1497,14 @@ export default function App() {
             <Text style={styles.sectionTitle}>Bildirimler</Text>
             <Text style={styles.muted}>{unreadNotificationCount} okunmamış bildirim</Text>
           </View>
-          <Pressable style={styles.inlineButton} onPress={handleMarkAllNotificationsRead} disabled={!unreadNotificationCount || isSubmitting}>
-            <Text style={styles.inlineButtonText}>Tümünü Okundu Yap</Text>
-          </Pressable>
-        </View>
-        <View style={styles.pushStatusBox}>
-          <Text style={styles.detailLabel}>Telefon bildirimi</Text>
-          <Text style={styles.muted}>{pushStatus}</Text>
-          <View style={styles.pushActionRow}>
-            <Pressable style={styles.inlineButton} onPress={loadPushStatus} disabled={isSubmitting}>
-              <Text style={styles.inlineButtonText}>Durumu Yenile</Text>
+          <View style={styles.notificationHeaderActions}>
+            <Pressable style={styles.inlineButton} onPress={handleMarkAllNotificationsRead} disabled={!unreadNotificationCount || isSubmitting}>
+              <Text style={styles.inlineButtonText}>Tümünü Okundu Yap</Text>
             </Pressable>
-            <Pressable style={styles.inlineButton} onPress={handleEnablePushNotifications} disabled={isSubmitting || Platform.OS === "web"}>
-              <Text style={styles.inlineButtonText}>Bildirimleri Aktifleştir</Text>
-            </Pressable>
-            <Pressable style={styles.inlineButton} onPress={handleSendPushTest} disabled={isSubmitting || Platform.OS === "web"}>
-              <Text style={styles.inlineButtonText}>Test Bildirimi</Text>
-            </Pressable>
-            <Pressable style={styles.inlineButton} onPress={handleLocalBadgeTest} disabled={isSubmitting || Platform.OS === "web"}>
-              <Text style={styles.inlineButtonText}>Rozet Testi</Text>
+            <Pressable style={styles.inlineButton} onPress={handleClearNotifications} disabled={!notifications.length || isSubmitting}>
+              <Text style={styles.inlineButtonText}>Temizle</Text>
             </Pressable>
           </View>
-          {false ? <View style={styles.pushDebugPanel}>
-            <View style={styles.pushDebugHeader}>
-              <Text style={styles.detailLabel}>Push tanı logları</Text>
-              <Pressable style={styles.debugClearButton} onPress={() => setPushDebugLogs([])} disabled={!pushDebugLogs.length}>
-                <Text style={styles.debugClearButtonText}>Temizle</Text>
-              </Pressable>
-            </View>
-            <ScrollView style={styles.pushDebugList} nestedScrollEnabled>
-              {pushDebugLogs.map((entry) => (
-                <View key={entry.id} style={styles.pushDebugItem}>
-                  <Text style={styles.pushDebugStep}>
-                    {entry.time} - {entry.step}
-                  </Text>
-                  <Text style={styles.pushDebugPayload}>{JSON.stringify(entry.payload)}</Text>
-                </View>
-              ))}
-              {!pushDebugLogs.length ? <Text style={styles.muted}>Henüz push tanı logu yok.</Text> : null}
-            </ScrollView>
-          </View> : null}
         </View>
         <ScrollView style={styles.notificationListScroll} nestedScrollEnabled>
           {notifications.map((notification) => (
@@ -1693,7 +1632,7 @@ export default function App() {
               </View>
               <View style={styles.orderCardFooter}>
                 <Text style={styles.detailValue}>
-                  Üretim: {workOrder.producedQuantity}/{workOrder.plannedQuantity}
+                  Üretim: {getWorkOrderDisplayQuantities(workOrder).producedQuantity}/{workOrder.plannedQuantity}
                 </Text>
                 <Text style={styles.muted}>{getWorkOrderFlowText(workOrder)}</Text>
               </View>
@@ -1740,11 +1679,11 @@ export default function App() {
               <Text style={styles.detailLabel}>Plan</Text>
             </View>
             <View style={styles.kpiBox}>
-              <Text style={styles.kpiValue}>{selectedWorkOrder.producedQuantity}</Text>
+              <Text style={styles.kpiValue}>{selectedDisplayQuantities?.producedQuantity ?? selectedWorkOrder.producedQuantity}</Text>
               <Text style={styles.detailLabel}>Üretim</Text>
             </View>
             <View style={styles.kpiBox}>
-              <Text style={styles.kpiValue}>{selectedWorkOrder.scrapQuantity}</Text>
+              <Text style={styles.kpiValue}>{selectedDisplayQuantities?.scrapQuantity ?? selectedWorkOrder.scrapQuantity}</Text>
               <Text style={styles.detailLabel}>Fire</Text>
             </View>
           </View>
@@ -1824,6 +1763,9 @@ export default function App() {
                     {isMine ? <Text style={styles.myOperationText}>Bu adım size atanmış.</Text> : null}
                     {isMine && isClosedWorkOrder(selectedWorkOrder) ? (
                       <Text style={styles.muted}>Bu iş emri kapalı. Operasyon aksiyonu yapılamaz.</Text>
+                    ) : null}
+                    {isMine && !isClosedWorkOrder(selectedWorkOrder) && isBeforePlannedStart(selectedWorkOrder) ? (
+                      <Text style={styles.error}>Plan tarihi gelmeden operatör operasyonu başlatamaz.</Text>
                     ) : null}
                     {isShortCompletedOperation(operation, selectedWorkOrder) ? (
                       <Text style={styles.error}>Bu operasyon planlanan adetten düşük kapatılmış. Üretim yöneticisi kontrolü gerekir.</Text>
@@ -1976,11 +1918,11 @@ export default function App() {
           <View style={styles.shiftSummaryRow}>
             <View style={styles.shiftSummaryBox}>
               <Text style={styles.summaryValue}>{plannedShiftCount}</Text>
-              <Text style={styles.detailLabel}>Planli</Text>
+              <Text style={styles.detailLabel}>Planlı</Text>
             </View>
             <View style={styles.shiftSummaryBox}>
               <Text style={styles.summaryValue}>{leaveShiftCount}</Text>
-              <Text style={styles.detailLabel}>Izin</Text>
+              <Text style={styles.detailLabel}>İzin</Text>
             </View>
             <View style={styles.shiftSummaryBox}>
               <Text style={styles.summaryValue}>{absentShiftCount}</Text>
@@ -1989,7 +1931,7 @@ export default function App() {
           </View>
 
           <View style={styles.shiftCalendarGrid}>
-            {["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"].map((dayName) => (
+            {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((dayName) => (
               <Text key={dayName} style={styles.shiftWeekday}>
                 {dayName}
               </Text>
@@ -2559,68 +2501,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10
   },
-  notificationListScroll: {
-    maxHeight: 280
-  },
-  pushStatusBox: {
-    gap: 6,
-    padding: 10,
-    backgroundColor: "#f8fafc",
-    borderColor: "#dbe3ea",
-    borderRadius: 8,
-    borderWidth: 1
-  },
-  pushActionRow: {
+  notificationHeaderActions: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "flex-end",
     gap: 8
   },
-  pushDebugPanel: {
-    gap: 8,
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: "#ffffff",
-    borderColor: "#dbe3ea",
-    borderRadius: 8,
-    borderWidth: 1
-  },
-  pushDebugHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10
-  },
-  debugClearButton: {
-    minHeight: 30,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    backgroundColor: "#edf1f5",
-    borderRadius: 6
-  },
-  debugClearButtonText: {
-    color: "#33424d",
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  pushDebugList: {
-    maxHeight: 180
-  },
-  pushDebugItem: {
-    gap: 3,
-    paddingVertical: 7,
-    borderTopColor: "#edf1f5",
-    borderTopWidth: 1
-  },
-  pushDebugStep: {
-    color: "#17202a",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  pushDebugPayload: {
-    color: "#60707d",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-    fontSize: 10,
-    lineHeight: 14
+  notificationListScroll: {
+    maxHeight: 280
   },
   calendarHeader: {
     flexDirection: "row",
@@ -2959,3 +2847,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1
   }
 });
+
+
+

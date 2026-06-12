@@ -17,14 +17,18 @@ export function getApiBaseUrl() {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  if (Constants.expoConfig?.extra?.apiUrl) {
-    return Constants.expoConfig.extra.apiUrl;
-  }
-
   const host = getDevelopmentHost();
 
-  if (host && host !== "localhost" && host !== "127.0.0.1") {
+  if (Platform.OS === "web" && host) {
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:4000/api";
+    }
+
     return `http://${host}:4000/api`;
+  }
+
+  if (Constants.expoConfig?.extra?.apiUrl) {
+    return Constants.expoConfig.extra.apiUrl;
   }
 
   return "http://localhost:4000/api";

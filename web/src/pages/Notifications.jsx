@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getNotifications, markAllNotificationsRead, markNotificationRead } from "../api/notifications.api.js";
+import { clearNotifications, getNotifications, markAllNotificationsRead, markNotificationRead } from "../api/notifications.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 
@@ -119,6 +119,13 @@ export default function Notifications() {
     window.dispatchEvent(new CustomEvent("mes-lite:notifications-unread-changed", { detail: { unreadCount: response.meta.unreadCount } }));
   }
 
+  async function handleClearNotifications() {
+    const response = await clearNotifications();
+    setNotifications([]);
+    setUnreadCount(response.meta.unreadCount);
+    window.dispatchEvent(new CustomEvent("mes-lite:notifications-unread-changed", { detail: { unreadCount: response.meta.unreadCount } }));
+  }
+
   async function handleOpenNotification(notification) {
     if (!notification.readAt) {
       await handleMarkRead(notification.id);
@@ -137,9 +144,14 @@ export default function Notifications() {
           <h1>Bildirim Merkezi</h1>
           <p>Size atanan operasyonları, saha mesajlarını ve kritik üretim uyarılarını takip edin.</p>
         </div>
-        <button className="primary-button" type="button" onClick={handleMarkAllRead} disabled={!unreadCount}>
-          Tümünü Okundu Yap
-        </button>
+        <div className="action-row">
+          <button className="primary-button" type="button" onClick={handleMarkAllRead} disabled={!unreadCount}>
+            Tümünü Okundu Yap
+          </button>
+          <button className="ghost-button" type="button" onClick={handleClearNotifications} disabled={!notifications.length}>
+            Bildirimleri Temizle
+          </button>
+        </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
@@ -213,3 +225,4 @@ export default function Notifications() {
     </div>
   );
 }
+

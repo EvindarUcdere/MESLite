@@ -7,5 +7,6 @@ export const notificationRoutes = Router();
 
 notificationRoutes.use(requireAuth);
 notificationRoutes.get("/", asyncHandler(notificationController.list));
+notificationRoutes.delete("/", asyncHandler(notificationController.clearAll));
 notificationRoutes.patch("/read-all", asyncHandler(notificationController.markAllRead));
 notificationRoutes.patch("/:id/read", asyncHandler(notificationController.markRead));

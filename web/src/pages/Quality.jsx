@@ -1,4 +1,4 @@
-import { AlertTriangle, ClipboardCheck, Plus } from "lucide-react";
+﻿import { AlertTriangle, ClipboardCheck, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
@@ -20,15 +20,15 @@ const SCRAP_REASON_LABELS = {
 };
 
 const IMPACT_LABELS = {
-  HIGH: "Yuksek risk",
-  MEDIUM: "Izlenmeli",
+  HIGH: "Yüksek risk",
+  MEDIUM: "İzlenmeli",
   LOW: "Normal",
   NEUTRAL: "Kontrol sonrasi"
 };
 
 const RELATION_LABELS = {
   BEFORE_CHECK: "Kalite oncesi",
-  CHECKED_OPERATION: "Kontrol noktasi",
+  CHECKED_OPERATION: "Kontrol noktası",
   AFTER_CHECK: "Kalite sonrasi",
   UNKNOWN: "Bilinmiyor"
 };
@@ -97,8 +97,8 @@ function getSelectedWorkOrderTrace(workOrder) {
       machine: operation.machine,
       assignedOperator: operation.assignedOperator,
       signals: [
-        ...(operation.scrapQuantity > 0 ? [{ label: "Fire kaydi", detail: `${operation.scrapQuantity} fire` }] : []),
-        ...((operation.downtimes ?? []).length > 0 ? [{ label: "Durus kaydi", detail: `${operation.downtimes.length} durus` }] : []),
+        ...(operation.scrapQuantity > 0 ? [{ label: "Fire kaydı", detail: `${operation.scrapQuantity} fire` }] : []),
+        ...((operation.downtimes ?? []).length > 0 ? [{ label: "Duruş kaydı", detail: `${operation.downtimes.length} durus` }] : []),
         ...((operation.messages ?? [])
           .filter((message) => ["QUALITY_ALERT", "STOPPAGE", "WARNING"].includes(message.severity))
           .slice(0, 1)
@@ -158,7 +158,7 @@ function TraceabilityPanel({ traceability, compact = false }) {
           <strong>{traceability.totals.suspectOperationCount}</strong>
         </div>
         <div>
-          <span>Toplam Durus</span>
+          <span>Toplam Duruş</span>
           <strong>{traceability.totals.totalDowntimeMinutes} dk</strong>
         </div>
         <div>
@@ -181,7 +181,7 @@ function TraceabilityPanel({ traceability, compact = false }) {
                 </strong>
                 <span>{IMPACT_LABELS[operation.impactLevel] ?? operation.impactLevel}</span>
                 <small>
-                  {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operator yok"}
+                  {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operatör yok"}
                 </small>
                 {operation.signals.slice(0, 3).map((signal, index) => (
                   <em key={`${operation.id}-${signal.type ?? signal.label}-${index}`}>
@@ -193,7 +193,7 @@ function TraceabilityPanel({ traceability, compact = false }) {
           </div>
         </div>
       ) : (
-        <p className="muted-text">Bu kalite kaydi icin belirgin risk sinyali yok.</p>
+        <p className="muted-text">Bu kalite kaydı için belirgin risk sinyali yok.</p>
       )}
 
       {!compact ? (
@@ -207,10 +207,10 @@ function TraceabilityPanel({ traceability, compact = false }) {
                 <span>{RELATION_LABELS[operation.relationToQuality] ?? operation.relationToQuality}</span>
               </div>
               <p>
-                {operation.status} / Uretim {operation.producedQuantity} / Fire {operation.scrapQuantity}
+                {operation.status} / Üretim {operation.producedQuantity} / Fire {operation.scrapQuantity}
               </p>
               <p>
-                {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operator yok"}
+                {operation.machine?.code ?? "Makine yok"} / {operation.assignedOperator?.name ?? "Operatör yok"}
               </p>
               <p>
                 Hedef {operation.metrics.plannedMinutes} dk - Net {operation.metrics.netMinutes} dk - Gecikme {operation.metrics.delayMinutes} dk
@@ -402,7 +402,7 @@ export default function Quality() {
                 </strong>
               </div>
               <div>
-                <span>Uretim / Fire</span>
+                <span>Üretim / Fire</span>
                 <strong>
                   {item.operation.producedQuantity} / {item.operation.scrapQuantity}
                 </strong>
@@ -630,3 +630,7 @@ export default function Quality() {
     </div>
   );
 }
+
+
+
+

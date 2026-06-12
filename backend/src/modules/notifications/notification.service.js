@@ -129,3 +129,11 @@ export function markAllNotificationsRead(userId) {
     }
   });
 }
+
+export function clearNotificationsForUser(userId) {
+  return prisma.notification.deleteMany({
+    where: {
+      recipientId: userId
+    }
+  });
+}

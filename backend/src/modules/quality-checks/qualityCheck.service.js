@@ -1,4 +1,4 @@
-import { prisma } from "../../config/db.js";
+﻿import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
@@ -97,7 +97,7 @@ function getOperationSignals(operation, metrics, relationToQuality) {
   const signals = [];
 
   if (operation.scrapQuantity > 0) {
-    signals.push({ type: "SCRAP", label: "Fire kaydi", severity: "WARNING", detail: `${operation.scrapQuantity} fire` });
+    signals.push({ type: "SCRAP", label: "Fire kaydı", severity: "WARNING", detail: `${operation.scrapQuantity} fire` });
   }
 
   if (metrics.delayMinutes > 0) {
@@ -108,7 +108,7 @@ function getOperationSignals(operation, metrics, relationToQuality) {
     const activeDowntime = operation.downtimes.some((downtime) => !downtime.endedAt);
     signals.push({
       type: "DOWNTIME",
-      label: activeDowntime ? "Acik durus" : "Durus kaydi",
+      label: activeDowntime ? "Açık duruş" : "Duruş kaydı",
       severity: activeDowntime ? "CRITICAL" : "WARNING",
       detail: `${metrics.downtimeMinutes} dk durus`
     });
@@ -120,7 +120,7 @@ function getOperationSignals(operation, metrics, relationToQuality) {
   }
 
   if (relationToQuality === "CHECKED_OPERATION") {
-    signals.push({ type: "CHECKPOINT", label: "Kalite kontrol noktasi", severity: "INFO", detail: "Kalite kaydi bu operasyon uzerinden girildi" });
+    signals.push({ type: "CHECKPOINT", label: "Kalite kontrol noktası", severity: "INFO", detail: "Kalite kaydı bu operasyon üzerinden girildi" });
   }
 
   return signals;
@@ -463,3 +463,5 @@ export async function updateQualityCheck(actor, id, data) {
 
   return withTraceability(qualityCheck);
 }
+
+

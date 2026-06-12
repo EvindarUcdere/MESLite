@@ -93,6 +93,10 @@ function assertOperatorCanUseOperation(actor, operation) {
   }
 }
 
+function isBeforePlannedStart(workOrder, date = new Date()) {
+  return Boolean(workOrder.plannedStartDate && date < new Date(workOrder.plannedStartDate));
+}
+
 function canReopenShortCompletedOperation(actor, operation) {
   return (
     ["ADMIN", "PRODUCTION_MANAGER"].includes(actor.role) &&
@@ -218,6 +222,10 @@ export async function startOperation(actor, id) {
 
   if (["COMPLETED", "CANCELLED"].includes(current.workOrder.status)) {
     throw new ApiError(400, "Operations of completed or cancelled work orders cannot be started");
+  }
+
+  if (actor.role === "OPERATOR" && isBeforePlannedStart(current.workOrder)) {
+    throw new ApiError(400, "Plan tarihi gelmeden operatör operasyonu başlatamaz");
   }
 
   if (!["READY", "PAUSED"].includes(current.status) && !isReopeningShortCompletedOperation) {

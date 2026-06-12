@@ -34,12 +34,17 @@ function calculateProgress(workOrder) {
 
 export async function getSummary() {
   const { start, end } = getTodayRange();
+  const now = new Date();
 
   const [
     activeWorkOrders,
     completedWorkOrders,
+    pausedWorkOrders,
+    overdueWorkOrders,
     runningMachines,
     stoppedMachines,
+    openAlerts,
+    criticalAlerts,
     productionTotals,
     todayProductionTotals,
     machineStatusGroups,
@@ -48,8 +53,17 @@ export async function getSummary() {
   ] = await Promise.all([
     prisma.workOrder.count({ where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } } }),
     prisma.workOrder.count({ where: { status: "COMPLETED" } }),
+    prisma.workOrder.count({ where: { status: "PAUSED" } }),
+    prisma.workOrder.count({
+      where: {
+        status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] },
+        plannedEndDate: { lt: now }
+      }
+    }),
     prisma.machine.count({ where: { status: "RUNNING" } }),
     prisma.machine.count({ where: { status: { in: ["STOPPED", "MAINTENANCE"] } } }),
+    prisma.productionAlert.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } }),
+    prisma.productionAlert.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] }, severity: "CRITICAL" } }),
     prisma.workOrder.aggregate({
       _sum: {
         producedQuantity: true,
@@ -92,8 +106,12 @@ export async function getSummary() {
   return {
     activeWorkOrders,
     completedWorkOrders,
+    pausedWorkOrders,
+    overdueWorkOrders,
     runningMachines,
     stoppedMachines,
+    openAlerts,
+    criticalAlerts,
     producedQuantity,
     scrapQuantity,
     scrapRate,
@@ -109,7 +127,7 @@ export async function getSummary() {
 export async function getLiveOverview() {
   const { start: operatorNotesStart } = getLast24HoursRange();
 
-  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks] = await Promise.all([
+  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks, pendingQualityOperations] = await Promise.all([
     prisma.workOrder.findMany({
       where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
       include: {
@@ -240,6 +258,32 @@ export async function getLiveOverview() {
       },
       orderBy: { checkedAt: "desc" },
       take: 10
+    }),
+    prisma.workOrderOperation.findMany({
+      where: {
+        status: "COMPLETED",
+        producedQuantity: { gt: 0 },
+        qualityChecks: { none: {} },
+        OR: [
+          { operationName: { contains: "kalite", mode: "insensitive" } },
+          { operationName: { contains: "quality", mode: "insensitive" } },
+          { operationName: { contains: "kontrol", mode: "insensitive" } }
+        ]
+      },
+      include: {
+        workOrder: { include: { product: true } },
+        machine: true,
+        assignedOperator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+      },
+      orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
+      take: 10
     })
   ]);
 
@@ -252,6 +296,7 @@ export async function getLiveOverview() {
     recentProductionLogs,
     operatorNotes: operatorNotes.filter((log) => log.note?.trim()),
     openAlerts,
-    recentQualityChecks
+    recentQualityChecks,
+    pendingQualityOperations
   };
 }

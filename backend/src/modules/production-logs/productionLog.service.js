@@ -14,6 +14,73 @@ const includeRelations = {
   attachments: true
 };
 
+const workOrderEmitInclude = {
+  product: true,
+  route: {
+    include: {
+      operations: {
+        include: {
+          defaultMachine: true
+        },
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
+  },
+  machine: true,
+  assignedOperator: {
+    select: { id: true, name: true, email: true, role: true }
+  },
+  createdBy: {
+    select: { id: true, name: true, email: true, role: true }
+  },
+  productionLogs: {
+    include: {
+      operator: {
+        select: { id: true, name: true, email: true, role: true }
+      },
+      machine: true,
+      workOrderOperation: true,
+      attachments: true
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5
+  },
+  operations: {
+    include: {
+      routeOperation: true,
+      machine: true,
+      assignedOperator: {
+        select: { id: true, name: true, email: true, role: true }
+      },
+      messages: {
+        include: {
+          sender: {
+            select: { id: true, name: true, email: true, role: true }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5
+      },
+      downtimes: {
+        include: {
+          shift: true,
+          operator: {
+            select: { id: true, name: true, email: true, role: true }
+          }
+        },
+        orderBy: { startedAt: "desc" },
+        take: 5
+      },
+      _count: {
+        select: {
+          productionLogs: true
+        }
+      }
+    },
+    orderBy: { sequenceNo: "asc" }
+  }
+};
+
 function timeToMinutes(time) {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
@@ -294,7 +361,12 @@ export async function createProductionLog(actor, data) {
       tx
     );
 
-    return { log, workOrder: updatedWorkOrder, operation: updatedOperation, alert };
+    const fullWorkOrder = await tx.workOrder.findUnique({
+      where: { id: updatedWorkOrder.id },
+      include: workOrderEmitInclude
+    });
+
+    return { log, workOrder: fullWorkOrder ?? updatedWorkOrder, operation: updatedOperation, alert };
   });
 
   emitEvent("production:logged", result.log);
