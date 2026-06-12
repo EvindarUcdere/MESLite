@@ -320,6 +320,39 @@ function formatShiftDay(value) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
+function getMonthCalendarDays(month, assignments = []) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  const firstDay = new Date(year, monthIndex - 1, 1);
+  const dayCount = new Date(year, monthIndex, 0).getDate();
+  const firstWeekday = (firstDay.getDay() + 6) % 7;
+  const assignmentsByDate = Object.fromEntries(assignments.map((assignment) => [assignment.workDate?.slice(0, 10), assignment]));
+  const cells = [];
+
+  for (let index = 0; index < firstWeekday; index += 1) {
+    cells.push({ key: `empty-start-${index}`, isEmpty: true });
+  }
+
+  for (let day = 1; day <= dayCount; day += 1) {
+    const date = `${month}-${String(day).padStart(2, "0")}`;
+    cells.push({
+      key: date,
+      date,
+      day,
+      assignment: assignmentsByDate[date]
+    });
+  }
+
+  while (cells.length % 7 !== 0) {
+    cells.push({ key: `empty-end-${cells.length}`, isEmpty: true });
+  }
+
+  return cells;
+}
+
+function getShiftShortCode(shift) {
+  return shift?.name?.trim()?.slice(0, 1)?.toLocaleUpperCase("tr-TR") ?? "-";
+}
+
 function canStartOperation(operation, workOrder) {
   return !isClosedWorkOrder(workOrder) && ["READY", "PAUSED"].includes(operation.status);
 }
@@ -673,6 +706,7 @@ export default function App() {
   const plannedShiftCount = shiftAssignments.filter((assignment) => ["PLANNED", "CONFIRMED"].includes(assignment.status)).length;
   const leaveShiftCount = shiftAssignments.filter((assignment) => assignment.status === "LEAVE").length;
   const absentShiftCount = shiftAssignments.filter((assignment) => assignment.status === "ABSENT").length;
+  const shiftCalendarDays = useMemo(() => getMonthCalendarDays(shiftMonth, shiftAssignments), [shiftMonth, shiftAssignments]);
 
   useEffect(() => {
     selectedWorkOrderIdRef.current = selectedWorkOrderId;
@@ -1513,7 +1547,7 @@ export default function App() {
               <Text style={styles.inlineButtonText}>Rozet Testi</Text>
             </Pressable>
           </View>
-          <View style={styles.pushDebugPanel}>
+          {false ? <View style={styles.pushDebugPanel}>
             <View style={styles.pushDebugHeader}>
               <Text style={styles.detailLabel}>Push tanı logları</Text>
               <Pressable style={styles.debugClearButton} onPress={() => setPushDebugLogs([])} disabled={!pushDebugLogs.length}>
@@ -1531,7 +1565,7 @@ export default function App() {
               ))}
               {!pushDebugLogs.length ? <Text style={styles.muted}>Henüz push tanı logu yok.</Text> : null}
             </ScrollView>
-          </View>
+          </View> : null}
         </View>
         <ScrollView style={styles.notificationListScroll} nestedScrollEnabled>
           {notifications.map((notification) => (
@@ -1954,28 +1988,57 @@ export default function App() {
             </View>
           </View>
 
-          <View style={styles.shiftCalendarList}>
-            {shiftAssignments.map((assignment) => {
-              const workDate = assignment.workDate?.slice(0, 10);
-              const shiftText = assignment.shift
-                ? `${assignment.shift.name} (${assignment.shift.startTime}-${assignment.shift.endTime})`
-                : "Vardiya atanmamis";
+          <View style={styles.shiftCalendarGrid}>
+            {["Pzt", "Sal", "Car", "Per", "Cum", "Cmt", "Paz"].map((dayName) => (
+              <Text key={dayName} style={styles.shiftWeekday}>
+                {dayName}
+              </Text>
+            ))}
+            {shiftCalendarDays.map((day) => {
+              const assignment = day.assignment;
+              const isLeave = assignment?.status === "LEAVE";
+              const isAbsent = assignment?.status === "ABSENT";
+              const shiftCode = assignment?.shift ? getShiftShortCode(assignment.shift) : "+";
+              const shiftTime = assignment?.shift ? `${assignment.shift.startTime}-${assignment.shift.endTime}` : "";
 
               return (
                 <View
-                  key={assignment.id}
+                  key={day.key}
                   style={[
-                    styles.shiftCalendarCard,
-                    assignment.status === "LEAVE" ? styles.shiftCalendarLeave : null,
-                    assignment.status === "ABSENT" ? styles.shiftCalendarAbsent : null
+                    styles.shiftDayCell,
+                    day.isEmpty ? styles.shiftDayCellEmpty : null,
+                    assignment ? styles.shiftDayCellAssigned : null,
+                    isLeave ? styles.shiftCalendarLeave : null,
+                    isAbsent ? styles.shiftCalendarAbsent : null
                   ]}
                 >
-                  <View style={styles.shiftCalendarText}>
-                    <Text style={styles.detailValue}>{workDate ? formatShiftDay(workDate) : "-"}</Text>
-                    <Text style={styles.muted}>{shiftText}</Text>
-                    {assignment.note ? <Text style={styles.detailLabel}>{assignment.note}</Text> : null}
-                  </View>
-                  <Text style={styles.statusBadge}>{SHIFT_STATUS_LABELS[assignment.status] ?? assignment.status}</Text>
+                  {!day.isEmpty ? (
+                    <>
+                      <View style={styles.shiftDayHeader}>
+                        <Text style={styles.shiftDayNumber}>{day.day}</Text>
+                        <Text style={[styles.shiftDayCode, assignment ? null : styles.shiftDayCodeEmpty]}>{shiftCode}</Text>
+                      </View>
+                      {assignment ? (
+                        <>
+                          <Text style={styles.shiftDayStatus} numberOfLines={1}>
+                            {SHIFT_STATUS_LABELS[assignment.status] ?? assignment.status}
+                          </Text>
+                          <Text style={styles.shiftDayTime} numberOfLines={1}>
+                            {shiftTime}
+                          </Text>
+                          {assignment.note ? (
+                            <Text style={styles.shiftDayNote} numberOfLines={2}>
+                              {assignment.note}
+                            </Text>
+                          ) : null}
+                        </>
+                      ) : (
+                        <Text style={styles.shiftDayTime} numberOfLines={1}>
+                          Plan yok
+                        </Text>
+                      )}
+                    </>
+                  ) : null}
                 </View>
               );
             })}
@@ -2611,6 +2674,80 @@ const styles = StyleSheet.create({
   shiftCalendarText: {
     flex: 1,
     gap: 3
+  },
+  shiftCalendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  shiftWeekday: {
+    width: "13.45%",
+    minHeight: 24,
+    color: "#60707d",
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  shiftDayCell: {
+    width: "13.45%",
+    minHeight: 86,
+    gap: 4,
+    padding: 6,
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  shiftDayCellEmpty: {
+    backgroundColor: "transparent",
+    borderColor: "transparent"
+  },
+  shiftDayCellAssigned: {
+    backgroundColor: "#f0fdfa",
+    borderColor: "#9bd8c8"
+  },
+  shiftDayHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 4
+  },
+  shiftDayNumber: {
+    color: "#17202a",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  shiftDayCode: {
+    minWidth: 22,
+    height: 22,
+    color: "#ffffff",
+    backgroundColor: "#256f6c",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 22,
+    overflow: "hidden",
+    textAlign: "center"
+  },
+  shiftDayCodeEmpty: {
+    color: "#8a9aa8",
+    backgroundColor: "#edf1f5"
+  },
+  shiftDayStatus: {
+    color: "#256f6c",
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  shiftDayTime: {
+    color: "#60707d",
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "700"
+  },
+  shiftDayNote: {
+    color: "#33424d",
+    fontSize: 9,
+    lineHeight: 12
   },
   mobileNotificationCard: {
     flexDirection: "row",
