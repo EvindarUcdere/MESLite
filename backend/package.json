@@ -15,6 +15,7 @@
     "seed:demo": "node prisma/demo-scenario.js",
     "cleanup:test-data": "node prisma/cleanup-test-work-orders.js",
     "reset:demo": "npm run cleanup:test-data && npm run seed:demo",
+    "seed:factory": "node prisma/seed-realistic-factory.js",
     "reconcile:production": "node prisma/reconcile-production-totals.js",
     "check:production-consistency": "node prisma/check-production-consistency.js",
     "test:phase2": "node prisma/phase2-acceptance.js",
