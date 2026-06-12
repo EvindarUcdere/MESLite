@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getOverviewReport } from "../api/reports.api.js";
 
 const STATUS_COLORS = {
@@ -87,17 +87,36 @@ function mapCountsToChartData(counts = {}) {
   }));
 }
 
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultReportFilters() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 30);
+
+  return {
+    from: toDateInputValue(from),
+    to: toDateInputValue(to)
+  };
+}
+
 export default function Reports() {
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filters, setFilters] = useState(getDefaultReportFilters);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadReport() {
+      setIsLoading(true);
+      setError("");
+
       try {
-        const data = await getOverviewReport();
+        const data = await getOverviewReport(filters);
 
         if (isMounted) {
           setReport(data);
@@ -118,7 +137,7 @@ export default function Reports() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [filters]);
 
   const summary = report?.summary ?? {};
   const summaryCards = [
@@ -153,6 +172,8 @@ export default function Reports() {
   const delayedOperations = report?.delayedOperations ?? [];
   const operationTimeByMachine = report?.operationTimeByMachine ?? [];
   const operationTimeByOperator = report?.operationTimeByOperator ?? [];
+  const productionTrendData = report?.productionTrend ?? [];
+  const managementInsights = report?.managementInsights ?? [];
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
     name: reason === "UNKNOWN" ? "Belirtilmemiş" : reason,
@@ -166,6 +187,16 @@ export default function Reports() {
           <h1>Raporlar</h1>
           <p>Üretim, fire, makine ve kalite performansını özetleyin.</p>
         </div>
+        <div className="report-filter-bar">
+          <label>
+            Başlangıç
+            <input type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
+          </label>
+          <label>
+            Bitiş
+            <input type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
+          </label>
+        </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
@@ -177,6 +208,43 @@ export default function Reports() {
             <strong>{isLoading ? "..." : value}</strong>
           </article>
         ))}
+      </section>
+
+      <section className="report-insight-grid">
+        {managementInsights.length ? (
+          managementInsights.map((insight) => (
+            <article key={`${insight.type}-${insight.title}`} className={`report-insight-card insight-${insight.severity.toLowerCase()}`}>
+              <span>{insight.severity === "CRITICAL" ? "Kritik" : insight.severity === "WARNING" ? "Uyarı" : "Bilgi"}</span>
+              <strong>{insight.title}</strong>
+              <p>{insight.message}</p>
+            </article>
+          ))
+        ) : (
+          <article className="report-insight-card">
+            <span>Bilgi</span>
+            <strong>Seçili dönem için risk sinyali yok</strong>
+            <p>Üretim, fire, gecikme ve duruş verileri normal eşiklerin altında görünüyor.</p>
+          </article>
+        )}
+      </section>
+
+      <section className="panel chart-panel report-wide-chart">
+        <h2>Günlük Üretim ve Fire Trendi</h2>
+        {productionTrendData.length ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={productionTrendData}>
+              <CartesianGrid stroke="#edf1f5" vertical={false} />
+              <XAxis dataKey="date" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="producedQuantity" name="Üretim" stroke="#256f6c" strokeWidth={3} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="scrapQuantity" name="Fire" stroke="#dc2626" strokeWidth={3} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="empty-state">Seçili tarih aralığında üretim kaydı yok.</p>
+        )}
       </section>
 
       <section className="operations-grid">

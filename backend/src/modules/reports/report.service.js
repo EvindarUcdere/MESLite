@@ -4,6 +4,39 @@ function scrapRate(producedQuantity, scrapQuantity) {
   return producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
 }
 
+function parseReportDate(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
+function getReportRange(query = {}) {
+  const now = new Date();
+  const defaultFrom = new Date(now);
+  defaultFrom.setDate(defaultFrom.getDate() - 30);
+  defaultFrom.setHours(0, 0, 0, 0);
+
+  const defaultTo = new Date(now);
+  defaultTo.setHours(23, 59, 59, 999);
+
+  const from = parseReportDate(query.from ? `${query.from}T00:00:00.000Z` : null, defaultFrom);
+  const to = parseReportDate(query.to ? `${query.to}T23:59:59.999Z` : null, defaultTo);
+
+  return from <= to ? { from, to } : { from: defaultFrom, to: defaultTo };
+}
+
+function dateRangeFilter(field, range) {
+  return {
+    [field]: {
+      gte: range.from,
+      lte: range.to
+    }
+  };
+}
+
 function countBy(items, key) {
   return items.reduce((acc, item) => {
     const value = item[key] ?? "UNKNOWN";
@@ -107,6 +140,110 @@ function sortByProducedThenScrap(items) {
   });
 }
 
+function groupDailyProduction(productionLogs) {
+  const map = {};
+
+  productionLogs.forEach((log) => {
+    const day = log.createdAt.toISOString().slice(0, 10);
+
+    if (!map[day]) {
+      map[day] = {
+        date: day,
+        producedQuantity: 0,
+        scrapQuantity: 0,
+        logCount: 0
+      };
+    }
+
+    map[day].producedQuantity += log.producedQuantity;
+    map[day].scrapQuantity += log.scrapQuantity;
+    map[day].logCount += 1;
+  });
+
+  return Object.values(map)
+    .map((item) => ({
+      ...item,
+      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+    }))
+    .sort((first, second) => first.date.localeCompare(second.date));
+}
+
+function buildManagementInsights({ summary, shiftPerformance, delayedOperations, operationDowntimeByMachine, operationDowntimeByShift, qualityDecisionByMachine }) {
+  const insights = [];
+
+  if (summary.scrapRate >= 10) {
+    insights.push({
+      type: "SCRAP_RISK",
+      severity: "CRITICAL",
+      title: "Fire oranı kritik seviyede",
+      message: `Seçili dönemde fire oranı %${summary.scrapRate}. Kalite ve proses parametreleri birlikte incelenmeli.`
+    });
+  } else if (summary.scrapRate >= 5) {
+    insights.push({
+      type: "SCRAP_WARNING",
+      severity: "WARNING",
+      title: "Fire oranı izlenmeli",
+      message: `Seçili dönemde fire oranı %${summary.scrapRate}. En yüksek fire üreten makine ve vardiya kontrol edilmeli.`
+    });
+  }
+
+  const weakestShift = [...shiftPerformance].sort((first, second) => second.scrapRate - first.scrapRate)[0];
+  if (weakestShift && weakestShift.scrapRate > 0) {
+    insights.push({
+      type: "SHIFT_SCRAP",
+      severity: weakestShift.scrapRate >= 10 ? "CRITICAL" : "INFO",
+      title: "Vardiya bazlı fire sinyali",
+      message: `${weakestShift.shiftName} vardiyasında fire oranı %${weakestShift.scrapRate}. Operatör, malzeme ve makine kombinasyonu incelenebilir.`
+    });
+  }
+
+  const mostDelayedOperation = delayedOperations[0];
+  if (mostDelayedOperation) {
+    insights.push({
+      type: "DELAY",
+      severity: mostDelayedOperation.delayMinutes >= 60 ? "WARNING" : "INFO",
+      title: "Gecikme odağı",
+      message: `${mostDelayedOperation.orderNo} / ${mostDelayedOperation.operationName} operasyonunda +${mostDelayedOperation.delayMinutes} dk gecikme var.`
+    });
+  }
+
+  const downtimeMachine = operationDowntimeByMachine[0];
+  if (downtimeMachine) {
+    insights.push({
+      type: "DOWNTIME_MACHINE",
+      severity: downtimeMachine.totalCount >= 3 ? "WARNING" : "INFO",
+      title: "Duruş yoğunluğu",
+      message: `${downtimeMachine.machineCode} makinesinde ${downtimeMachine.totalCount} duruş kaydı var. Bakım ve malzeme bekleme nedenleri ayrıştırılmalı.`
+    });
+  }
+
+  const downtimeShift = operationDowntimeByShift[0];
+  if (downtimeShift) {
+    insights.push({
+      type: "DOWNTIME_SHIFT",
+      severity: "INFO",
+      title: "Vardiya duruş odağı",
+      message: `${downtimeShift.shiftName} vardiyasında ${downtimeShift.totalCount} operasyon duruşu kaydedildi.`
+    });
+  }
+
+  const qualityMachine = qualityDecisionByMachine[0];
+  if (qualityMachine) {
+    insights.push({
+      type: "QUALITY_MACHINE",
+      severity: qualityMachine.criticalCount > 0 ? "WARNING" : "INFO",
+      title: "Kalite karar odağı",
+      message: `${qualityMachine.machineCode} makinesinde ${qualityMachine.totalCount} kalite kararı oluştu. Geri işleme/hurda dağılımı kontrol edilmeli.`
+    });
+  }
+
+  return insights.slice(0, 6);
+}
+
+function toDateInputValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function addQualityDecisionMetric(map, key, base, alert) {
   if (!map[key]) {
     map[key] = {
@@ -138,9 +275,11 @@ function addQualityDecisionMetric(map, key, base, alert) {
   }
 }
 
-export async function getOverviewReport() {
+export async function getOverviewReport(query = {}) {
+  const range = getReportRange(query);
   const [workOrders, productionLogs, qualityChecks, productionAlerts, machines, machineStatusLogs, operationDowntimes, workOrderOperations] = await Promise.all([
     prisma.workOrder.findMany({
+      where: dateRangeFilter("updatedAt", range),
       include: {
         product: true,
         machine: true,
@@ -151,6 +290,7 @@ export async function getOverviewReport() {
       orderBy: { updatedAt: "desc" }
     }),
     prisma.productionLog.findMany({
+      where: dateRangeFilter("createdAt", range),
       include: {
         workOrder: { include: { product: true } },
         machine: true,
@@ -162,6 +302,7 @@ export async function getOverviewReport() {
       orderBy: { createdAt: "desc" }
     }),
     prisma.qualityCheck.findMany({
+      where: dateRangeFilter("checkedAt", range),
       include: {
         workOrder: { include: { product: true } },
         workOrderOperation: {
@@ -177,6 +318,7 @@ export async function getOverviewReport() {
     }),
     prisma.productionAlert.findMany({
       where: {
+        ...dateRangeFilter("updatedAt", range),
         qualityDecision: {
           not: null
         }
@@ -211,11 +353,12 @@ export async function getOverviewReport() {
     }),
     prisma.machine.findMany({ include: { productionLine: true } }),
     prisma.machineStatusLog.findMany({
-      where: { status: { in: ["STOPPED", "MAINTENANCE"] } },
+      where: { status: { in: ["STOPPED", "MAINTENANCE"] }, ...dateRangeFilter("createdAt", range) },
       orderBy: { createdAt: "desc" },
       take: 100
     }),
     prisma.operationDowntime.findMany({
+      where: dateRangeFilter("startedAt", range),
       include: {
         workOrder: { include: { product: true } },
         workOrderOperation: true,
@@ -231,7 +374,9 @@ export async function getOverviewReport() {
     prisma.workOrderOperation.findMany({
       where: {
         startedAt: {
-          not: null
+          not: null,
+          gte: range.from,
+          lte: range.to
         }
       },
       include: {
@@ -527,27 +672,46 @@ export async function getOverviewReport() {
     }))
   );
 
+  const summary = {
+    workOrderCount: workOrders.length,
+    productionLogCount: productionLogs.length,
+    machineCount: machines.length,
+    producedQuantity,
+    scrapQuantity,
+    scrapRate: scrapRate(producedQuantity, scrapQuantity),
+    qualityCheckCount: qualityChecks.length,
+    defectQuantity,
+    qualityDecisionCount: productionAlerts.length,
+    qualityReworkCount,
+    qualityScrapDecisionCount,
+    qualityConditionalAcceptCount
+  };
+  const operationDowntimeByShift = Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount);
+  const operationDowntimeByMachine = Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount);
+  const productionTrend = groupDailyProduction(productionLogs);
+  const managementInsights = buildManagementInsights({
+    summary,
+    shiftPerformance,
+    delayedOperations,
+    operationDowntimeByMachine,
+    operationDowntimeByShift,
+    qualityDecisionByMachine
+  });
+
   return {
-    summary: {
-      workOrderCount: workOrders.length,
-      productionLogCount: productionLogs.length,
-      machineCount: machines.length,
-      producedQuantity,
-      scrapQuantity,
-      scrapRate: scrapRate(producedQuantity, scrapQuantity),
-      qualityCheckCount: qualityChecks.length,
-      defectQuantity,
-      qualityDecisionCount: productionAlerts.length,
-      qualityReworkCount,
-      qualityScrapDecisionCount,
-      qualityConditionalAcceptCount
+    dateRange: {
+      from: toDateInputValue(range.from),
+      to: toDateInputValue(range.to)
     },
+    summary,
+    productionTrend,
+    managementInsights,
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
     machineDowntimeReasonCounts: countBy(machineStatusLogs, "reason"),
     operationDowntimeReasonCounts: countByReason(operationDowntimes),
-    operationDowntimeByShift: Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount),
-    operationDowntimeByMachine: Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount),
+    operationDowntimeByShift,
+    operationDowntimeByMachine,
     operationDowntimeByOperation: Object.values(downtimeByOperationMap).sort((first, second) => second.totalCount - first.totalCount),
     recentOperationDowntimes: operationDowntimes.slice(0, 10),
     operationTimePerformance,
