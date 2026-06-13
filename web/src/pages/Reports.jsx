@@ -302,6 +302,9 @@ export default function Reports() {
     { name: "Kalite", value: oeeSummary.quality ?? 0 },
     { name: "OEE", value: oeeSummary.oee ?? 0 }
   ];
+  const oeeRingStyle = {
+    background: `conic-gradient(#087f7b ${Math.min(oeeValue, 100) * 3.6}deg, #edf2f5 0deg)`
+  };
   const managementInsights = report?.managementInsights ?? [];
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
@@ -428,7 +431,12 @@ export default function Reports() {
           <div className="report-card-heading">
             <span>OEE</span>
           </div>
-          <strong>{isLoading ? "..." : `${oeeValue}%`}</strong>
+          <div className="report-oee-main">
+            <strong>{isLoading ? "..." : `${oeeValue}%`}</strong>
+            <div className="report-oee-ring" style={oeeRingStyle} aria-label={`OEE ${oeeValue}%`}>
+              <span>{isLoading ? "..." : `${Math.round(oeeValue)}%`}</span>
+            </div>
+          </div>
           <div className="report-oee-track">
             <span style={{ width: `${Math.min(oeeValue, 100)}%` }} />
           </div>
@@ -533,17 +541,28 @@ export default function Reports() {
       </section>
 
       <section className="operations-grid">
-        <article className="panel chart-panel">
-          <h2>OEE Bileşenleri</h2>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={oeeComponentData}>
-              <CartesianGrid stroke="#edf1f5" vertical={false} />
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, 100]} />
-              <Tooltip />
-              <Bar dataKey="value" name="Oran" fill="#256f6c" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <article className="panel oee-components-panel">
+          <div className="panel-title-row">
+            <h2>OEE Bileşenleri</h2>
+            <span>Hedef 85%</span>
+          </div>
+          <div className="oee-component-list">
+            {oeeComponentData.map((item) => {
+              const tone = item.value >= 85 ? "good" : item.value >= 60 ? "warning" : "danger";
+
+              return (
+                <div key={item.name} className={`oee-component-row oee-${tone}`}>
+                  <div className="oee-component-label">
+                    <span>{item.name}</span>
+                    <strong>{item.value}%</strong>
+                  </div>
+                  <div className="oee-component-track">
+                    <span style={{ width: `${Math.min(item.value, 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </article>
 
         <article className="panel">
