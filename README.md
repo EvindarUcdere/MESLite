@@ -40,18 +40,18 @@ MES Lite was designed to show backend-heavy product thinking, not only screen im
 - Shift, machine, operator, downtime and quality metrics are reportable.
 - Web and mobile clients share the same backend contracts.
 
-## Turkce Kisa Ozet
+## Türkçe Kısa Özet
 
-MES Lite, fabrika uretim sureclerini takip etmek icin gelistirilen gercekci bir MVP projesidir. Sistem; is emirlerini rota ve operasyon adimlariyla takip eder, operatorlerin mobil uygulama uzerinden uretim, fire, durus ve not bilgisi girmesini saglar, uretim yoneticisinin web panelden sureci anlik izlemesine imkan verir.
+MES Lite, fabrika üretim süreçlerini takip etmek için geliştirilen gerçekçi bir MVP projesidir. Sistem; iş emirlerini rota ve operasyon adımlarıyla takip eder, operatörlerin mobil uygulama üzerinden üretim, fire, duruş ve not bilgisi girmesini sağlar, üretim yöneticisinin web panelden süreci anlık izlemesine imkân verir.
 
-Projede ozellikle su gercek uretim problemleri ele alindi:
+Projede özellikle şu gerçek üretim problemleri ele alındı:
 
-- Urunun hangi operasyon adiminda oldugunu izleme.
-- Operasyonlar arasi fire sonrasi aktarilabilir miktari hesaplama.
-- Operatorun eksik uretimi tamamlandi diye kapatmasini engelleme.
-- Kalite uygunsuzluklarinda geri isleme, hurda veya sartli kabul karari verme.
-- Vardiya, makine, operator ve durus nedeni bazli raporlama.
-- Web ve mobil arasinda anlik bildirim ve operasyon bazli mesaj akisi.
+- Ürünün hangi operasyon adımında olduğunu izleme.
+- Operasyonlar arası fire sonrası aktarılabilir miktarı hesaplama.
+- Operatörün eksik üretimi tamamlandı diye kapatmasını engelleme.
+- Kalite uygunsuzluklarında geri işleme, hurda veya şartlı kabul kararı verme.
+- Vardiya, makine, operatör ve duruş nedeni bazlı raporlama.
+- Web ve mobil arasında anlık bildirim ve operasyon bazlı mesaj akışı.
 
 ## What Problem Does It Solve?
 

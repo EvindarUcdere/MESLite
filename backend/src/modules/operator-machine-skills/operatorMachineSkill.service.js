@@ -36,11 +36,11 @@ async function assertSkillRefs(data) {
   ]);
 
   if (!operator || operator.role !== "OPERATOR" || !operator.isActive) {
-    throw new ApiError(400, "Active operator user is required for machine skill");
+    throw new ApiError(400, "Makine yetkinliği için aktif operatör kullanıcısı gereklidir");
   }
 
   if (!machine || !machine.isActive) {
-    throw new ApiError(400, "Active machine is required for machine skill");
+    throw new ApiError(400, "Makine yetkinliği için aktif makine gereklidir");
   }
 }
 

@@ -18,7 +18,7 @@ function normalizeOperations(operations = []) {
 
   return operations.map((operation) => {
     if (sequenceSet.has(operation.sequenceNo)) {
-      throw new ApiError(400, "Operation sequence numbers must be unique in a route");
+      throw new ApiError(400, "Bir rotadaki operasyon sıra numaraları benzersiz olmalıdır");
     }
 
     sequenceSet.add(operation.sequenceNo);
@@ -68,7 +68,7 @@ export async function updateProductRoute(id, data) {
   const current = await prisma.productRoute.findUnique({ where: { id } });
 
   if (!current) {
-    throw new ApiError(404, "Product route not found");
+    throw new ApiError(404, "Ürün rotası bulunamadı");
   }
 
   const operations = data.operations ? normalizeOperations(data.operations) : null;

@@ -73,7 +73,7 @@ async function assertOperators(operatorIds) {
   });
 
   if (count !== operatorIds.length) {
-    throw new ApiError(400, "All group members must be active operators");
+    throw new ApiError(400, "Tüm ekip üyeleri aktif operatör olmalıdır");
   }
 }
 
@@ -144,13 +144,13 @@ export function findShiftTemplates() {
 export async function createShiftTemplate(data) {
   const shift = await prisma.shift.findUnique({ where: { id: data.shiftId } });
   if (!shift || !shift.isActive) {
-    throw new ApiError(400, "Active shift is required");
+    throw new ApiError(400, "Aktif vardiya gereklidir");
   }
 
   if (data.groupId) {
     const group = await prisma.operatorGroup.findUnique({ where: { id: data.groupId } });
     if (!group || !group.isActive) {
-      throw new ApiError(400, "Active operator group is required");
+      throw new ApiError(400, "Aktif operatör ekibi gereklidir");
     }
   }
 
@@ -187,16 +187,16 @@ export async function generateMonthlyPlan(data) {
   ]);
 
   if (!group || !group.isActive) {
-    throw new ApiError(400, "Active operator group is required");
+    throw new ApiError(400, "Aktif operatör ekibi gereklidir");
   }
 
   if (!template || !template.isActive) {
-    throw new ApiError(400, "Active shift template is required");
+    throw new ApiError(400, "Aktif vardiya şablonu gereklidir");
   }
 
   const activeMembers = group.members.filter((member) => member.operator.isActive && member.operator.role === "OPERATOR");
   if (!activeMembers.length) {
-    throw new ApiError(400, "Operator group has no active operators");
+    throw new ApiError(400, "Operatör ekibinde aktif operatör yok");
   }
 
   const days = getMonthDays(data.month).filter((day) => shouldScheduleDay(day, template.pattern, template.startOffset));

@@ -237,7 +237,7 @@ export default function ShiftPlanning() {
         await loadData();
       } catch (_error) {
         if (isMounted) {
-          setError("Vardiya plani yuklenemedi.");
+          setError("Vardiya planı yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -374,7 +374,7 @@ export default function ShiftPlanning() {
       await loadData();
       setCellResult(result);
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Vardiya hucresi kaydedilemedi."));
+      setError(getApiErrorMessage(submitError, "Vardiya hücresi kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -424,7 +424,7 @@ export default function ShiftPlanning() {
       setBulkResult(result);
       await loadData();
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Aylik vardiya plani olusturulamadi."));
+      setError(getApiErrorMessage(submitError, "Aylık vardiya planı oluşturulamadı."));
     } finally {
       setIsSubmitting(false);
     }
@@ -444,7 +444,7 @@ export default function ShiftPlanning() {
       setGroupForm({ name: "", description: "", operatorIds: [] });
       await loadData();
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Operator ekibi kaydedilemedi."));
+      setError(getApiErrorMessage(submitError, "Operatör ekibi kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -466,7 +466,7 @@ export default function ShiftPlanning() {
       setTemplateForm((current) => ({ ...current, name: "", description: "" }));
       await loadData();
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Vardiya sablonu kaydedilemedi."));
+      setError(getApiErrorMessage(submitError, "Vardiya şablonu kaydedilemedi."));
     } finally {
       setIsSubmitting(false);
     }
@@ -506,15 +506,15 @@ export default function ShiftPlanning() {
   }
 
   if (isLoading) {
-    return <p>Vardiya plani yukleniyor...</p>;
+    return <p>Vardiya planı yükleniyor...</p>;
   }
 
   return (
     <div className="page-stack shift-planning-page roster-page">
       <div className="page-header shift-planning-header">
         <div>
-          <h1>Vardiya Plani</h1>
-          <p>Çalışanlari satir satir takip edin; her gunu sabah, aksam, gece veya izin olarak dogrudan duzenleyin.</p>
+          <h1>Vardiya Planı</h1>
+          <p>Çalışanları satır satır takip edin; her günü sabah, akşam, gece veya izin olarak doğrudan düzenleyin.</p>
         </div>
         <div className="roster-toolbar">
           <label>
@@ -524,7 +524,7 @@ export default function ShiftPlanning() {
           <label>
             Ekip
             <select value={selectedGroupId} onChange={(event) => setSelectedGroupId(event.target.value)}>
-              <option value="all">Tum ekipler</option>
+              <option value="all">Tüm ekipler</option>
               {groups.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
@@ -561,7 +561,7 @@ export default function ShiftPlanning() {
           <label>
             Ekip
             <select value={bulkPlanForm.groupId} onChange={(event) => updateBulkPlanForm("groupId", event.target.value)} required>
-              {!groups.length ? <option value="">Once ekip olusturun</option> : null}
+              {!groups.length ? <option value="">Önce ekip oluşturun</option> : null}
               {groups.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name} ({group.members.length})
@@ -572,7 +572,7 @@ export default function ShiftPlanning() {
           <label>
             Sablon
             <select value={bulkPlanForm.templateId} onChange={(event) => updateBulkPlanForm("templateId", event.target.value)} required>
-              {!templates.length ? <option value="">Once sablon olusturun</option> : null}
+              {!templates.length ? <option value="">Önce şablon oluşturun</option> : null}
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name} - {TEMPLATE_PATTERN_LABELS[template.pattern]}
@@ -586,7 +586,7 @@ export default function ShiftPlanning() {
           </label>
           <label className="inline-check">
             <input type="checkbox" checked={bulkPlanForm.overwrite} onChange={(event) => updateBulkPlanForm("overwrite", event.target.checked)} />
-            Bu ay icin ekibin eski planini yenile
+            Bu ay için ekibin eski planını yenile
           </label>
           <button className="primary-button" type="submit" disabled={isSubmitting || !groups.length || !templates.length}>
             Şablondan Üret
@@ -749,25 +749,25 @@ export default function ShiftPlanning() {
               ) : null}
               {cellResult ? (
                 <p className="success-note">
-                  {cellResult.upserted ? `${cellResult.upserted} hucre guncellendi.` : ""}
-                  {cellResult.deleted ? ` ${cellResult.deleted} hucre bosaltildi.` : ""}
+                  {cellResult.upserted ? `${cellResult.upserted} hücre güncellendi.` : ""}
+                  {cellResult.deleted ? ` ${cellResult.deleted} hücre boşaltıldı.` : ""}
                 </p>
               ) : null}
             </form>
           ) : (
             <div className="empty-editor-state">
               <CalendarDays size={28} />
-              <p>Duzenlemek icin roster tablosunda bir hucre secin.</p>
+              <p>Düzenlemek için roster tablosunda bir hücre seçin.</p>
             </div>
           )}
         </aside>
       </section>
 
       <details className="panel roster-admin-panel">
-        <summary>Plan Ayarlari: ekip, sablon ve makine yetkinliği</summary>
+        <summary>Plan Ayarları: ekip, şablon ve makine yetkinliği</summary>
         <div className="shift-planning-forms">
           <form className="compact-form" onSubmit={handleGroupSubmit}>
-            <h2>Operator Ekibi</h2>
+            <h2>Operatör Ekibi</h2>
             <div className="form-grid-two">
               <label>
                 Ekip Adi
@@ -801,7 +801,7 @@ export default function ShiftPlanning() {
               <label>
                 Ekip
                 <select value={templateForm.groupId} onChange={(event) => updateTemplateForm("groupId", event.target.value)}>
-                  <option value="">Genel sablon</option>
+                  <option value="">Genel şablon</option>
                   {groups.map((group) => (
                     <option key={group.id} value={group.id}>
                       {group.name}
@@ -843,7 +843,7 @@ export default function ShiftPlanning() {
             <h2>Makine Yetkinligi</h2>
             <div className="form-grid-two">
               <label>
-                Operator
+                Operatör
                 <select value={skillForm.operatorId} onChange={(event) => updateSkillForm("operatorId", event.target.value)} required>
                   {operators.map((operator) => (
                     <option key={operator.id} value={operator.id}>

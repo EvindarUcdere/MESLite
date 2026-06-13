@@ -8,7 +8,7 @@ export async function requireAuth(req, _res, next) {
     const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
 
     if (!token) {
-      throw new ApiError(401, "Authentication token is required");
+      throw new ApiError(401, "Oturum doğrulama tokenı zorunludur");
     }
 
     const decoded = verifyToken(token);

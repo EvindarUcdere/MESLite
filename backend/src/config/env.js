@@ -16,11 +16,11 @@ function validateEnv() {
   const nodeEnv = process.env.NODE_ENV ?? "development";
 
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is required");
+    throw new Error("DATABASE_URL zorunludur");
   }
 
   if (nodeEnv === "production" && (!process.env.JWT_SECRET || process.env.JWT_SECRET === "change-this-secret")) {
-    throw new Error("JWT_SECRET must be set to a strong value in production");
+    throw new Error("Production ortamında JWT_SECRET güçlü bir değer olarak ayarlanmalıdır");
   }
 }
 

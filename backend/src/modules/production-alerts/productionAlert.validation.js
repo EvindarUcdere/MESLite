@@ -15,7 +15,7 @@ export const updateProductionAlertSchema = z.object({
     if (body.status === "RESOLVED" && !body.resolutionNote?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Resolution note is required when resolving an alert",
+        message: "Uyarı kapatılırken çözüm notu zorunludur",
         path: ["resolutionNote"]
       });
     }
@@ -26,12 +26,12 @@ export const decideQualityActionSchema = z.object({
   body: z.object({
     decision: z.enum(["REWORK_OPERATION", "SCRAP", "CONDITIONAL_ACCEPT"]),
     reworkOperationId: z.string().uuid().nullable().optional(),
-    note: z.string().trim().min(3, "Quality action note is required")
+    note: z.string().trim().min(3, "Kalite aksiyon notu zorunludur")
   }).superRefine((body, ctx) => {
     if (body.decision === "REWORK_OPERATION" && !body.reworkOperationId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Rework operation is required for rework action",
+        message: "Geri işleme aksiyonu için operasyon seçimi zorunludur",
         path: ["reworkOperationId"]
       });
     }

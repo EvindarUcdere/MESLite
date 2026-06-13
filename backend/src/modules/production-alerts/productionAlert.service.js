@@ -58,7 +58,7 @@ async function getAlertOrThrow(id, tx = prisma) {
   });
 
   if (!alert) {
-    throw new ApiError(404, "Production alert not found");
+    throw new ApiError(404, "Üretim uyarısı bulunamadı");
   }
 
   return alert;
@@ -154,7 +154,7 @@ export async function decideQualityAction(actor, id, data) {
 
   const isQualityAlert = current.title.toLocaleLowerCase("tr-TR").includes("kalite");
   if (!isQualityAlert) {
-    throw new ApiError(400, "Quality action can only be created for quality alerts");
+    throw new ApiError(400, "Kalite aksiyonu yalnızca kalite uyarıları için oluşturulabilir");
   }
 
   const decisionNote = data.note.trim();
@@ -174,7 +174,7 @@ export async function decideQualityAction(actor, id, data) {
       });
 
       if (!targetOperation || targetOperation.workOrderId !== current.workOrderId) {
-        throw new ApiError(400, "Rework operation must belong to the alert work order");
+        throw new ApiError(400, "Geri işleme operasyonu uyarının iş emrine ait olmalıdır");
       }
 
       if (current.workOrder.status === "COMPLETED" || current.workOrder.status === "CANCELLED") {

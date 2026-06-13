@@ -331,7 +331,7 @@ export async function createQualityCheck(actor, data) {
   });
 
   if (!workOrder) {
-    throw new ApiError(404, "Work order not found");
+    throw new ApiError(404, "İş emri bulunamadı");
   }
 
   const selectedOperation = data.workOrderOperationId
@@ -339,21 +339,21 @@ export async function createQualityCheck(actor, data) {
     : null;
 
   if (data.workOrderOperationId && !selectedOperation) {
-    throw new ApiError(400, "Selected operation must belong to the selected work order");
+    throw new ApiError(400, "Seçilen operasyon seçilen iş emrine ait olmalıdır");
   }
 
   if (workOrder.operations.length && !data.workOrderOperationId) {
-    throw new ApiError(400, "Operation is required for routed work order quality checks");
+    throw new ApiError(400, "Rotalı iş emirlerinde kalite kontrol için operasyon seçimi zorunludur");
   }
 
   if (workOrder.producedQuantity <= 0) {
-    throw new ApiError(400, "Quality check requires production quantity");
+    throw new ApiError(400, "Kalite kontrol için üretim adedi gereklidir");
   }
 
   const producedQuantity = selectedOperation?.producedQuantity ?? workOrder.producedQuantity;
 
   if (producedQuantity <= 0) {
-    throw new ApiError(400, "Quality check requires production quantity for selected operation");
+    throw new ApiError(400, "Seçilen operasyon için kalite kontrol yapılmadan önce üretim adedi gereklidir");
   }
 
   if (data.defectQuantity > producedQuantity) {
@@ -361,7 +361,7 @@ export async function createQualityCheck(actor, data) {
   }
 
   if (["FAILED", "PARTIAL"].includes(data.status) && !data.defectReason?.trim()) {
-    throw new ApiError(400, "Defect reason is required for failed or partial quality checks");
+    throw new ApiError(400, "Kaldı veya kısmi kalite sonuçlarında hata nedeni zorunludur");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -422,7 +422,7 @@ export async function updateQualityCheck(actor, id, data) {
   });
 
   if (!current) {
-    throw new ApiError(404, "Quality check not found");
+    throw new ApiError(404, "Kalite kontrol kaydı bulunamadı");
   }
 
   const qualityCheck = await prisma.$transaction(async (tx) => {

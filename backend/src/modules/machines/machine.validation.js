@@ -19,7 +19,7 @@ export const updateMachineStatusSchema = z.object({
     if (["STOPPED", "MAINTENANCE"].includes(body.status) && !body.reason?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Reason is required for stopped or maintenance machine statuses",
+        message: "Duruş veya bakım durumundaki makineler için neden zorunludur",
         path: ["reason"]
       });
     }

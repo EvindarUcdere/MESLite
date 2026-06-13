@@ -147,7 +147,7 @@ export async function createProductionLog(actor, data) {
   const isZeroQuantityLog = data.producedQuantity === 0 && data.scrapQuantity === 0;
 
   if (isZeroQuantityLog && !data.note?.trim()) {
-    throw new ApiError(400, "A note is required when production and scrap quantities are both zero");
+    throw new ApiError(400, "Üretim ve fire adedi sıfırsa not girmek zorunludur");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -159,43 +159,43 @@ export async function createProductionLog(actor, data) {
       : null;
 
     if (data.workOrderOperationId && !operation) {
-      throw new ApiError(404, "Work order operation not found");
+      throw new ApiError(404, "İş emri operasyonu bulunamadı");
     }
 
     if (operation && operation.workOrderId !== data.workOrderId) {
-      throw new ApiError(400, "Production log operation must belong to the selected work order");
+      throw new ApiError(400, "Üretim kaydı operasyonu seçilen iş emrine ait olmalıdır");
     }
 
     const workOrder = operation?.workOrder ?? (await tx.workOrder.findUnique({ where: { id: data.workOrderId } }));
 
     if (!workOrder) {
-      throw new ApiError(404, "Work order not found");
+      throw new ApiError(404, "İş emri bulunamadı");
     }
 
     const allowedWorkOrderStatuses = operation ? ["PLANNED", "IN_PROGRESS", "PAUSED"] : ["IN_PROGRESS"];
 
     if (!allowedWorkOrderStatuses.includes(workOrder.status)) {
-      throw new ApiError(400, "Production can only be logged for in-progress work orders");
+      throw new ApiError(400, "Üretim girişi yalnızca üretimdeki iş emirleri için yapılabilir");
     }
 
     if (operation) {
       if (!["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status)) {
-        throw new ApiError(400, "Production can only be logged for ready, in-progress or paused operations");
+        throw new ApiError(400, "Üretim girişi yalnızca hazır, üretimde veya duraklatılmış operasyonlar için yapılabilir");
       }
 
       if (!operation.machineId || operation.machineId !== data.machineId) {
-        throw new ApiError(400, "Production log machine must match the operation machine");
+        throw new ApiError(400, "Üretim kaydındaki makine operasyon makinesiyle eşleşmelidir");
       }
 
       if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
-        throw new ApiError(403, "Operator can only log production for assigned operations");
+        throw new ApiError(403, "Operatör yalnızca kendisine atanmış operasyonlar için üretim girişi yapabilir");
       }
     } else if (!workOrder.machineId || workOrder.machineId !== data.machineId) {
-      throw new ApiError(400, "Production log machine must match the work order machine");
+      throw new ApiError(400, "Üretim kaydındaki makine iş emri makinesiyle eşleşmelidir");
     }
 
     if (!operation && actor.role === "OPERATOR" && workOrder.assignedOperatorId !== actor.id) {
-      throw new ApiError(403, "Operator can only log production for assigned work orders");
+      throw new ApiError(403, "Operatör yalnızca kendisine atanmış iş emirleri için üretim girişi yapabilir");
     }
 
     const previousOperation = operation
@@ -222,7 +222,7 @@ export async function createProductionLog(actor, data) {
     const operatorId = actor.role === "OPERATOR" ? actor.id : operation?.assignedOperatorId ?? workOrder.assignedOperatorId;
 
     if (!operatorId) {
-      throw new ApiError(400, "Assigned operator is required before logging production");
+      throw new ApiError(400, "Üretim girişi yapılmadan önce operatör atanmalıdır");
     }
 
     const shiftId = await findShiftIdForLog(tx, data.shiftId, data.endedAt ? new Date(data.endedAt) : new Date());
@@ -248,7 +248,7 @@ export async function createProductionLog(actor, data) {
 
     if (data.isCriticalAlert) {
       if (!data.note?.trim()) {
-        throw new ApiError(400, "Alert note is required for critical production alerts");
+        throw new ApiError(400, "Kritik üretim uyarıları için uyarı notu zorunludur");
       }
 
       alert = await createProductionAlert(tx, {
@@ -382,7 +382,7 @@ export async function createProductionLog(actor, data) {
 
 export async function addProductionLogAttachment(actor, productionLogId, file) {
   if (!file) {
-    throw new ApiError(400, "Image file is required");
+    throw new ApiError(400, "Görsel dosyası zorunludur");
   }
 
   const productionLog = await prisma.productionLog.findUnique({
@@ -393,11 +393,11 @@ export async function addProductionLogAttachment(actor, productionLogId, file) {
   });
 
   if (!productionLog) {
-    throw new ApiError(404, "Production log not found");
+    throw new ApiError(404, "Üretim kaydı bulunamadı");
   }
 
   if (actor.role === "OPERATOR" && productionLog.operatorId !== actor.id) {
-    throw new ApiError(403, "Operator can only attach images to own production logs");
+    throw new ApiError(403, "Operatör yalnızca kendi üretim kayıtlarına görsel ekleyebilir");
   }
 
   const attachment = await prisma.productionLogAttachment.create({
@@ -440,7 +440,7 @@ export async function updateProductionLog(actor, id, data) {
   });
 
   if (!current) {
-    throw new ApiError(404, "Production log not found");
+    throw new ApiError(404, "Üretim kaydı bulunamadı");
   }
 
   const workOrder = await prisma.workOrder.findUnique({
@@ -453,7 +453,7 @@ export async function updateProductionLog(actor, id, data) {
   });
 
   if (!workOrder) {
-    throw new ApiError(404, "Work order not found");
+    throw new ApiError(404, "İş emri bulunamadı");
   }
 
   const finalOperationId = workOrder.operations.at(-1)?.id;

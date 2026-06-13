@@ -283,11 +283,11 @@ export async function createWorkOrder(userId, data) {
       });
 
       if (!route || !route.isActive) {
-        throw new ApiError(400, "Active product route is required");
+        throw new ApiError(400, "Aktif ürün rotası gereklidir");
       }
 
       if (route.productId !== data.productId) {
-        throw new ApiError(400, "Selected route must belong to the selected product");
+        throw new ApiError(400, "Seçilen rota seçilen ürüne ait olmalıdır");
       }
 
       if (!route.operations.length) {
@@ -469,7 +469,7 @@ export async function assignOperator(actor, id, operatorId) {
   const operator = await prisma.user.findUnique({ where: { id: operatorId } });
 
   if (!operator || operator.role !== "OPERATOR" || !operator.isActive) {
-    throw new ApiError(400, "Active operator user is required");
+    throw new ApiError(400, "Aktif operatör kullanıcısı gereklidir");
   }
 
   const workOrder = await prisma.$transaction(async (tx) => {
@@ -502,7 +502,7 @@ export async function assignMachine(actor, id, machineId) {
   const machine = await prisma.machine.findUnique({ where: { id: machineId } });
 
   if (!machine || !machine.isActive) {
-    throw new ApiError(400, "Active machine is required");
+    throw new ApiError(400, "Aktif makine gereklidir");
   }
 
   const workOrder = await prisma.$transaction(async (tx) => {
@@ -542,7 +542,7 @@ export async function startWorkOrder(id, actor) {
   });
 
   if (!current) {
-    throw new ApiError(404, "Work order not found");
+    throw new ApiError(404, "İş emri bulunamadı");
   }
 
   if (["COMPLETED", "CANCELLED"].includes(current.status)) {
@@ -563,11 +563,11 @@ export async function startWorkOrder(id, actor) {
   }
 
   if (hasOperationFlow && (!targetOperation.machineId || !targetOperation.assignedOperatorId)) {
-    throw new ApiError(400, "Operation machine and operator must be assigned before starting production");
+    throw new ApiError(400, "Üretim başlatılmadan önce operasyon makinesi ve operatörü atanmalıdır");
   }
 
   if (!hasOperationFlow && (!current.machineId || !current.assignedOperatorId)) {
-    throw new ApiError(400, "Machine and operator must be assigned before starting production");
+    throw new ApiError(400, "Üretim başlatılmadan önce makine ve operatör atanmalıdır");
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -701,7 +701,7 @@ export async function pauseWorkOrder(id, actor) {
   });
 
   if (!current) {
-    throw new ApiError(404, "Work order not found");
+    throw new ApiError(404, "İş emri bulunamadı");
   }
 
   if (current.status !== "IN_PROGRESS") {
@@ -797,7 +797,7 @@ export async function completeWorkOrder(actor, id) {
   const current = await prisma.workOrder.findUnique({ where: { id } });
 
   if (!current) {
-    throw new ApiError(404, "Work order not found");
+    throw new ApiError(404, "İş emri bulunamadı");
   }
 
   if (!["IN_PROGRESS", "PAUSED"].includes(current.status)) {
@@ -805,11 +805,11 @@ export async function completeWorkOrder(actor, id) {
   }
 
   if (current.producedQuantity <= 0) {
-    throw new ApiError(400, "Production quantity must be logged before completing a work order");
+    throw new ApiError(400, "İş emri tamamlanmadan önce üretim adedi kaydedilmelidir");
   }
 
   if (actor.role === "OPERATOR" && current.producedQuantity < current.plannedQuantity) {
-    throw new ApiError(400, `Work order cannot be completed before planned quantity is produced (${current.producedQuantity}/${current.plannedQuantity})`);
+    throw new ApiError(400, `Planlanan adet üretilmeden iş emri tamamlanamaz (${current.producedQuantity}/${current.plannedQuantity})`);
   }
 
   const result = await prisma.$transaction(async (tx) => {

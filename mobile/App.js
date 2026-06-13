@@ -623,15 +623,15 @@ async function getNativeDevicePushTokenDiagnostic() {
       tokenPreview: maskPushToken(tokenValue)
     });
     console.log("Native Device Push Token:", tokenResult);
-    return tokenValue ? `${tokenResult?.type ?? "native"}:${maskPushToken(tokenValue)}` : "native-token-bos";
+    return tokenValue ? `${tokenResult?.type ?? "native"}:${maskPushToken(tokenValue)}` : "native-token-boş";
   } catch (nativeTokenError) {
-    const errorMessage = nativeTokenError?.message ?? "Bilinmeyen native token hatasi";
+    const errorMessage = nativeTokenError?.message ?? "Bilinmeyen native token hatası";
     logPushDebug("native-device-token-request-error", {
       message: errorMessage,
       code: nativeTokenError?.code
     });
     console.log("Native Device Push Token error:", errorMessage, nativeTokenError);
-    return `native-token-hatasi: ${errorMessage}`;
+    return `native-token-hatası: ${errorMessage}`;
   }
 }
 
@@ -863,7 +863,7 @@ export default function App() {
         setPushStatus(
           hasPermission
             ? `Push token alinamadi. Native token: ${nativeTokenDiagnostic}. Google Play servisleri, FCM ve EAS APK kurulumunu kontrol edin.`
-            : "Bildirim izni verilmedi. Android ayarlarindan MES Lite bildirim iznini acin."
+            : "Bildirim izni verilmedi. Android ayarlarından MES Lite bildirim iznini açın."
         );
         return false;
       }
@@ -912,14 +912,14 @@ export default function App() {
         active: activeTokens.length,
         latest: activeTokens[0]?.lastSeenAt
       });
-      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayitli). Son kayit: ${formatDateTime(activeTokens[0].lastSeenAt)}` : "Aktif telefon bildirimi yok. Bildirimleri Aktiflestir butonuna basin.");
+      setPushStatus(activeTokens.length ? `Telefon bildirimi aktif (${activeTokens.length} cihaz kayıtlı). Son kayıt: ${formatDateTime(activeTokens[0].lastSeenAt)}` : "Aktif telefon bildirimi yok. Bildirimleri Aktifleştir butonuna basın.");
     } catch (pushStatusError) {
       logPushDebug("push-status-load-error", {
         message: pushStatusError?.message,
         responseStatus: pushStatusError?.response?.status,
         responseMessage: pushStatusError?.response?.data?.message
       });
-      setPushStatus("Bildirim durumu okunamadi.");
+      setPushStatus("Bildirim durumu okunamadı.");
     }
   }
 
@@ -1909,10 +1909,10 @@ export default function App() {
             </View>
             <View style={styles.calendarMonthActions}>
               <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getPreviousMonth(shiftMonth))} disabled={isSubmitting}>
-                <Text style={styles.inlineButtonText}>Onceki</Text>
+                <Text style={styles.inlineButtonText}>Önceki</Text>
               </Pressable>
               <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getCurrentMonth())} disabled={isSubmitting}>
-                <Text style={styles.inlineButtonText}>Bugun</Text>
+                <Text style={styles.inlineButtonText}>Bugün</Text>
               </Pressable>
               <Pressable style={styles.inlineButton} onPress={() => setShiftMonth(getNextMonth(shiftMonth))} disabled={isSubmitting}>
                 <Text style={styles.inlineButtonText}>Sonraki</Text>
@@ -1991,7 +1991,7 @@ export default function App() {
             })}
           </View>
 
-          {!shiftAssignments.length ? <Text style={styles.muted}>Bu ay icin vardiya plani bulunmuyor.</Text> : null}
+          {!shiftAssignments.length ? <Text style={styles.muted}>Bu ay için vardiya planı bulunmuyor.</Text> : null}
         </View>
       ) : null}
 

@@ -18,7 +18,7 @@ export const createProductionLogSchema = z.object({
     if (body.scrapQuantity > 0 && !body.scrapReason) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Scrap reason is required when scrap quantity is greater than zero",
+        message: "Fire adedi sıfırdan büyükse fire nedeni zorunludur",
         path: ["scrapReason"]
       });
     }

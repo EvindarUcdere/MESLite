@@ -89,7 +89,7 @@ async function findActiveShiftId(tx, date = new Date()) {
 
 function assertOperatorCanUseOperation(actor, operation) {
   if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
-    throw new ApiError(403, "Operator can only manage assigned operations");
+    throw new ApiError(403, "Operatör yalnızca kendisine atanmış operasyonları yönetebilir");
   }
 }
 
@@ -121,7 +121,7 @@ async function getOperationOrThrow(id) {
   });
 
   if (!operation) {
-    throw new ApiError(404, "Work order operation not found");
+    throw new ApiError(404, "İş emri operasyonu bulunamadı");
   }
 
   return operation;
@@ -464,7 +464,7 @@ export async function completeOperation(actor, id) {
   });
 
   if (productionLogCount === 0) {
-    throw new ApiError(400, "At least one production log must be saved before completing an operation");
+    throw new ApiError(400, "Operasyon tamamlanmadan önce en az bir üretim kaydı girilmelidir");
   }
 
   const previousOperation = await prisma.workOrderOperation.findFirst({
@@ -606,7 +606,7 @@ export async function createOperationMessage(actor, id, data) {
   const operation = await getOperationOrThrow(id);
 
   if (actor.role === "OPERATOR" && operation.assignedOperatorId !== actor.id) {
-    throw new ApiError(403, "Operator can only message assigned operations");
+    throw new ApiError(403, "Operatör yalnızca kendisine atanmış operasyonlara mesaj yazabilir");
   }
 
   const message = await prisma.operationMessage.create({

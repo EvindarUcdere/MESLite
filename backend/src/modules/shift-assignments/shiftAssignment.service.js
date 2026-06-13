@@ -62,11 +62,11 @@ async function assertAssignmentRefs(data) {
   ]);
 
   if (!operator || operator.role !== "OPERATOR" || !operator.isActive) {
-    throw new ApiError(400, "Active operator user is required for shift assignment");
+    throw new ApiError(400, "Vardiya ataması için aktif operatör kullanıcısı gereklidir");
   }
 
   if (!shift || !shift.isActive) {
-    throw new ApiError(400, "Active shift is required");
+    throw new ApiError(400, "Aktif vardiya gereklidir");
   }
 }
 
@@ -113,17 +113,17 @@ export async function bulkUpsertShiftAssignments(data) {
   });
 
   if (operatorCount !== operatorIds.length) {
-    throw new ApiError(400, "All assignments must belong to active operators");
+    throw new ApiError(400, "Tüm atamalar aktif operatörlere ait olmalıdır");
   }
 
   if (data.status !== "EMPTY") {
     if (!data.shiftId) {
-      throw new ApiError(400, "Shift is required for planned assignments");
+      throw new ApiError(400, "Planlı atamalar için vardiya seçimi zorunludur");
     }
 
     const shift = await prisma.shift.findUnique({ where: { id: data.shiftId } });
     if (!shift || !shift.isActive) {
-      throw new ApiError(400, "Active shift is required");
+      throw new ApiError(400, "Aktif vardiya gereklidir");
     }
   }
 
@@ -180,7 +180,7 @@ export async function updateShiftAssignment(id, data) {
     const shift = await prisma.shift.findUnique({ where: { id: data.shiftId } });
 
     if (!shift || !shift.isActive) {
-      throw new ApiError(400, "Active shift is required");
+      throw new ApiError(400, "Aktif vardiya gereklidir");
     }
   }
 
