@@ -2139,10 +2139,10 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 620,
     alignSelf: "center",
-    gap: 12,
+    gap: 14,
     minHeight: fullScreenHeight,
-    padding: 14,
-    paddingTop: 28,
+    padding: 12,
+    paddingTop: 18,
     paddingBottom: 36
   },
   authPage: {
@@ -2166,20 +2166,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    padding: 16,
-    backgroundColor: "#17313a",
-    borderRadius: 10
+    minHeight: 112,
+    padding: 18,
+    backgroundColor: "#12363d",
+    borderColor: "#1d5960",
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowColor: "#0f2930",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 4
   },
   eyebrow: {
     marginBottom: 4,
-    color: "#9ee2d0",
+    color: "#8de7d2",
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase"
   },
   title: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: "900",
     color: "#ffffff"
   },
@@ -2190,7 +2198,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 4,
-    color: "#dbe3ea"
+    color: "#c7dce2",
+    fontSize: 15
   },
   authSubtitle: {
     marginTop: 4,
@@ -2198,40 +2207,51 @@ const styles = StyleSheet.create({
   },
   mobileSummary: {
     flexDirection: "row",
-    gap: 8
+    gap: 10
   },
   summaryItem: {
     flex: 1,
-    minHeight: 64,
+    minHeight: 76,
     alignItems: "center",
     justifyContent: "center",
-    padding: 8,
+    padding: 10,
     backgroundColor: "#ffffff",
-    borderColor: "#dbe3ea",
-    borderRadius: 8,
-    borderWidth: 1
+    borderColor: "#d9e4ea",
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: "#18313a",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2
   },
   summaryValue: {
-    color: "#17202a",
-    fontSize: 21,
+    color: "#0f2c34",
+    fontSize: 24,
     fontWeight: "900"
   },
   card: {
-    gap: 10,
-    padding: 14,
+    gap: 12,
+    padding: 16,
     backgroundColor: "#ffffff",
-    borderColor: "#d6e0e8",
-    borderRadius: 8,
-    borderWidth: 1
+    borderColor: "#d9e4ea",
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: "#18313a",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 2
   },
   tabCard: {
-    padding: 8
+    padding: 8,
+    borderRadius: 18
   },
   sectionTitle: {
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: "900",
-    color: "#17202a"
+    color: "#0f2c34"
   },
   detailHeader: {
     flexDirection: "row",
@@ -2241,13 +2261,14 @@ const styles = StyleSheet.create({
     gap: 12
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    color: "#256f6c",
-    backgroundColor: "#d9f2e8",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    color: "#11635e",
+    backgroundColor: "#d8f3ea",
     borderRadius: 999,
     fontSize: 11,
-    fontWeight: "800"
+    fontWeight: "900",
+    overflow: "hidden"
   },
   shortClosedBadge: {
     color: "#9a3412",
@@ -2260,26 +2281,26 @@ const styles = StyleSheet.create({
   },
   detailBox: {
     flex: 1,
-    gap: 4,
+    gap: 5,
     minWidth: 140,
-    minHeight: 66,
+    minHeight: 72,
     justifyContent: "center",
-    padding: 10,
-    backgroundColor: "#f8fbfc",
-    borderColor: "#e6edf2",
-    borderRadius: 6,
+    padding: 12,
+    backgroundColor: "#f7fafb",
+    borderColor: "#e1eaf0",
+    borderRadius: 12,
     borderWidth: 1
   },
   detailLabel: {
-    color: "#60707d",
+    color: "#607580",
     fontSize: 12,
-    fontWeight: "700"
+    fontWeight: "800"
   },
   detailValue: {
-    color: "#17202a",
+    color: "#0f2c34",
     fontSize: 14,
     lineHeight: 19,
-    fontWeight: "800"
+    fontWeight: "900"
   },
   kpiRow: {
     flexDirection: "row",
@@ -2288,18 +2309,18 @@ const styles = StyleSheet.create({
   kpiBox: {
     flex: 1,
     gap: 2,
-    minHeight: 64,
+    minHeight: 72,
     alignItems: "center",
     justifyContent: "center",
     padding: 10,
-    backgroundColor: "#f8fbfc",
-    borderColor: "#e6edf2",
-    borderRadius: 6,
+    backgroundColor: "#f7fafb",
+    borderColor: "#e1eaf0",
+    borderRadius: 12,
     borderWidth: 1
   },
   kpiValue: {
-    color: "#17202a",
-    fontSize: 20,
+    color: "#0f2c34",
+    fontSize: 24,
     fontWeight: "900"
   },
   progressHeader: {
@@ -2309,14 +2330,14 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   progressTrack: {
-    height: 10,
+    height: 12,
     overflow: "hidden",
-    backgroundColor: "#edf1f5",
+    backgroundColor: "#e8eef2",
     borderRadius: 999
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#256f6c",
+    backgroundColor: "#0f8f84",
     borderRadius: 999
   },
   label: {
@@ -2325,34 +2346,34 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   input: {
-    minHeight: 46,
-    paddingHorizontal: 12,
-    color: "#17202a",
-    backgroundColor: "#ffffff",
+    minHeight: 50,
+    paddingHorizontal: 14,
+    color: "#0f2c34",
+    backgroundColor: "#fbfdfe",
     borderColor: "#c8d3dd",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   primaryButton: {
-    minHeight: 46,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
-    backgroundColor: "#256f6c",
-    borderRadius: 6
+    backgroundColor: "#0f7f78",
+    borderRadius: 12
   },
   primaryButtonText: {
     color: "#ffffff",
     fontWeight: "800"
   },
   secondaryButton: {
-    minHeight: 44,
+    minHeight: 46,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
     backgroundColor: "#ffffff",
     borderColor: "#c8d3dd",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   secondaryButtonText: {
@@ -2372,13 +2393,13 @@ const styles = StyleSheet.create({
   },
   inlineButton: {
     alignSelf: "flex-start",
-    minHeight: 38,
+    minHeight: 40,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fbfc",
     borderColor: "#c8d3dd",
-    borderRadius: 6,
+    borderRadius: 10,
     borderWidth: 1
   },
   inlineButtonText: {
@@ -2386,14 +2407,17 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   muted: {
-    color: "#60707d"
+    color: "#607580",
+    lineHeight: 20
   },
   productionNotice: {
-    gap: 5,
-    padding: 12,
-    backgroundColor: "#f0fdfa",
-    borderColor: "#b9eadb",
-    borderRadius: 6,
+    gap: 6,
+    padding: 14,
+    backgroundColor: "#edfdfa",
+    borderColor: "#9bd8c8",
+    borderLeftColor: "#0f7f78",
+    borderLeftWidth: 4,
+    borderRadius: 14,
     borderWidth: 1
   },
   quickRow: {
@@ -2403,14 +2427,14 @@ const styles = StyleSheet.create({
   },
   quickButton: {
     minWidth: 58,
-    minHeight: 42,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#edf1f5",
+    backgroundColor: "#f1f5f8",
     borderColor: "#dbe3ea",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   quickButtonText: {
@@ -2423,13 +2447,13 @@ const styles = StyleSheet.create({
     gap: 8
   },
   alertToggle: {
-    minHeight: 44,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
     backgroundColor: "#fff7ed",
     borderColor: "#fed7aa",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   alertToggleActive: {
@@ -2449,12 +2473,19 @@ const styles = StyleSheet.create({
     borderWidth: 1
   },
   orderCard: {
-    gap: 10,
-    padding: 12,
+    gap: 12,
+    padding: 14,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
-    borderRadius: 8,
-    borderWidth: 1
+    borderLeftColor: "#0f7f78",
+    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: "#18313a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1
   },
   orderCardHeader: {
     flexDirection: "row",
@@ -2493,11 +2524,13 @@ const styles = StyleSheet.create({
   },
   selectedOrderRow: {
     backgroundColor: "#eefaf7",
-    borderColor: "#256f6c"
+    borderColor: "#0f7f78",
+    borderLeftColor: "#0f7f78"
   },
   followUpOrderCard: {
     backgroundColor: "#f8fafc",
-    borderColor: "#c8d3dd"
+    borderColor: "#c8d3dd",
+    borderLeftColor: "#64748b"
   },
   notificationPanelHeader: {
     flexDirection: "row",
@@ -2513,7 +2546,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   notificationListScroll: {
-    maxHeight: 280
+    maxHeight: 310
   },
   calendarHeader: {
     flexDirection: "row",
@@ -2533,13 +2566,13 @@ const styles = StyleSheet.create({
   },
   shiftSummaryBox: {
     flex: 1,
-    minHeight: 58,
+    minHeight: 68,
     alignItems: "center",
     justifyContent: "center",
     padding: 8,
-    backgroundColor: "#f8fbfc",
-    borderColor: "#e6edf2",
-    borderRadius: 6,
+    backgroundColor: "#f7fafb",
+    borderColor: "#e1eaf0",
+    borderRadius: 12,
     borderWidth: 1
   },
   shiftCalendarList: {
@@ -2571,7 +2604,12 @@ const styles = StyleSheet.create({
   shiftCalendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6
+    gap: 6,
+    padding: 6,
+    backgroundColor: "#f8fbfc",
+    borderColor: "#e1eaf0",
+    borderRadius: 14,
+    borderWidth: 1
   },
   shiftWeekday: {
     width: "13.45%",
@@ -2583,12 +2621,12 @@ const styles = StyleSheet.create({
   },
   shiftDayCell: {
     width: "13.45%",
-    minHeight: 86,
+    minHeight: 92,
     gap: 4,
     padding: 6,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1
   },
   shiftDayCellEmpty: {
@@ -2596,8 +2634,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent"
   },
   shiftDayCellAssigned: {
-    backgroundColor: "#f0fdfa",
-    borderColor: "#9bd8c8"
+    backgroundColor: "#ecfdf8",
+    borderColor: "#8fd4c5"
   },
   shiftDayHeader: {
     flexDirection: "row",
@@ -2614,7 +2652,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     color: "#ffffff",
-    backgroundColor: "#256f6c",
+    backgroundColor: "#0f7f78",
     borderRadius: 999,
     fontSize: 11,
     fontWeight: "900",
@@ -2648,15 +2686,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    padding: 10,
+    padding: 12,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
-    borderRadius: 8,
+    borderLeftColor: "#c8d3dd",
+    borderLeftWidth: 4,
+    borderRadius: 14,
     borderWidth: 1
   },
   mobileNotificationUnread: {
-    backgroundColor: "#f0fdfa",
-    borderColor: "#256f6c"
+    backgroundColor: "#effdf9",
+    borderColor: "#0f7f78",
+    borderLeftColor: "#0f7f78"
   },
   mobileNotificationText: {
     flex: 1,
@@ -2666,21 +2707,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 6,
     padding: 4,
-    backgroundColor: "#eef3f6",
-    borderColor: "#dbe3ea",
-    borderRadius: 8,
+    backgroundColor: "#edf3f6",
+    borderColor: "#d6e1e8",
+    borderRadius: 14,
     borderWidth: 1
   },
   mobileTabButton: {
     flex: 1,
-    minHeight: 38,
+    minHeight: 42,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
-    borderRadius: 6
+    borderRadius: 10
   },
   mobileTabButtonActive: {
-    backgroundColor: "#256f6c"
+    backgroundColor: "#0f7f78",
+    shadowColor: "#0f2930",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 7,
+    elevation: 2
   },
   mobileTabText: {
     color: "#60707d",
@@ -2690,8 +2736,9 @@ const styles = StyleSheet.create({
     color: "#ffffff"
   },
   orderNo: {
-    color: "#17202a",
-    fontWeight: "800"
+    color: "#0f2c34",
+    fontSize: 15,
+    fontWeight: "900"
   },
   actionRow: {
     flexDirection: "row",
@@ -2704,36 +2751,36 @@ const styles = StyleSheet.create({
     gap: 8
   },
   choiceButton: {
-    minHeight: 38,
+    minHeight: 40,
     justifyContent: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#edf1f5",
-    borderColor: "#edf1f5",
+    backgroundColor: "#f1f5f8",
+    borderColor: "#e4ebf0",
     borderRadius: 999,
     borderWidth: 1
   },
   operationChoiceButton: {
     minWidth: 150,
     flexGrow: 1,
-    gap: 3,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    backgroundColor: "#edf1f5",
-    borderColor: "#edf1f5",
-    borderRadius: 8,
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#f1f5f8",
+    borderColor: "#e4ebf0",
+    borderRadius: 14,
     borderWidth: 1
   },
   choiceButtonActive: {
-    backgroundColor: "#d9f2e8",
-    borderColor: "#256f6c"
+    backgroundColor: "#d8f3ea",
+    borderColor: "#0f7f78"
   },
   choiceText: {
     color: "#17202a",
     fontWeight: "700"
   },
   operationSection: {
-    gap: 10
+    gap: 12
   },
   operationSummary: {
     flexDirection: "row",
@@ -2741,39 +2788,55 @@ const styles = StyleSheet.create({
     gap: 8
   },
   operationCard: {
-    gap: 8,
-    padding: 12,
+    gap: 9,
+    marginLeft: 8,
+    padding: 14,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
-    borderRadius: 8,
-    borderWidth: 2
+    borderLeftColor: "#94a3b8",
+    borderLeftWidth: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: "#18313a",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 9,
+    elevation: 1
   },
   myOperationCard: {
-    borderColor: "#256f6c"
+    borderColor: "#0f7f78",
+    borderLeftColor: "#0f7f78",
+    backgroundColor: "#eefaf7"
   },
   operationWAITING: {
-    opacity: 0.72,
-    backgroundColor: "#f8fafc"
+    opacity: 0.82,
+    backgroundColor: "#f8fafc",
+    borderLeftColor: "#94a3b8"
   },
   operationREADY: {
     backgroundColor: "#ecfdf8",
-    borderColor: "#256f6c"
+    borderColor: "#9bd8c8",
+    borderLeftColor: "#0f7f78"
   },
   operationIN_PROGRESS: {
     backgroundColor: "#eff6ff",
-    borderColor: "#2563eb"
+    borderColor: "#bfdbfe",
+    borderLeftColor: "#2563eb"
   },
   operationPAUSED: {
     backgroundColor: "#fffbeb",
-    borderColor: "#d97706"
+    borderColor: "#fde68a",
+    borderLeftColor: "#d97706"
   },
   operationCOMPLETED: {
     backgroundColor: "#f0fdf4",
-    borderColor: "#16a34a"
+    borderColor: "#bbf7d0",
+    borderLeftColor: "#16a34a"
   },
   shortCompletedOperationCard: {
     backgroundColor: "#fff7ed",
-    borderColor: "#f97316"
+    borderColor: "#fed7aa",
+    borderLeftColor: "#f97316"
   },
   operationHeader: {
     flexDirection: "row",
@@ -2782,15 +2845,16 @@ const styles = StyleSheet.create({
     gap: 10
   },
   operationSequence: {
-    minWidth: 28,
-    height: 28,
+    minWidth: 32,
+    height: 32,
     textAlign: "center",
     textAlignVertical: "center",
     color: "#ffffff",
-    backgroundColor: "#256f6c",
+    backgroundColor: "#0f7f78",
     borderRadius: 999,
     fontWeight: "900",
-    lineHeight: 28
+    lineHeight: 32,
+    overflow: "hidden"
   },
   operationHeaderText: {
     flex: 1,
@@ -2803,17 +2867,17 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   operationStage: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     color: "#ffffff",
-    backgroundColor: "#256f6c",
+    backgroundColor: "#0f7f78",
     borderRadius: 999,
     fontSize: 11,
     fontWeight: "900",
     overflow: "hidden"
   },
   myOperationText: {
-    color: "#256f6c",
+    color: "#0f7f78",
     fontWeight: "900"
   },
   operationActionRow: {
@@ -2822,14 +2886,14 @@ const styles = StyleSheet.create({
     gap: 8
   },
   operationActionButton: {
-    minHeight: 40,
+    minHeight: 44,
     flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
     backgroundColor: "#ffffff",
     borderColor: "#c8d3dd",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   operationActionText: {
@@ -2838,16 +2902,17 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   operationMessage: {
-    gap: 2,
-    padding: 8,
+    gap: 3,
+    padding: 10,
     backgroundColor: "#ffffff",
     borderColor: "#dbe3ea",
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1
   },
   operationMessageForm: {
-    gap: 8,
-    paddingTop: 8,
+    gap: 9,
+    marginTop: 2,
+    paddingTop: 10,
     borderTopColor: "#dbe3ea",
     borderTopWidth: 1
   }
