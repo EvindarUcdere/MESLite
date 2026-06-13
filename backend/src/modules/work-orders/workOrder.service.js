@@ -2,7 +2,7 @@
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
-import { createNotification } from "../notifications/notification.service.js";
+import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
 
 const workOrderInclude = {
   product: true,
@@ -109,7 +109,61 @@ function isBeforePlannedStart(workOrder, date = new Date()) {
   return Boolean(workOrder.plannedStartDate && date < new Date(workOrder.plannedStartDate));
 }
 
-export function findWorkOrders() {
+async function notifyDuePlannedWorkOrders() {
+  const now = new Date();
+  const dueWorkOrders = await prisma.workOrder.findMany({
+    where: {
+      status: "PLANNED",
+      plannedStartDate: {
+        lte: now
+      },
+      operations: {
+        some: {
+          sequenceNo: 1,
+          status: "READY"
+        }
+      }
+    },
+    select: {
+      id: true,
+      orderNo: true,
+      plannedStartDate: true
+    },
+    take: 25
+  });
+
+  for (const workOrder of dueWorkOrders) {
+    const existingNotification = await prisma.notification.findFirst({
+      where: {
+        type: "WORK_ORDER_START_DUE",
+        entityType: "WorkOrder",
+        entityId: workOrder.id
+      },
+      select: { id: true }
+    });
+
+    if (existingNotification) {
+      continue;
+    }
+
+    await createNotificationsForRoles(["ADMIN", "PRODUCTION_MANAGER"], {
+      type: "WORK_ORDER_START_DUE",
+      title: "Planlı iş emri başlama zamanı geldi",
+      message: `${workOrder.orderNo} iş emri planlanan başlangıç tarihine ulaştı. Üretim yöneticisi iş emrini başlatabilir.`,
+      entityType: "WorkOrder",
+      entityId: workOrder.id,
+      metadata: {
+        workOrderId: workOrder.id,
+        orderNo: workOrder.orderNo,
+        plannedStartDate: workOrder.plannedStartDate
+      }
+    });
+  }
+}
+
+export async function findWorkOrders() {
+  await notifyDuePlannedWorkOrders();
+
   return prisma.workOrder.findMany({
     include: workOrderInclude,
     orderBy: { createdAt: "desc" }
@@ -128,6 +182,12 @@ export function findWorkOrderById(id) {
 
 function parseDateOnly(value) {
   return new Date(`${value}T00:00:00.000Z`);
+}
+
+function dateOnlyFromDate(value) {
+  const date = new Date(value);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
 }
 
 export async function findAvailableOperators({ workDate, shiftId, machineId }) {
@@ -236,6 +296,57 @@ export async function createWorkOrder(userId, data) {
     }
 
     const assignmentMap = new Map((data.operationAssignments ?? []).map((assignment) => [assignment.routeOperationId, assignment]));
+
+    if (route && data.operationAssignments?.length) {
+      if (!data.plannedStartDate) {
+        throw new ApiError(400, "Operatör ataması için plan başlangıç tarihi gereklidir");
+      }
+
+      const workDate = dateOnlyFromDate(data.plannedStartDate);
+
+      for (const operation of route.operations) {
+        const assignment = assignmentMap.get(operation.id);
+        const machineId = assignment?.machineId ?? operation.defaultMachineId ?? data.machineId;
+        const operatorId = assignment?.assignedOperatorId ?? data.assignedOperatorId;
+
+        if (!operatorId) {
+          continue;
+        }
+
+        const operator = await tx.user.findUnique({
+          where: { id: operatorId },
+          include: {
+            shiftAssignments: {
+              where: {
+                workDate,
+                ...(data.shiftId ? { shiftId: data.shiftId } : {}),
+                status: {
+                  in: ["PLANNED", "CONFIRMED"]
+                }
+              }
+            },
+            machineSkills: {
+              where: {
+                ...(machineId ? { machineId } : {}),
+                isActive: true
+              }
+            }
+          }
+        });
+
+        if (!operator || operator.role !== "OPERATOR" || !operator.isActive) {
+          throw new ApiError(400, `${operation.operationName} operasyonu için aktif operatör seçilmelidir`);
+        }
+
+        if (!operator.shiftAssignments.length) {
+          throw new ApiError(400, `${operator.name} seçilen tarih/vardiyada çalışmıyor`);
+        }
+
+        if (machineId && !operator.machineSkills.length) {
+          throw new ApiError(400, `${operator.name} seçilen makine için yetkin değil`);
+        }
+      }
+    }
 
     const workOrder = await tx.workOrder.create({
       data: {
@@ -438,8 +549,8 @@ export async function startWorkOrder(id, actor) {
     throw new ApiError(400, "Completed or cancelled work orders cannot be started");
   }
 
-  if (isOperator(actor) && isBeforePlannedStart(current)) {
-    throw new ApiError(400, "Plan tarihi gelmeden operatör iş emrini başlatamaz");
+  if (isBeforePlannedStart(current)) {
+    throw new ApiError(400, "Plan başlangıç tarihi gelmeden iş emri başlatılamaz");
   }
 
   const hasOperationFlow = current.operations.length > 0;

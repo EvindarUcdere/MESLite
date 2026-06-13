@@ -406,6 +406,67 @@ body {
   font-size: 14px;
 }
 
+.table-search {
+  min-width: min(360px, 100%);
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.credential-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #8fd8bf;
+  border-radius: 8px;
+  background: #ecfdf6;
+}
+
+.credential-card > div {
+  display: grid;
+  gap: 5px;
+}
+
+.credential-card strong {
+  color: #14523f;
+}
+
+.credential-card code {
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17202a;
+  overflow-wrap: anywhere;
+}
+
+.credential-card small {
+  color: #60707d;
+}
+
+.credential-card button,
+.password-inline button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #c8d3dd;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #17202a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.password-inline {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
 .chart-panel {
   min-height: 320px;
 }
@@ -2707,6 +2768,33 @@ th {
   margin-top: 14px;
 }
 
+.quality-check-form {
+  grid-template-columns: minmax(280px, 1.4fr) minmax(260px, 1fr) minmax(140px, 0.65fr) minmax(150px, 0.7fr);
+  align-items: end;
+}
+
+.quality-check-form label:nth-of-type(1) {
+  grid-column: span 2;
+}
+
+.quality-check-form .field-span-all {
+  padding: 12px;
+  background: #f7fafc;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.quality-check-form .choice-list {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  max-height: 180px;
+  overflow: auto;
+}
+
+.quality-check-form > button {
+  width: 100%;
+  justify-content: center;
+}
+
 .quality-context div {
   display: grid;
   gap: 4px;
@@ -2953,6 +3041,12 @@ th {
 
   .operation-message-form {
     grid-template-columns: 1fr;
+  }
+
+  .quality-check-form,
+  .quality-check-form label:nth-of-type(1) {
+    grid-template-columns: 1fr;
+    grid-column: 1 / -1;
   }
 
   .work-order-list-toolbar {

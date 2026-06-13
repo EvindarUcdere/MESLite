@@ -224,14 +224,21 @@ export default function Dashboard() {
     {
       label: "Bugünkü Üretim",
       value: summary?.todayProducedQuantity ?? 0,
-      hint: `${summary?.todayScrapQuantity ?? 0} fire`,
+      hint: "Son adımdan çıkan bitmiş ürün",
+      tone: "neutral",
+      to: "/reports"
+    },
+    {
+      label: "Makine İşlem Adedi",
+      value: summary?.todayProcessProducedQuantity ?? 0,
+      hint: "Bugün girilen operasyon kayıtları",
       tone: "neutral",
       to: "/reports"
     },
     {
       label: "Fire Orani",
       value: `${summary?.todayScrapRate ?? 0}%`,
-      hint: "Bugünkü üretime göre",
+      hint: `${summary?.todayFinalScrapQuantity ?? 0} final fire / ${summary?.todayScrapQuantity ?? 0} proses firesi`,
       tone: (summary?.todayScrapRate ?? 0) > 5 ? "warning" : "good",
       to: "/reports"
     },
@@ -248,6 +255,11 @@ export default function Dashboard() {
     {
       name: "Bugün",
       produced: summary?.todayProducedQuantity ?? 0,
+      scrap: summary?.todayScrapQuantity ?? 0
+    },
+    {
+      name: "Makine İşlem",
+      produced: summary?.todayProcessProducedQuantity ?? 0,
       scrap: summary?.todayScrapQuantity ?? 0
     },
     {

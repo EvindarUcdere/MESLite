@@ -121,6 +121,14 @@ model User {
   name               String
   email              String                 @unique
   passwordHash       String
+  employeeCode       String?                @unique
+  phone              String?
+  department         String?
+  position           String?
+  hireDate           DateTime?              @db.Date
+  terminationDate    DateTime?              @db.Date
+  emergencyContactName  String?
+  emergencyContactPhone String?
   role               UserRole               @default(OPERATOR)
   isActive           Boolean                @default(true)
   createdAt          DateTime               @default(now())

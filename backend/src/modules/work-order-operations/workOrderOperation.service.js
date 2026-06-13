@@ -224,7 +224,7 @@ export async function startOperation(actor, id) {
     throw new ApiError(400, "Operations of completed or cancelled work orders cannot be started");
   }
 
-  if (actor.role === "OPERATOR" && isBeforePlannedStart(current.workOrder)) {
+  if (isBeforePlannedStart(current.workOrder)) {
     throw new ApiError(400, "Plan tarihi gelmeden operatör operasyonu başlatamaz");
   }
 

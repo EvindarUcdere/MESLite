@@ -1,7 +1,54 @@
-import { Pencil, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { KeyRound, Pencil, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { createUser, getUsers, updateUser, updateUserStatus } from "../api/masterData.api.js";
 import { ROLE_LABELS } from "../utils/roles.js";
+
+const emptyUserForm = {
+  name: "",
+  email: "",
+  password: "User123!",
+  employeeCode: "",
+  phone: "",
+  department: "",
+  position: "",
+  hireDate: "",
+  terminationDate: "",
+  emergencyContactName: "",
+  emergencyContactPhone: "",
+  role: "OPERATOR",
+  isActive: true
+};
+
+function toDateInput(value) {
+  return value ? new Date(value).toISOString().slice(0, 10) : "";
+}
+
+function buildEditForm(user) {
+  return {
+    name: user.name ?? "",
+    email: user.email ?? "",
+    password: "",
+    employeeCode: user.employeeCode ?? "",
+    phone: user.phone ?? "",
+    department: user.department ?? "",
+    position: user.position ?? "",
+    hireDate: toDateInput(user.hireDate),
+    terminationDate: toDateInput(user.terminationDate),
+    emergencyContactName: user.emergencyContactName ?? "",
+    emergencyContactPhone: user.emergencyContactPhone ?? "",
+    role: user.role ?? "OPERATOR",
+    isActive: Boolean(user.isActive)
+  };
+}
+
+function normalizePayload(form) {
+  return Object.fromEntries(Object.entries(form).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
+}
+
+function generateTemporaryPassword() {
+  const number = Math.floor(1000 + Math.random() * 9000);
+  return `MesLite${number}!`;
+}
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -9,20 +56,24 @@ export default function Users() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "User123!",
-    role: "OPERATOR",
-    isActive: true
-  });
-  const [editForm, setEditForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "OPERATOR",
-    isActive: true
-  });
+  const [form, setForm] = useState(emptyUserForm);
+  const [editForm, setEditForm] = useState({ ...emptyUserForm, password: "" });
+  const [search, setSearch] = useState("");
+  const [credentialCard, setCredentialCard] = useState(null);
+
+  const filteredUsers = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase("tr-TR");
+
+    if (!term) {
+      return users;
+    }
+
+    return users.filter((user) =>
+      [user.name, user.email, user.employeeCode, user.department, user.position, user.phone]
+        .filter(Boolean)
+        .some((value) => value.toLocaleLowerCase("tr-TR").includes(term))
+    );
+  }, [search, users]);
 
   async function loadUsers() {
     setError("");
@@ -42,7 +93,7 @@ export default function Users() {
         }
       } catch (_error) {
         if (isMounted) {
-          setError("Kullanıcılar yüklenemedi.");
+          setError("Çalışanlar yüklenemedi.");
         }
       } finally {
         if (isMounted) {
@@ -68,24 +119,17 @@ export default function Users() {
 
   function selectUser(user) {
     setSelectedUser(user);
-    setEditForm({
-      name: user.name,
-      email: user.email,
-      password: "",
-      role: user.role,
-      isActive: user.isActive
-    });
+    setEditForm(buildEditForm(user));
   }
 
   function clearSelection() {
     setSelectedUser(null);
-    setEditForm({
-      name: "",
-      email: "",
-      password: "",
-      role: "OPERATOR",
-      isActive: true
-    });
+    setEditForm({ ...emptyUserForm, password: "" });
+  }
+
+  async function copyCredentials(credentials) {
+    const text = `MES Lite Mobil Giriş\nE-posta: ${credentials.email}\nŞifre: ${credentials.password}`;
+    await navigator.clipboard?.writeText(text);
   }
 
   async function handleSubmit(event) {
@@ -94,17 +138,19 @@ export default function Users() {
     setIsSubmitting(true);
 
     try {
-      await createUser(form);
-      setForm({
-        name: "",
-        email: "",
-        password: "User123!",
-        role: "OPERATOR",
-        isActive: true
+      const payload = normalizePayload(form);
+      const createdUser = await createUser(payload);
+
+      setCredentialCard({
+        title: "Mobil giriş bilgileri oluşturuldu",
+        name: createdUser.name,
+        email: createdUser.email,
+        password: createdUser.temporaryPassword ?? payload.password
       });
+      setForm({ ...emptyUserForm, password: generateTemporaryPassword() });
       await loadUsers();
     } catch (_error) {
-      setError("Kullanıcı oluşturulamadı.");
+      setError("Çalışan oluşturulamadı. E-posta veya sicil no daha önce kullanılmış olabilir.");
     } finally {
       setIsSubmitting(false);
     }
@@ -117,7 +163,7 @@ export default function Users() {
       await updateUserStatus(userId, isActive);
       await loadUsers();
     } catch (_error) {
-      setError("Kullanıcı durumu güncellenemedi.");
+      setError("Çalışan durumu güncellenemedi.");
     }
   }
 
@@ -132,58 +178,141 @@ export default function Users() {
     setIsSubmitting(true);
 
     try {
-      await updateUser(selectedUser.id, {
-        name: editForm.name,
-        email: editForm.email,
-        role: editForm.role,
-        isActive: editForm.isActive,
+      const payload = normalizePayload({
+        ...editForm,
         ...(editForm.password ? { password: editForm.password } : {})
       });
+
+      if (!editForm.password) {
+        delete payload.password;
+      }
+
+      const updatedUser = await updateUser(selectedUser.id, payload);
+
+      if (payload.password) {
+        setCredentialCard({
+          title: "Mobil şifre sıfırlandı",
+          name: updatedUser.name,
+          email: updatedUser.email,
+          password: updatedUser.temporaryPassword ?? payload.password
+        });
+      }
+
       await loadUsers();
       clearSelection();
     } catch (_error) {
-      setError("Kullanıcı güncellenemedi.");
+      setError("Çalışan güncellenemedi. Sicil no veya e-posta çakışıyor olabilir.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function renderProfileFields(state, updater, includePassword = true) {
+    return (
+      <>
+        <label>
+          Ad Soyad
+          <input value={state.name} onChange={(event) => updater("name", event.target.value)} placeholder="Ahmet Yılmaz" required />
+        </label>
+        <label>
+          Mobil / Web E-posta
+          <input value={state.email} onChange={(event) => updater("email", event.target.value)} type="email" placeholder="operator@meslite.local" required />
+        </label>
+        <label>
+          {includePassword ? "Geçici Şifre" : "Şifre Sıfırla"}
+          <div className="password-inline">
+            <input
+              value={state.password}
+              onChange={(event) => updater("password", event.target.value)}
+              type="text"
+              minLength="8"
+              placeholder={includePassword ? "MesLite123!" : "Boş bırakılırsa değişmez"}
+              required={includePassword}
+            />
+            <button type="button" onClick={() => updater("password", generateTemporaryPassword())} title="Geçici şifre üret">
+              <KeyRound size={16} />
+            </button>
+          </div>
+        </label>
+        <label>
+          Sicil No
+          <input value={state.employeeCode} onChange={(event) => updater("employeeCode", event.target.value)} placeholder="EMP-0042" />
+        </label>
+        <label>
+          Telefon
+          <input value={state.phone} onChange={(event) => updater("phone", event.target.value)} placeholder="+90 555 100 00 00" />
+        </label>
+        <label>
+          Departman
+          <input value={state.department} onChange={(event) => updater("department", event.target.value)} placeholder="Montaj" />
+        </label>
+        <label>
+          Pozisyon
+          <input value={state.position} onChange={(event) => updater("position", event.target.value)} placeholder="Montaj Operatörü" />
+        </label>
+        <label>
+          İşe Giriş
+          <input value={state.hireDate} onChange={(event) => updater("hireDate", event.target.value)} type="date" />
+        </label>
+        <label>
+          İşten Çıkış
+          <input value={state.terminationDate} onChange={(event) => updater("terminationDate", event.target.value)} type="date" />
+        </label>
+        <label>
+          Acil Kişi
+          <input value={state.emergencyContactName} onChange={(event) => updater("emergencyContactName", event.target.value)} placeholder="Yakın adı" />
+        </label>
+        <label>
+          Acil Telefon
+          <input value={state.emergencyContactPhone} onChange={(event) => updater("emergencyContactPhone", event.target.value)} placeholder="+90 555 200 00 00" />
+        </label>
+        <label>
+          Rol
+          <select value={state.role} onChange={(event) => updater("role", event.target.value)} required>
+            <option value="OPERATOR">Operatör</option>
+            <option value="PRODUCTION_MANAGER">Üretim Yöneticisi</option>
+            <option value="QUALITY_STAFF">Kalite Personeli</option>
+            <option value="VIEWER">İzleyici</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </label>
+      </>
+    );
   }
 
   return (
     <div className="page-stack">
       <header className="page-header">
         <div>
-          <h1>Kullanıcılar</h1>
-          <p>Operatör, üretim yöneticisi ve kalite personeli hesaplarını yönetin.</p>
+          <h1>Çalışanlar</h1>
+          <p>Çalışan kartlarını, web hesaplarını ve mobil operatör giriş bilgilerini yönetin.</p>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
+      {credentialCard ? (
+        <section className="credential-card">
+          <div>
+            <strong>{credentialCard.title}</strong>
+            <span>{credentialCard.name}</span>
+            <code>E-posta: {credentialCard.email}</code>
+            <code>Geçici şifre: {credentialCard.password}</code>
+            <small>Bu şifre veritabanında düz metin saklanmaz; sadece bu işlemden sonra gösterilir.</small>
+          </div>
+          <button type="button" onClick={() => copyCredentials(credentialCard)}>
+            Kopyala
+          </button>
+          <button type="button" onClick={() => setCredentialCard(null)} aria-label="Bilgileri kapat">
+            <X size={16} />
+          </button>
+        </section>
+      ) : null}
+
       <section className="panel">
-        <h2>Kullanıcı Oluştur</h2>
+        <h2>Çalışan Oluştur</h2>
         <form className="work-order-form" onSubmit={handleSubmit}>
-          <label>
-            Ad Soyad
-            <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="Ahmet Yılmaz" required />
-          </label>
-          <label>
-            E-posta
-            <input value={form.email} onChange={(event) => updateForm("email", event.target.value)} type="email" placeholder="operator@factory.local" required />
-          </label>
-          <label>
-            Geçici Şifre
-            <input value={form.password} onChange={(event) => updateForm("password", event.target.value)} type="text" minLength="8" required />
-          </label>
-          <label>
-            Rol
-            <select value={form.role} onChange={(event) => updateForm("role", event.target.value)} required>
-              <option value="OPERATOR">Operatör</option>
-              <option value="PRODUCTION_MANAGER">Üretim Yöneticisi</option>
-              <option value="QUALITY_STAFF">Kalite Personeli</option>
-              <option value="VIEWER">İzleyici</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </label>
+          {renderProfileFields(form, updateForm)}
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             <Plus size={18} />
             {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
@@ -195,36 +324,15 @@ export default function Users() {
         <section className="panel">
           <div className="section-title-row">
             <div>
-              <h2>Kullanıcı Düzenle</h2>
-              <p className="muted-text">Geçmiş kayıtları korumak için kullanıcılar silinmez, pasife alınır.</p>
+              <h2>Çalışan Kartı Düzenle</h2>
+              <p className="muted-text">Şifre alanını doldurursanız mobil/web giriş şifresi sıfırlanır. Boş bırakılırsa mevcut şifre korunur.</p>
             </div>
             <button className="icon-button" type="button" onClick={clearSelection} aria-label="Düzenlemeyi kapat" title="Düzenlemeyi kapat">
               <X size={18} />
             </button>
           </div>
           <form className="work-order-form" onSubmit={handleUpdate}>
-            <label>
-              Ad Soyad
-              <input value={editForm.name} onChange={(event) => updateEditForm("name", event.target.value)} required />
-            </label>
-            <label>
-              E-posta
-              <input value={editForm.email} onChange={(event) => updateEditForm("email", event.target.value)} type="email" required />
-            </label>
-            <label>
-              Şifre Sıfırla
-              <input value={editForm.password} onChange={(event) => updateEditForm("password", event.target.value)} type="text" minLength="8" placeholder="Boş bırakılırsa değişmez" />
-            </label>
-            <label>
-              Rol
-              <select value={editForm.role} onChange={(event) => updateEditForm("role", event.target.value)} required>
-                <option value="OPERATOR">Operatör</option>
-                <option value="PRODUCTION_MANAGER">Üretim Yöneticisi</option>
-                <option value="QUALITY_STAFF">Kalite Personeli</option>
-                <option value="VIEWER">İzleyici</option>
-                <option value="ADMIN">Admin</option>
-              </select>
-            </label>
+            {renderProfileFields(editForm, updateEditForm, false)}
             <label>
               Durum
               <select value={editForm.isActive ? "active" : "passive"} onChange={(event) => updateEditForm("isActive", event.target.value === "active")}>
@@ -241,23 +349,43 @@ export default function Users() {
       ) : null}
 
       <section className="panel">
-        <h2>Kullanıcı Listesi</h2>
+        <div className="section-title-row">
+          <div>
+            <h2>Çalışan Listesi</h2>
+            <p className="muted-text">E-posta mobil giriş kullanıcı adıdır. Şifre güvenlik nedeniyle listede gösterilmez; düzenle ile sıfırlanır.</p>
+          </div>
+          <input className="table-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="İsim, sicil, departman veya telefon ara" />
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Sicil</th>
                 <th>Ad Soyad</th>
-                <th>E-posta</th>
+                <th>Mobil Giriş</th>
+                <th>Departman</th>
+                <th>Pozisyon</th>
+                <th>Telefon</th>
                 <th>Rol</th>
                 <th>Durum</th>
                 <th>İşlem</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id} className={selectedUser?.id === user.id ? "selected-row" : ""}>
-                  <td>{user.name}</td>
-                  <td>{user.email}</td>
+                  <td>{user.employeeCode ?? "-"}</td>
+                  <td>
+                    <strong>{user.name}</strong>
+                    <div className="muted-text">{user.email}</div>
+                  </td>
+                  <td>
+                    <strong>{user.email}</strong>
+                    <div className="muted-text">Şifre: oluştururken verilir veya sıfırlanır</div>
+                  </td>
+                  <td>{user.department ?? "-"}</td>
+                  <td>{user.position ?? "-"}</td>
+                  <td>{user.phone ?? "-"}</td>
                   <td>{ROLE_LABELS[user.role] ?? user.role}</td>
                   <td>
                     <span className={`status-pill ${user.isActive ? "quality-passed" : "status-cancelled"}`}>{user.isActive ? "Aktif" : "Pasif"}</span>
@@ -274,9 +402,9 @@ export default function Users() {
                   </td>
                 </tr>
               ))}
-              {!isLoading && users.length === 0 ? (
+              {!isLoading && filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="5">Henüz kullanıcı yok.</td>
+                  <td colSpan="9">Çalışan bulunamadı.</td>
                 </tr>
               ) : null}
             </tbody>

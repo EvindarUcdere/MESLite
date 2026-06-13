@@ -85,31 +85,21 @@ function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
 
-function getOperatorAvailabilityLabel(operator) {
-  const notes = [];
-
-  if (!operator.hasShiftAssignment) {
-    notes.push("vardiya yok");
-  }
-
-  if (!operator.hasMachineSkill) {
-    notes.push("yetkinlik yok");
-  }
-
-  if (operator.activeOperationCount) {
-    notes.push(`${operator.activeOperationCount} aktif iş`);
-  }
-
-  return notes.length ? ` (${notes.join(", ")})` : "";
-}
-
 function getStartableOperation(workOrder) {
   return (workOrder.operations ?? []).find((operation) => operation.status === "PAUSED") ?? (workOrder.operations ?? []).find((operation) => operation.status === "READY");
+}
+
+function isBeforePlannedStart(workOrder) {
+  return Boolean(workOrder.plannedStartDate && new Date() < new Date(workOrder.plannedStartDate));
 }
 
 function getStartBlockReason(workOrder) {
   if (!["PLANNED", "PAUSED"].includes(workOrder.status)) {
     return "Sadece planlanan veya duraklatılan iş emirleri başlatılabilir.";
+  }
+
+  if (isBeforePlannedStart(workOrder)) {
+    return "Plan başlangıç tarihi gelmeden iş emri başlatılamaz.";
   }
 
   if (workOrder.operations?.length) {
@@ -151,6 +141,10 @@ function canComplete(workOrder) {
 
 function canStartOperation(operation, workOrder, user) {
   const isManagerOverride = [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER].includes(user?.role);
+  if (isBeforePlannedStart(workOrder)) {
+    return false;
+  }
+
   return ["READY", "PAUSED"].includes(operation.status) || (isManagerOverride && isShortCompletedOperation(operation, workOrder));
 }
 
@@ -547,7 +541,21 @@ export default function WorkOrders() {
       );
 
       if (isMounted) {
-        setAvailableOperatorsByOperation(Object.fromEntries(entries));
+        const nextAvailableOperators = Object.fromEntries(entries);
+        setAvailableOperatorsByOperation(nextAvailableOperators);
+        setOperationAssignments((current) =>
+          current.map((assignment) => {
+            if (!assignment.assignedOperatorId) {
+              return assignment;
+            }
+
+            const isStillAvailable = (nextAvailableOperators[assignment.routeOperationId] ?? []).some(
+              (operator) => operator.id === assignment.assignedOperatorId && operator.isAvailable
+            );
+
+            return isStillAvailable ? assignment : { ...assignment, assignedOperatorId: "" };
+          })
+        );
       }
     }
 
@@ -583,6 +591,7 @@ export default function WorkOrders() {
         productId: form.productId,
         plannedQuantity: Number(form.plannedQuantity),
         plannedStartDate: form.workDate ? `${form.workDate}T00:00:00.000Z` : undefined,
+        ...(form.shiftId ? { shiftId: form.shiftId } : {}),
         ...(form.routeId ? { routeId: form.routeId } : {}),
         ...(operationAssignments.length
           ? {
@@ -834,7 +843,7 @@ export default function WorkOrders() {
             <input value={form.plannedQuantity} onChange={(event) => updateForm("plannedQuantity", event.target.value)} type="number" min="1" required />
           </label>
           <label>
-            Plan Tarihi
+            Plan Başlangıç Tarihi
             <input value={form.workDate} onChange={(event) => updateForm("workDate", event.target.value)} type="date" required />
           </label>
           <label>
@@ -877,7 +886,6 @@ export default function WorkOrders() {
               {operationAssignments.map((assignment) => {
                 const availableOperators = availableOperatorsByOperation[assignment.routeOperationId] ?? [];
                 const selectableOperators = availableOperators.filter((operator) => operator.isAvailable);
-                const fallbackOperators = selectableOperators.length ? selectableOperators : availableOperators;
 
                 return (
                   <div className="operation-assignment-row" key={assignment.routeOperationId}>
@@ -902,19 +910,18 @@ export default function WorkOrders() {
                       <select
                         value={assignment.assignedOperatorId}
                         onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "assignedOperatorId", event.target.value)}
-                        disabled={!assignment.machineId}
+                        disabled={!assignment.machineId || !selectableOperators.length}
                       >
-                        <option value="">Sonra ata</option>
-                        {fallbackOperators.map((operator) => (
+                        <option value="">{selectableOperators.length ? "Operatör seçin" : "Uygun operatör yok"}</option>
+                        {selectableOperators.map((operator) => (
                           <option key={operator.id} value={operator.id}>
                             {operator.name}
-                            {getOperatorAvailabilityLabel(operator)}
                           </option>
                         ))}
                       </select>
                     </label>
                     {assignment.machineId && availableOperators.length && !selectableOperators.length ? (
-                      <p className="form-warning">Tam uygun operatör yok. Listede vardiya/yetkinlik eksiği olan operatörler açıklamalı gösteriliyor; planı sonra Vardiya Planı ekranından düzeltebilirsiniz.</p>
+                      <p className="form-error">Bu tarih/vardiya/makine için atanabilir operatör yok. Önce Vardiya Planı ekranından çalışma günü ve makine yetkinliği tanımlayın.</p>
                     ) : null}
                     {assignment.machineId && !availableOperators.length ? (
                       <p className="form-error">Bu makine için aktif operatör bulunamadı. Kullanıcı ve vardiya planı ekranından operatör/yetkinlik ekleyin.</p>

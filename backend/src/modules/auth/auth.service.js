@@ -9,7 +9,8 @@ function sanitizeUser(user) {
 }
 
 export async function login({ email, password }) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const normalizedEmail = email.trim().toLocaleLowerCase("tr-TR");
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
   if (!user || !user.isActive) {
     throw new ApiError(401, "Invalid email or password");

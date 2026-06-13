@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
+import { getApiBaseUrl } from "./src/api/client";
 import { createMobileDebugLog } from "./src/api/mobileDebugLogs.api";
 import { clearNotifications, getNotifications, markAllNotificationsRead, markNotificationRead } from "./src/api/notifications.api";
 import { createProductionLog, uploadProductionLogImage } from "./src/api/productionLogs.api";
@@ -1112,7 +1113,11 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
-      const session = await login({ email, password });
+      const cleanEmail = email.trim().toLocaleLowerCase("tr-TR");
+      const cleanPassword = password.trim();
+      const session = await login({ email: cleanEmail, password: cleanPassword });
+      setEmail(cleanEmail);
+      setPassword(cleanPassword);
       setUser(session.user);
       await loadWorkOrders();
       await loadNotifications();
@@ -1120,7 +1125,7 @@ export default function App() {
       await registerDevicePushToken();
       await loadPushStatus();
     } catch (loginError) {
-      setError(getErrorMessage(loginError, "Giriş yapılamadı."));
+      setError(`${getErrorMessage(loginError, "Giriş yapılamadı.")} API: ${getApiBaseUrl()}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1443,9 +1448,9 @@ export default function App() {
         <Text style={styles.authSubtitle}>Operatör üretim girişi</Text>
         <View style={styles.card}>
           <Text style={styles.label}>E-posta</Text>
-          <TextInput style={styles.input} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} />
+          <TextInput style={styles.input} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="username" value={email} onChangeText={setEmail} />
           <Text style={styles.label}>Şifre</Text>
-          <TextInput style={styles.input} secureTextEntry value={password} onChangeText={setPassword} />
+          <TextInput style={styles.input} autoCapitalize="none" autoCorrect={false} secureTextEntry textContentType="password" value={password} onChangeText={setPassword} />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={styles.primaryButton} onPress={handleLogin} disabled={isSubmitting}>
             <Text style={styles.primaryButtonText}>{isSubmitting ? "Giriş yapılıyor..." : "Giriş Yap"}</Text>

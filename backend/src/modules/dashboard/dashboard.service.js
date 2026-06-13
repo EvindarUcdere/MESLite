@@ -32,6 +32,25 @@ function calculateProgress(workOrder) {
   return Number(((workOrder.producedQuantity / workOrder.plannedQuantity) * 100).toFixed(2));
 }
 
+function sumProductionLogs(productionLogs) {
+  return productionLogs.reduce(
+    (acc, log) => ({
+      producedQuantity: acc.producedQuantity + log.producedQuantity,
+      scrapQuantity: acc.scrapQuantity + log.scrapQuantity
+    }),
+    { producedQuantity: 0, scrapQuantity: 0 }
+  );
+}
+
+function isFinalProductLog(log) {
+  if (!log.workOrderOperationId) {
+    return true;
+  }
+
+  const finalOperation = log.workOrder?.operations?.at(-1);
+  return finalOperation?.id === log.workOrderOperationId;
+}
+
 export async function getSummary() {
   const { start, end } = getTodayRange();
   const now = new Date();
@@ -46,7 +65,7 @@ export async function getSummary() {
     openAlerts,
     criticalAlerts,
     productionTotals,
-    todayProductionTotals,
+    todayProductionLogs,
     machineStatusGroups,
     workOrderStatusGroups,
     qualityStatusGroups
@@ -70,16 +89,27 @@ export async function getSummary() {
         scrapQuantity: true
       }
     }),
-    prisma.productionLog.aggregate({
+    prisma.productionLog.findMany({
       where: {
         createdAt: {
           gte: start,
           lt: end
         }
       },
-      _sum: {
-        producedQuantity: true,
-        scrapQuantity: true
+      include: {
+        workOrder: {
+          include: {
+            operations: {
+              select: {
+                id: true,
+                sequenceNo: true
+              },
+              orderBy: {
+                sequenceNo: "asc"
+              }
+            }
+          }
+        }
       }
     }),
     prisma.machine.groupBy({
@@ -99,9 +129,14 @@ export async function getSummary() {
   const producedQuantity = productionTotals._sum.producedQuantity ?? 0;
   const scrapQuantity = productionTotals._sum.scrapQuantity ?? 0;
   const scrapRate = producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
-  const todayProducedQuantity = todayProductionTotals._sum.producedQuantity ?? 0;
-  const todayScrapQuantity = todayProductionTotals._sum.scrapQuantity ?? 0;
-  const todayScrapRate = todayProducedQuantity > 0 ? Number(((todayScrapQuantity / todayProducedQuantity) * 100).toFixed(2)) : 0;
+  const todayProcessTotals = sumProductionLogs(todayProductionLogs);
+  const todayFinalProductTotals = sumProductionLogs(todayProductionLogs.filter(isFinalProductLog));
+  const todayProducedQuantity = todayFinalProductTotals.producedQuantity;
+  const todayScrapQuantity = todayProcessTotals.scrapQuantity;
+  const todayFinalScrapQuantity = todayFinalProductTotals.scrapQuantity;
+  const todayProcessProducedQuantity = todayProcessTotals.producedQuantity;
+  const todayScrapRate =
+    todayProducedQuantity > 0 ? Number(((todayFinalScrapQuantity / todayProducedQuantity) * 100).toFixed(2)) : 0;
 
   return {
     activeWorkOrders,
@@ -118,6 +153,8 @@ export async function getSummary() {
     todayProducedQuantity,
     todayScrapQuantity,
     todayScrapRate,
+    todayFinalScrapQuantity,
+    todayProcessProducedQuantity,
     machineStatusCounts: normalizeGroupCounts(machineStatusGroups, "status"),
     workOrderStatusCounts: normalizeGroupCounts(workOrderStatusGroups, "status"),
     qualityStatusCounts: normalizeGroupCounts(qualityStatusGroups, "status")

@@ -424,7 +424,7 @@ export default function Quality() {
             <p className="muted-text">Üretimi yapılmış iş emirleri için kalite sonucunu, operasyon adımını ve hata nedenini kaydedin.</p>
           </div>
         </div>
-        <form className="work-order-form" onSubmit={handleSubmit}>
+        <form className="work-order-form quality-check-form" onSubmit={handleSubmit}>
           <label>
             İş Emri
             <select value={form.workOrderId} onChange={(event) => updateForm("workOrderId", event.target.value)} required>

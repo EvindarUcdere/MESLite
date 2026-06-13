@@ -5,11 +5,54 @@ const userSelect = {
   id: true,
   name: true,
   email: true,
+  employeeCode: true,
+  phone: true,
+  department: true,
+  position: true,
+  hireDate: true,
+  terminationDate: true,
+  emergencyContactName: true,
+  emergencyContactPhone: true,
   role: true,
   isActive: true,
   createdAt: true,
   updatedAt: true
 };
+
+const profileFields = [
+  "employeeCode",
+  "phone",
+  "department",
+  "position",
+  "hireDate",
+  "terminationDate",
+  "emergencyContactName",
+  "emergencyContactPhone"
+];
+
+function normalizeUserProfile(data) {
+  const profile = {};
+
+  for (const field of profileFields) {
+    if (data[field] !== undefined) {
+      profile[field] = data[field] === "" ? null : data[field];
+    }
+  }
+
+  if (profile.hireDate) {
+    profile.hireDate = new Date(profile.hireDate);
+  }
+
+  if (profile.terminationDate) {
+    profile.terminationDate = new Date(profile.terminationDate);
+  }
+
+  return profile;
+}
+
+function normalizeEmail(email) {
+  return email.trim().toLocaleLowerCase("tr-TR");
+}
 
 export function findUsers() {
   return prisma.user.findMany({
@@ -26,32 +69,52 @@ export function findUserById(id) {
 }
 
 export async function createUser(data) {
-  const passwordHash = await bcrypt.hash(data.password, 10);
+  const temporaryPassword = data.password.trim();
+  const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+  const email = normalizeEmail(data.email);
 
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name: data.name,
-      email: data.email,
+      email,
       role: data.role,
       isActive: data.isActive,
+      ...normalizeUserProfile(data),
       passwordHash
     },
     select: userSelect
   });
+
+  return {
+    ...user,
+    temporaryPassword
+  };
 }
 
 export async function updateUser(id, data) {
   const { password, ...rest } = data;
-  const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
+  const temporaryPassword = password ? password.trim() : undefined;
+  const passwordHash = temporaryPassword ? await bcrypt.hash(temporaryPassword, 10) : undefined;
+  const profile = normalizeUserProfile(rest);
+  const normalizedRest = {
+    ...rest,
+    ...(rest.email ? { email: normalizeEmail(rest.email) } : {})
+  };
 
-  return prisma.user.update({
+  const user = await prisma.user.update({
     where: { id },
     data: {
-      ...rest,
+      ...normalizedRest,
+      ...profile,
       ...(passwordHash ? { passwordHash } : {})
     },
     select: userSelect
   });
+
+  return {
+    ...user,
+    ...(temporaryPassword ? { temporaryPassword } : {})
+  };
 }
 
 export function updateUserStatus(id, isActive) {

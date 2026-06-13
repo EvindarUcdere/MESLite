@@ -10,7 +10,7 @@ export default function Products() {
   const [form, setForm] = useState({
     code: "",
     name: "",
-    unit: "pcs",
+    unit: "adet",
     targetCycleTime: ""
   });
 
@@ -59,15 +59,15 @@ export default function Products() {
 
     try {
       await createProduct({
-        code: form.code,
-        name: form.name,
-        unit: form.unit,
+        code: form.code.trim(),
+        name: form.name.trim(),
+        unit: form.unit.trim(),
         ...(form.targetCycleTime ? { targetCycleTime: Number(form.targetCycleTime) } : {})
       });
-      setForm({ code: "", name: "", unit: "pcs", targetCycleTime: "" });
+      setForm({ code: "", name: "", unit: "adet", targetCycleTime: "" });
       await loadProducts();
     } catch (_error) {
-      setError("Ürün oluşturulamadı.");
+      setError("Ürün oluşturulamadı. Ürün kodu daha önce kullanılmış olabilir.");
     } finally {
       setIsSubmitting(false);
     }
@@ -78,26 +78,34 @@ export default function Products() {
       <header className="page-header">
         <div>
           <h1>Ürünler</h1>
-          <p>İş emirlerinde kullanılacak ürün ana verilerini yönetin.</p>
+          <p>İş emirlerinde ve rotalarda kullanılacak ürün ana verilerini yönetin.</p>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
+      <section className="panel info-panel">
+        <h2>Bu ekranda ne tutulur?</h2>
+        <p>
+          Ürün kartı stok deposu değildir. Burada üretilecek mamul veya yarı mamulün kodu, adı, ölçü birimi ve hedef çevrim süresi tutulur.
+          Rota, makine operasyonları ve iş emirleri bu kart üzerinden bağlanır.
+        </p>
+      </section>
+
       <section className="panel">
         <h2>Ürün Oluştur</h2>
         <form className="work-order-form" onSubmit={handleSubmit}>
           <label>
-            Kod
-            <input value={form.code} onChange={(event) => updateForm("code", event.target.value)} placeholder="PRD-002" required />
+            Ürün Kodu
+            <input value={form.code} onChange={(event) => updateForm("code", event.target.value)} placeholder="E2E-AMB-001" required />
           </label>
           <label>
-            Ad
-            <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="Assembly Part" required />
+            Ürün Adı
+            <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="Ambalajlı Final Demo" required />
           </label>
           <label>
             Birim
-            <input value={form.unit} onChange={(event) => updateForm("unit", event.target.value)} placeholder="pcs" required />
+            <input value={form.unit} onChange={(event) => updateForm("unit", event.target.value)} placeholder="adet" required />
           </label>
           <label>
             Hedef Çevrim Süresi
@@ -129,7 +137,7 @@ export default function Products() {
                   <td>{product.code}</td>
                   <td>{product.name}</td>
                   <td>{product.unit}</td>
-                  <td>{product.targetCycleTime ? `${product.targetCycleTime}s` : "-"}</td>
+                  <td>{product.targetCycleTime ? `${product.targetCycleTime} sn` : "-"}</td>
                   <td>
                     <span className={`status-pill ${product.isActive ? "quality-passed" : "status-cancelled"}`}>{product.isActive ? "Aktif" : "Pasif"}</span>
                   </td>

@@ -122,6 +122,25 @@ function addLogMetrics(item, log) {
   item.logCount += 1;
 }
 
+function sumProductionLogs(productionLogs) {
+  return productionLogs.reduce(
+    (acc, log) => ({
+      producedQuantity: acc.producedQuantity + log.producedQuantity,
+      scrapQuantity: acc.scrapQuantity + log.scrapQuantity
+    }),
+    { producedQuantity: 0, scrapQuantity: 0 }
+  );
+}
+
+function isFinalProductLog(log) {
+  if (!log.workOrderOperationId) {
+    return true;
+  }
+
+  const finalOperation = log.workOrder?.operations?.at(-1);
+  return finalOperation?.id === log.workOrderOperationId;
+}
+
 function sortByProducedThenScrap(items) {
   return items.sort((first, second) => {
     if (first.shiftId === "UNASSIGNED" && second.shiftId !== "UNASSIGNED") {
@@ -292,7 +311,20 @@ export async function getOverviewReport(query = {}) {
     prisma.productionLog.findMany({
       where: dateRangeFilter("createdAt", range),
       include: {
-        workOrder: { include: { product: true } },
+        workOrder: {
+          include: {
+            product: true,
+            operations: {
+              select: {
+                id: true,
+                sequenceNo: true
+              },
+              orderBy: {
+                sequenceNo: "asc"
+              }
+            }
+          }
+        },
         machine: true,
         shift: true,
         operator: {
@@ -393,8 +425,13 @@ export async function getOverviewReport(query = {}) {
     })
   ]);
 
-  const producedQuantity = productionLogs.reduce((sum, log) => sum + log.producedQuantity, 0);
-  const scrapQuantity = productionLogs.reduce((sum, log) => sum + log.scrapQuantity, 0);
+  const finalProductLogs = productionLogs.filter(isFinalProductLog);
+  const processTotals = sumProductionLogs(productionLogs);
+  const finalProductTotals = sumProductionLogs(finalProductLogs);
+  const producedQuantity = finalProductTotals.producedQuantity;
+  const scrapQuantity = processTotals.scrapQuantity;
+  const finalScrapQuantity = finalProductTotals.scrapQuantity;
+  const processProducedQuantity = processTotals.producedQuantity;
   const defectQuantity = qualityChecks.reduce((sum, check) => sum + check.defectQuantity, 0);
   const qualityDecisionCounts = countBy(productionAlerts, "qualityDecision");
   const qualityReworkCount = qualityDecisionCounts.REWORK_OPERATION ?? 0;
@@ -421,7 +458,7 @@ export async function getOverviewReport(query = {}) {
     return acc;
   }, {});
 
-  const productPerformanceMap = productionLogs.reduce((acc, log) => {
+  const productPerformanceMap = finalProductLogs.reduce((acc, log) => {
     const productId = log.workOrder.productId;
 
     if (!acc[productId]) {
@@ -677,8 +714,10 @@ export async function getOverviewReport(query = {}) {
     productionLogCount: productionLogs.length,
     machineCount: machines.length,
     producedQuantity,
+    processProducedQuantity,
     scrapQuantity,
-    scrapRate: scrapRate(producedQuantity, scrapQuantity),
+    finalScrapQuantity,
+    scrapRate: scrapRate(producedQuantity, finalScrapQuantity),
     qualityCheckCount: qualityChecks.length,
     defectQuantity,
     qualityDecisionCount: productionAlerts.length,
@@ -688,7 +727,7 @@ export async function getOverviewReport(query = {}) {
   };
   const operationDowntimeByShift = Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount);
   const operationDowntimeByMachine = Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount);
-  const productionTrend = groupDailyProduction(productionLogs);
+  const productionTrend = groupDailyProduction(finalProductLogs);
   const managementInsights = buildManagementInsights({
     summary,
     shiftPerformance,

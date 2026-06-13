@@ -130,13 +130,32 @@ async function cleanupOperationalData() {
   await prisma.auditLog.deleteMany({});
 }
 
-async function upsertUser({ name, email, role, isActive = true }) {
+const departmentByGroup = ["Kesim", "CNC İşleme", "Kaynak", "Montaj", "Kalite"];
+const positionByGroup = ["Kesim Operatörü", "CNC Operatörü", "Kaynak Operatörü", "Montaj Operatörü", "Kalite Kontrol Operatörü"];
+
+function userProfile(index, groupIndex, isActive = true) {
+  const hireDate = new Date(Date.UTC(2021 + (index % 4), index % 12, 1 + (index % 20)));
+  const terminationDate = isActive ? null : new Date(Date.UTC(2026, 4, 20 + (index % 8)));
+
+  return {
+    employeeCode: `${isActive ? "EMP" : "OLD"}-${String(index + 1).padStart(4, "0")}`,
+    phone: `+90 5${30 + (index % 40)} ${String(100 + index).padStart(3, "0")} ${String(20 + index).padStart(2, "0")} ${String(10 + index).padStart(2, "0")}`,
+    department: departmentByGroup[groupIndex] ?? "Üretim",
+    position: positionByGroup[groupIndex] ?? "Operatör",
+    hireDate,
+    terminationDate,
+    emergencyContactName: `Acil Kişi ${index + 1}`,
+    emergencyContactPhone: `+90 5${50 + (index % 30)} ${String(200 + index).padStart(3, "0")} ${String(40 + index).padStart(2, "0")} ${String(30 + index).padStart(2, "0")}`
+  };
+}
+
+async function upsertUser({ name, email, role, isActive = true, profile = {} }) {
   const passwordHash = await bcrypt.hash(password, 10);
 
   return prisma.user.upsert({
     where: { email },
-    update: { name, role, isActive },
-    create: { name, email, role, isActive, passwordHash }
+    update: { name, role, isActive, ...profile },
+    create: { name, email, role, isActive, passwordHash, ...profile }
   });
 }
 
@@ -146,22 +165,37 @@ async function seedUsers() {
     data: { isActive: false }
   });
 
-  const admin = await upsertUser({ name: "MES Lite Admin", email: "admin@meslite.local", role: "ADMIN" });
+  const admin = await upsertUser({ name: "MES Lite Admin", email: "admin@meslite.local", role: "ADMIN", profile: { employeeCode: "ADM-0001", department: "Bilgi Sistemleri", position: "Sistem Yöneticisi", phone: "+90 555 100 00 01" } });
   const manager = await upsertUser({ name: "Üretim Müdürü Selim Arda", email: "manager@meslite.local", role: "PRODUCTION_MANAGER" });
   const qualityStaff = await upsertUser({ name: "Kalite Sorumlusu Ebru Kaya", email: "quality@meslite.local", role: "QUALITY_STAFF" });
   await upsertUser({ name: "Yönetim Gözlemcisi", email: "viewer@meslite.local", role: "VIEWER" });
+
+  await upsertUser({
+    name: "Line Operator",
+    email: "operator@meslite.local",
+    role: "OPERATOR",
+    profile: {
+      employeeCode: "EMP-DEMO-LINE",
+      phone: "+90 555 100 00 10",
+      department: "Kesim",
+      position: "Hat Operatörü",
+      hireDate: new Date(Date.UTC(2024, 0, 15)),
+      emergencyContactName: "Demo Acil Kişi",
+      emergencyContactPhone: "+90 555 200 00 10"
+    }
+  });
 
   const operators = [];
   for (let index = 0; index < operatorNames.length; index += 1) {
     const name = operatorNames[index];
     const email = `op${String(index + 1).padStart(2, "0")}.${slugify(name)}@meslite.local`;
-    operators.push(await upsertUser({ name, email, role: "OPERATOR" }));
+    operators.push(await upsertUser({ name, email, role: "OPERATOR", profile: userProfile(index, Math.floor(index / 10), true) }));
   }
 
   for (let index = 0; index < formerOperatorNames.length; index += 1) {
     const name = formerOperatorNames[index];
     const email = `former${String(index + 1).padStart(2, "0")}.${slugify(name)}@meslite.local`;
-    await upsertUser({ name, email, role: "OPERATOR", isActive: false });
+    await upsertUser({ name, email, role: "OPERATOR", isActive: false, profile: userProfile(index, index % 5, false) });
   }
 
   return { admin, manager, qualityStaff, operators };
@@ -329,7 +363,7 @@ async function seedGroupsSkillsAndRoster({ operators, machines, shifts }) {
     "Kesim Ekibi": ["PRS-01", "LZR-01", "BKM-01"],
     "CNC Ekibi": ["CNC-01", "CNC-02", "DRL-01"],
     "Kaynak Ekibi": ["KYN-01", "MNT-01"],
-    "Montaj Ekibi": ["MNT-01", "MNT-02", "PKT-01"],
+    "Montaj Ekibi": ["MNT-01", "MNT-02", "PKT-01", "BOY-01"],
     "Kalite Ekibi": ["TST-01", "KLT-01", "KLT-02"]
   };
 
@@ -374,8 +408,8 @@ async function seedGroupsSkillsAndRoster({ operators, machines, shifts }) {
       const isSunday = workDate.getUTCDay() === 0;
 
       operators.forEach((operator, operatorIndex) => {
-        const teamIndex = Math.floor(operatorIndex / 10);
-        const shiftKey = shiftKeys[(teamIndex + Math.floor((day - 1) / 7)) % shiftKeys.length];
+        const teamMemberIndex = operatorIndex % 10;
+        const shiftKey = shiftKeys[(teamMemberIndex + Math.floor((day - 1) / 7)) % shiftKeys.length];
         assignments.push({
           operatorId: operator.id,
           shiftId: shifts[shiftKey].id,
@@ -428,7 +462,7 @@ function pickOperatorForMachine(machineCode, operators) {
 
 async function createWorkOrderScenario({ orderNo, routePack, operators, shifts, manager, qualityStaff, dayOffset, status, plannedQuantity, progressRatio = 1 }) {
   const plannedStartDate = addDays(dateOnly(new Date()), dayOffset);
-  const actualStartDate = dayOffset <= 0 ? addMinutes(plannedStartDate, 6 * 60 + 20) : null;
+  const actualStartDate = dayOffset <= 0 && status !== "PLANNED" ? addMinutes(plannedStartDate, 6 * 60 + 20) : null;
   const isCompleted = status === "COMPLETED";
   const isActive = ["IN_PROGRESS", "PAUSED"].includes(status);
   const expectedScrap = status === "PLANNED" ? 0 : Math.max(0, Math.round(plannedQuantity * (0.01 + ((Math.abs(dayOffset) % 5) * 0.004))));
@@ -466,7 +500,7 @@ async function createWorkOrderScenario({ orderNo, routePack, operators, shifts, 
       } else if (index === Math.floor(routePack.operations.length * progressRatio)) {
         operationStatus = status === "PAUSED" ? "PAUSED" : "IN_PROGRESS";
       }
-    } else if (index === 0 && dayOffset <= 1) {
+    } else if (index === 0) {
       operationStatus = "READY";
     }
 
@@ -644,6 +678,25 @@ async function seedWorkOrders({ routes, operators, shifts, manager, qualityStaff
       progressRatio: 0
     });
   }
+
+  scenarios.push(
+    {
+      orderNo: "FAC-2026-06-PLAN-TODAY",
+      routePack: routes[0],
+      dayOffset: 0,
+      status: "PLANNED",
+      plannedQuantity: 150,
+      progressRatio: 0
+    },
+    {
+      orderNo: "FAC-2026-06-PLAN-TOMORROW",
+      routePack: routes[1],
+      dayOffset: 1,
+      status: "PLANNED",
+      plannedQuantity: 120,
+      progressRatio: 0
+    }
+  );
 
   for (const scenario of scenarios) {
     await createWorkOrderScenario({ ...scenario, operators, shifts, manager, qualityStaff });

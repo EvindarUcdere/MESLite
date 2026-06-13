@@ -10,6 +10,7 @@ export const createWorkOrderSchema = z.object({
     plannedQuantity: z.number().int().positive(),
     plannedStartDate: z.string().datetime().optional(),
     plannedEndDate: z.string().datetime().optional(),
+    shiftId: z.string().uuid().optional(),
     operationAssignments: z
       .array(
         z.object({
