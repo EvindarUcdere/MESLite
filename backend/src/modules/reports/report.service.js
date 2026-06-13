@@ -4,6 +4,22 @@ function scrapRate(producedQuantity, scrapQuantity) {
   return producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
 }
 
+function percent(numerator, denominator) {
+  if (denominator <= 0) {
+    return 0;
+  }
+
+  return Number(((numerator / denominator) * 100).toFixed(2));
+}
+
+function clampRate(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(value, 1));
+}
+
 function parseReportDate(value, fallback) {
   if (!value) {
     return fallback;
@@ -34,6 +50,99 @@ function dateRangeFilter(field, range) {
       gte: range.from,
       lte: range.to
     }
+  };
+}
+
+const WORK_ORDER_STATUSES = new Set(["PLANNED", "IN_PROGRESS", "PAUSED", "COMPLETED", "CANCELLED"]);
+
+function normalizeFilterValue(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getReportFilters(query = {}) {
+  const status = normalizeFilterValue(query.status);
+
+  return {
+    productId: normalizeFilterValue(query.productId),
+    machineId: normalizeFilterValue(query.machineId),
+    shiftId: normalizeFilterValue(query.shiftId),
+    operatorId: normalizeFilterValue(query.operatorId),
+    routeId: normalizeFilterValue(query.routeId),
+    status: WORK_ORDER_STATUSES.has(status) ? status : undefined
+  };
+}
+
+function compactAnd(...conditions) {
+  return conditions.filter(Boolean);
+}
+
+function hasWorkOrderScope(filters) {
+  return Boolean(filters.productId || filters.routeId || filters.status);
+}
+
+function buildWorkOrderScope(filters) {
+  const scope = {};
+
+  if (filters.productId) {
+    scope.productId = filters.productId;
+  }
+
+  if (filters.routeId) {
+    scope.routeId = filters.routeId;
+  }
+
+  if (filters.status) {
+    scope.status = filters.status;
+  }
+
+  return scope;
+}
+
+function buildRelatedWorkOrderFilter(filters) {
+  return hasWorkOrderScope(filters) ? { workOrder: buildWorkOrderScope(filters) } : null;
+}
+
+function buildWorkOrderWhere(range, filters) {
+  const assignmentFilters = [];
+
+  if (filters.machineId) {
+    assignmentFilters.push(
+      { machineId: filters.machineId },
+      { operations: { some: { machineId: filters.machineId } } },
+      { productionLogs: { some: { machineId: filters.machineId } } },
+      { operationDowntimes: { some: { machineId: filters.machineId } } }
+    );
+  }
+
+  if (filters.operatorId) {
+    assignmentFilters.push(
+      { assignedOperatorId: filters.operatorId },
+      { operations: { some: { assignedOperatorId: filters.operatorId } } },
+      { productionLogs: { some: { operatorId: filters.operatorId } } },
+      { operationDowntimes: { some: { operatorId: filters.operatorId } } }
+    );
+  }
+
+  if (filters.shiftId) {
+    assignmentFilters.push(
+      { productionLogs: { some: { shiftId: filters.shiftId } } },
+      { operationDowntimes: { some: { shiftId: filters.shiftId } } }
+    );
+  }
+
+  return {
+    AND: compactAnd(
+      {
+        OR: [
+          dateRangeFilter("plannedStartDate", range),
+          dateRangeFilter("actualStartDate", range),
+          dateRangeFilter("actualEndDate", range),
+          dateRangeFilter("updatedAt", range)
+        ]
+      },
+      hasWorkOrderScope(filters) ? buildWorkOrderScope(filters) : null,
+      assignmentFilters.length ? { OR: assignmentFilters } : null
+    )
   };
 }
 
@@ -98,6 +207,21 @@ function createTimeGroup(base) {
   };
 }
 
+function createOeeGroup(base) {
+  return {
+    ...base,
+    operationCount: 0,
+    plannedMinutes: 0,
+    actualMinutes: 0,
+    downtimeMinutes: 0,
+    runMinutes: 0,
+    idealRunMinutes: 0,
+    producedQuantity: 0,
+    scrapQuantity: 0,
+    totalProcessedQuantity: 0
+  };
+}
+
 function addTimeMetrics(group, item) {
   group.operationCount += 1;
   group.completedOperationCount += item.completedAt ? 1 : 0;
@@ -113,6 +237,33 @@ function finalizeTimeGroup(group) {
     ...group,
     avgDelayMinutes: group.operationCount > 0 ? Number((group.delayMinutes / group.operationCount).toFixed(1)) : 0,
     avgNetMinutes: group.operationCount > 0 ? Number((group.netMinutes / group.operationCount).toFixed(1)) : 0
+  };
+}
+
+function addOeeMetrics(group, metrics) {
+  group.operationCount += 1;
+  group.plannedMinutes += metrics.plannedMinutes;
+  group.actualMinutes += metrics.actualMinutes;
+  group.downtimeMinutes += metrics.downtimeMinutes;
+  group.runMinutes += metrics.runMinutes;
+  group.idealRunMinutes += metrics.idealRunMinutes;
+  group.producedQuantity += metrics.producedQuantity;
+  group.scrapQuantity += metrics.scrapQuantity;
+  group.totalProcessedQuantity += metrics.totalProcessedQuantity;
+}
+
+function finalizeOeeGroup(group) {
+  const availabilityRate = clampRate(group.runMinutes / group.plannedMinutes);
+  const performanceRate = clampRate(group.idealRunMinutes / group.runMinutes);
+  const qualityRate = clampRate(group.producedQuantity / group.totalProcessedQuantity);
+  const oeeRate = availabilityRate * performanceRate * qualityRate;
+
+  return {
+    ...group,
+    availability: Number((availabilityRate * 100).toFixed(2)),
+    performance: Number((performanceRate * 100).toFixed(2)),
+    quality: Number((qualityRate * 100).toFixed(2)),
+    oee: Number((oeeRate * 100).toFixed(2))
   };
 }
 
@@ -187,8 +338,102 @@ function groupDailyProduction(productionLogs) {
     .sort((first, second) => first.date.localeCompare(second.date));
 }
 
+function monthKey(date) {
+  return date.toISOString().slice(0, 7);
+}
+
+function monthLabel(key) {
+  const [year, month] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("tr-TR", { month: "short", year: "numeric" }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function isDateWithinRange(date, range) {
+  return Boolean(date && date >= range.from && date <= range.to);
+}
+
+function getWorkOrderReportDate(workOrder, range) {
+  return [workOrder.plannedStartDate, workOrder.actualStartDate, workOrder.actualEndDate].find((date) => isDateWithinRange(date, range)) ?? null;
+}
+
+function buildPlanActualPerformance(workOrders, range) {
+  const map = {};
+  const cursor = new Date(Date.UTC(range.from.getUTCFullYear(), range.from.getUTCMonth(), 1));
+  const lastMonth = new Date(Date.UTC(range.to.getUTCFullYear(), range.to.getUTCMonth(), 1));
+
+  while (cursor <= lastMonth) {
+    const key = monthKey(cursor);
+
+    map[key] = {
+      period: key,
+      label: monthLabel(key),
+      workOrderCount: 0,
+      completedWorkOrderCount: 0,
+      plannedQuantity: 0,
+      producedQuantity: 0,
+      scrapQuantity: 0
+    };
+
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  workOrders.forEach((workOrder) => {
+    const date = getWorkOrderReportDate(workOrder, range);
+
+    if (!date) {
+      return;
+    }
+
+    const key = monthKey(date);
+
+    if (!map[key]) {
+      map[key] = {
+        period: key,
+        label: monthLabel(key),
+        workOrderCount: 0,
+        completedWorkOrderCount: 0,
+        plannedQuantity: 0,
+        producedQuantity: 0,
+        scrapQuantity: 0
+      };
+    }
+
+    map[key].workOrderCount += 1;
+    map[key].completedWorkOrderCount += workOrder.status === "COMPLETED" ? 1 : 0;
+    map[key].plannedQuantity += workOrder.plannedQuantity;
+    map[key].producedQuantity += workOrder.producedQuantity;
+    map[key].scrapQuantity += workOrder.scrapQuantity;
+  });
+
+  return Object.values(map)
+    .map((item) => ({
+      ...item,
+      gapQuantity: Math.max(item.plannedQuantity - item.producedQuantity, 0),
+      completionRate: item.plannedQuantity > 0 ? Number(((item.producedQuantity / item.plannedQuantity) * 100).toFixed(2)) : 0,
+      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+    }))
+    .sort((first, second) => first.period.localeCompare(second.period));
+}
+
 function buildManagementInsights({ summary, shiftPerformance, delayedOperations, operationDowntimeByMachine, operationDowntimeByShift, qualityDecisionByMachine }) {
   const insights = [];
+
+  if (summary.planCompletionRate < 85 && summary.plannedQuantity > 0) {
+    insights.push({
+      type: "PLAN_GAP",
+      severity: "WARNING",
+      title: "Plan gerçekleşmesi düşük",
+      message: `Seçili dönemde plan gerçekleşmesi %${summary.planCompletionRate}. ${summary.productionGapQuantity} adet açık üretim var.`
+    });
+  }
+
+  if (summary.oee > 0 && summary.oee < 60) {
+    insights.push({
+      type: "OEE_LOW",
+      severity: "WARNING",
+      title: "OEE düşük",
+      message: `Seçili dönemde toplam OEE %${summary.oee}. Kullanılabilirlik, performans ve kalite bileşenleri birlikte incelenmeli.`
+    });
+  }
 
   if (summary.scrapRate >= 10) {
     insights.push({
@@ -296,9 +541,11 @@ function addQualityDecisionMetric(map, key, base, alert) {
 
 export async function getOverviewReport(query = {}) {
   const range = getReportRange(query);
+  const filters = getReportFilters(query);
+  const workOrderScope = buildRelatedWorkOrderFilter(filters);
   const [workOrders, productionLogs, qualityChecks, productionAlerts, machines, machineStatusLogs, operationDowntimes, workOrderOperations] = await Promise.all([
     prisma.workOrder.findMany({
-      where: dateRangeFilter("updatedAt", range),
+      where: buildWorkOrderWhere(range, filters),
       include: {
         product: true,
         machine: true,
@@ -309,7 +556,15 @@ export async function getOverviewReport(query = {}) {
       orderBy: { updatedAt: "desc" }
     }),
     prisma.productionLog.findMany({
-      where: dateRangeFilter("createdAt", range),
+      where: {
+        AND: compactAnd(
+          dateRangeFilter("createdAt", range),
+          workOrderScope,
+          filters.machineId ? { machineId: filters.machineId } : null,
+          filters.shiftId ? { shiftId: filters.shiftId } : null,
+          filters.operatorId ? { operatorId: filters.operatorId } : null
+        )
+      },
       include: {
         workOrder: {
           include: {
@@ -334,7 +589,19 @@ export async function getOverviewReport(query = {}) {
       orderBy: { createdAt: "desc" }
     }),
     prisma.qualityCheck.findMany({
-      where: dateRangeFilter("checkedAt", range),
+      where: {
+        AND: compactAnd(
+          dateRangeFilter("checkedAt", range),
+          workOrderScope,
+          filters.machineId ? { workOrderOperation: { machineId: filters.machineId } } : null,
+          filters.shiftId ? { workOrder: { productionLogs: { some: { shiftId: filters.shiftId } } } } : null,
+          filters.operatorId
+            ? {
+                OR: [{ checkedById: filters.operatorId }, { workOrderOperation: { assignedOperatorId: filters.operatorId } }]
+              }
+            : null
+        )
+      },
       include: {
         workOrder: { include: { product: true } },
         workOrderOperation: {
@@ -350,10 +617,27 @@ export async function getOverviewReport(query = {}) {
     }),
     prisma.productionAlert.findMany({
       where: {
-        ...dateRangeFilter("updatedAt", range),
-        qualityDecision: {
-          not: null
-        }
+        AND: compactAnd(
+          dateRangeFilter("updatedAt", range),
+          { qualityDecision: { not: null } },
+          workOrderScope,
+          filters.machineId
+            ? {
+                OR: [{ productionLog: { machineId: filters.machineId } }, { reworkOperation: { machineId: filters.machineId } }]
+              }
+            : null,
+          filters.shiftId ? { productionLog: { shiftId: filters.shiftId } } : null,
+          filters.operatorId
+            ? {
+                OR: [
+                  { productionLog: { operatorId: filters.operatorId } },
+                  { reworkOperation: { assignedOperatorId: filters.operatorId } },
+                  { createdById: filters.operatorId },
+                  { resolvedById: filters.operatorId }
+                ]
+              }
+            : null
+        )
       },
       include: {
         workOrder: { include: { product: true } },
@@ -383,14 +667,35 @@ export async function getOverviewReport(query = {}) {
       },
       orderBy: { updatedAt: "desc" }
     }),
-    prisma.machine.findMany({ include: { productionLine: true } }),
+    prisma.machine.findMany({
+      where: filters.machineId ? { id: filters.machineId } : undefined,
+      include: { productionLine: true }
+    }),
     prisma.machineStatusLog.findMany({
-      where: { status: { in: ["STOPPED", "MAINTENANCE"] }, ...dateRangeFilter("createdAt", range) },
+      where: {
+        AND: compactAnd(
+          { status: { in: ["STOPPED", "MAINTENANCE"] } },
+          dateRangeFilter("createdAt", range),
+          filters.machineId ? { machineId: filters.machineId } : null
+        )
+      },
       orderBy: { createdAt: "desc" },
       take: 100
     }),
     prisma.operationDowntime.findMany({
-      where: dateRangeFilter("startedAt", range),
+      where: {
+        AND: compactAnd(
+          dateRangeFilter("startedAt", range),
+          workOrderScope,
+          filters.machineId ? { machineId: filters.machineId } : null,
+          filters.shiftId ? { shiftId: filters.shiftId } : null,
+          filters.operatorId
+            ? {
+                OR: [{ operatorId: filters.operatorId }, { workOrderOperation: { assignedOperatorId: filters.operatorId } }]
+              }
+            : null
+        )
+      },
       include: {
         workOrder: { include: { product: true } },
         workOrderOperation: true,
@@ -405,11 +710,19 @@ export async function getOverviewReport(query = {}) {
     }),
     prisma.workOrderOperation.findMany({
       where: {
-        startedAt: {
-          not: null,
-          gte: range.from,
-          lte: range.to
-        }
+        AND: compactAnd(
+          {
+            startedAt: {
+              not: null,
+              gte: range.from,
+              lte: range.to
+            }
+          },
+          workOrderScope,
+          filters.machineId ? { machineId: filters.machineId } : null,
+          filters.operatorId ? { assignedOperatorId: filters.operatorId } : null,
+          filters.shiftId ? { productionLogs: { some: { shiftId: filters.shiftId } } } : null
+        )
       },
       include: {
         routeOperation: true,
@@ -484,6 +797,9 @@ export async function getOverviewReport(query = {}) {
   const downtimeByOperationMap = {};
   const timeByMachineMap = {};
   const timeByOperatorMap = {};
+  const oeeOverallGroup = createOeeGroup({ scope: "OVERALL", label: "Genel" });
+  const oeeByMachineMap = {};
+  const oeeByOperationMap = {};
   const qualityDecisionByOperationMap = {};
   const qualityDecisionByMachineMap = {};
   const now = new Date();
@@ -575,6 +891,10 @@ export async function getOverviewReport(query = {}) {
     const downtimeMinutes = sumDowntimeMinutes(operation.downtimes ?? [], operation.completedAt ?? now);
     const netMinutes = Math.max(actualMinutes - downtimeMinutes, 0);
     const delayMinutes = plannedMinutes > 0 ? Math.max(netMinutes - plannedMinutes, 0) : 0;
+    const totalProcessedQuantity = operation.producedQuantity + operation.scrapQuantity;
+    const plannedQuantity = operation.workOrder.plannedQuantity;
+    const idealRunMinutes =
+      plannedMinutes > 0 && plannedQuantity > 0 ? Math.min(plannedMinutes * (totalProcessedQuantity / plannedQuantity), plannedMinutes) : 0;
 
     const item = {
       operationId: operation.id,
@@ -593,6 +913,10 @@ export async function getOverviewReport(query = {}) {
       downtimeMinutes,
       netMinutes,
       delayMinutes,
+      producedQuantity: operation.producedQuantity,
+      scrapQuantity: operation.scrapQuantity,
+      totalProcessedQuantity,
+      idealRunMinutes,
       startedAt: operation.startedAt,
       completedAt: operation.completedAt
     };
@@ -616,12 +940,62 @@ export async function getOverviewReport(query = {}) {
     }
     addTimeMetrics(timeByOperatorMap[operatorKey], item);
 
+    addOeeMetrics(oeeOverallGroup, {
+      plannedMinutes,
+      actualMinutes,
+      downtimeMinutes,
+      runMinutes: netMinutes,
+      idealRunMinutes,
+      producedQuantity: operation.producedQuantity,
+      scrapQuantity: operation.scrapQuantity,
+      totalProcessedQuantity
+    });
+
+    if (!oeeByMachineMap[machineKey]) {
+      oeeByMachineMap[machineKey] = createOeeGroup({
+        machineId: machineKey,
+        machineCode: item.machineCode,
+        machineName: item.machineName
+      });
+    }
+    addOeeMetrics(oeeByMachineMap[machineKey], {
+      plannedMinutes,
+      actualMinutes,
+      downtimeMinutes,
+      runMinutes: netMinutes,
+      idealRunMinutes,
+      producedQuantity: operation.producedQuantity,
+      scrapQuantity: operation.scrapQuantity,
+      totalProcessedQuantity
+    });
+
+    const operationNameKey = `${operation.routeOperationId ?? operation.operationName}:${operation.operationName}`;
+    if (!oeeByOperationMap[operationNameKey]) {
+      oeeByOperationMap[operationNameKey] = createOeeGroup({
+        operationKey: operationNameKey,
+        operationName: operation.operationName
+      });
+    }
+    addOeeMetrics(oeeByOperationMap[operationNameKey], {
+      plannedMinutes,
+      actualMinutes,
+      downtimeMinutes,
+      runMinutes: netMinutes,
+      idealRunMinutes,
+      producedQuantity: operation.producedQuantity,
+      scrapQuantity: operation.scrapQuantity,
+      totalProcessedQuantity
+    });
+
     return item;
   });
 
   const delayedOperations = operationTimePerformance.filter((operation) => operation.delayMinutes > 0).sort((first, second) => second.delayMinutes - first.delayMinutes);
   const operationTimeByMachine = Object.values(timeByMachineMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
   const operationTimeByOperator = Object.values(timeByOperatorMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
+  const oeeSummary = finalizeOeeGroup(oeeOverallGroup);
+  const oeeByMachine = Object.values(oeeByMachineMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
+  const oeeByOperation = Object.values(oeeByOperationMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
 
   productionAlerts.forEach((alert) => {
     const operation = alert.reworkOperation ?? alert.productionLog.workOrderOperation;
@@ -709,12 +1083,24 @@ export async function getOverviewReport(query = {}) {
     }))
   );
 
+  const planActualPerformance = buildPlanActualPerformance(workOrders, range);
+  const plannedQuantity = planActualPerformance.reduce((sum, item) => sum + item.plannedQuantity, 0);
+  const productionGapQuantity = Math.max(plannedQuantity - producedQuantity, 0);
+  const planCompletionRate = plannedQuantity > 0 ? Number(((producedQuantity / plannedQuantity) * 100).toFixed(2)) : 0;
+
   const summary = {
     workOrderCount: workOrders.length,
     productionLogCount: productionLogs.length,
     machineCount: machines.length,
+    plannedQuantity,
     producedQuantity,
     processProducedQuantity,
+    productionGapQuantity,
+    planCompletionRate,
+    availability: oeeSummary.availability,
+    performance: oeeSummary.performance,
+    quality: oeeSummary.quality,
+    oee: oeeSummary.oee,
     scrapQuantity,
     finalScrapQuantity,
     scrapRate: scrapRate(producedQuantity, finalScrapQuantity),
@@ -742,8 +1128,10 @@ export async function getOverviewReport(query = {}) {
       from: toDateInputValue(range.from),
       to: toDateInputValue(range.to)
     },
+    filters,
     summary,
     productionTrend,
+    planActualPerformance,
     managementInsights,
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
@@ -757,6 +1145,9 @@ export async function getOverviewReport(query = {}) {
     delayedOperations: delayedOperations.slice(0, 10),
     operationTimeByMachine,
     operationTimeByOperator,
+    oeeSummary,
+    oeeByMachine,
+    oeeByOperation,
     qualityStatusCounts: countBy(qualityChecks, "status"),
     qualityDecisionCounts,
     qualityDecisionByOperation,

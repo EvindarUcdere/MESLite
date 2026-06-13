@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
+import { getProductRoutes } from "../api/productRoutes.api.js";
 import { getOverviewReport } from "../api/reports.api.js";
+import { getShifts } from "../api/shiftPlanning.api.js";
 
 const STATUS_COLORS = {
   PLANNED: "#64748b",
@@ -98,6 +101,40 @@ function getDefaultReportFilters() {
 
   return {
     from: toDateInputValue(from),
+    to: toDateInputValue(to),
+    productId: "",
+    machineId: "",
+    shiftId: "",
+    operatorId: "",
+    routeId: "",
+    status: ""
+  };
+}
+
+const REPORT_PERIOD_PRESETS = [
+  { label: "1 Ay", months: 1 },
+  { label: "3 Ay", months: 3 },
+  { label: "6 Ay", months: 6 },
+  { label: "9 Ay", months: 9 },
+  { label: "12 Ay", months: 12 }
+];
+
+const WORK_ORDER_STATUS_OPTIONS = [
+  { value: "PLANNED", label: "Planlandı" },
+  { value: "IN_PROGRESS", label: "Üretimde" },
+  { value: "PAUSED", label: "Duraklatıldı" },
+  { value: "COMPLETED", label: "Tamamlandı" },
+  { value: "CANCELLED", label: "İptal" }
+];
+
+function getPresetRange(months) {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(1);
+  from.setMonth(from.getMonth() - months + 1);
+
+  return {
+    from: toDateInputValue(from),
     to: toDateInputValue(to)
   };
 }
@@ -107,6 +144,49 @@ export default function Reports() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState(getDefaultReportFilters);
+  const [filterOptions, setFilterOptions] = useState({
+    products: [],
+    machines: [],
+    shifts: [],
+    operators: [],
+    routes: []
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFilterOptions() {
+      try {
+        const [products, machines, shifts, users, routes] = await Promise.all([
+          getProducts(),
+          getMachines(),
+          getShifts(),
+          getUsers(),
+          getProductRoutes()
+        ]);
+
+        if (isMounted) {
+          setFilterOptions({
+            products,
+            machines,
+            shifts,
+            operators: users.filter((user) => user.role === "OPERATOR" && user.isActive),
+            routes
+          });
+        }
+      } catch (_error) {
+        if (isMounted) {
+          setFilterOptions({ products: [], machines: [], shifts: [], operators: [], routes: [] });
+        }
+      }
+    }
+
+    loadFilterOptions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -143,7 +223,14 @@ export default function Reports() {
   const summaryCards = [
     ["İş Emri", summary.workOrderCount ?? 0],
     ["Üretim Kaydı", summary.productionLogCount ?? 0],
+    ["Planlanan Adet", summary.plannedQuantity ?? 0],
     ["Toplam Üretim", summary.producedQuantity ?? 0],
+    ["Plan Gerçekleşme", `${summary.planCompletionRate ?? 0}%`],
+    ["Kalan Üretim", summary.productionGapQuantity ?? 0],
+    ["OEE", `${summary.oee ?? 0}%`],
+    ["Kullanılabilirlik", `${summary.availability ?? 0}%`],
+    ["Performans", `${summary.performance ?? 0}%`],
+    ["Kalite", `${summary.quality ?? 0}%`],
     ["Fire Oranı", `${summary.scrapRate ?? 0}%`],
     ["Kalite Kontrol", summary.qualityCheckCount ?? 0],
     ["Hatalı Adet", summary.defectQuantity ?? 0],
@@ -173,21 +260,44 @@ export default function Reports() {
   const operationTimeByMachine = report?.operationTimeByMachine ?? [];
   const operationTimeByOperator = report?.operationTimeByOperator ?? [];
   const productionTrendData = report?.productionTrend ?? [];
+  const planActualData = report?.planActualPerformance ?? [];
+  const oeeSummary = report?.oeeSummary ?? {};
+  const oeeByMachineData = report?.oeeByMachine ?? [];
+  const oeeByOperationData = report?.oeeByOperation ?? [];
+  const oeeComponentData = [
+    { name: "Kullanılabilirlik", value: oeeSummary.availability ?? 0 },
+    { name: "Performans", value: oeeSummary.performance ?? 0 },
+    { name: "Kalite", value: oeeSummary.quality ?? 0 },
+    { name: "OEE", value: oeeSummary.oee ?? 0 }
+  ];
   const managementInsights = report?.managementInsights ?? [];
   const machineDowntimeReasonData = Object.entries(report?.machineDowntimeReasonCounts ?? {}).map(([reason, value]) => ({
     status: reason,
     name: reason === "UNKNOWN" ? "Belirtilmemiş" : reason,
     value
   }));
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+  const clearReportFilters = () => {
+    setFilters(getDefaultReportFilters());
+  };
 
   return (
     <div className="page-stack">
-      <header className="page-header">
-        <div>
+      <header className="page-header report-page-header">
+        <div className="report-page-title">
           <h1>Raporlar</h1>
           <p>Üretim, fire, makine ve kalite performansını özetleyin.</p>
         </div>
         <div className="report-filter-bar">
+          <div className="period-preset-row" aria-label="Hazır rapor dönemleri">
+            {REPORT_PERIOD_PRESETS.map((preset) => (
+              <button key={preset.months} type="button" onClick={() => setFilters((current) => ({ ...current, ...getPresetRange(preset.months) }))}>
+                {preset.label}
+              </button>
+            ))}
+          </div>
           <label>
             Başlangıç
             <input type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
@@ -196,12 +306,82 @@ export default function Reports() {
             Bitiş
             <input type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
           </label>
+          <label>
+            Ürün
+            <select value={filters.productId} onChange={(event) => updateFilter("productId", event.target.value)}>
+              <option value="">Tüm ürünler</option>
+              {filterOptions.products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.code} - {product.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Makine
+            <select value={filters.machineId} onChange={(event) => updateFilter("machineId", event.target.value)}>
+              <option value="">Tüm makineler</option>
+              {filterOptions.machines.map((machine) => (
+                <option key={machine.id} value={machine.id}>
+                  {machine.code} - {machine.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Vardiya
+            <select value={filters.shiftId} onChange={(event) => updateFilter("shiftId", event.target.value)}>
+              <option value="">Tüm vardiyalar</option>
+              {filterOptions.shifts.map((shift) => (
+                <option key={shift.id} value={shift.id}>
+                  {shift.name} ({shift.startTime}-{shift.endTime})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Operatör
+            <select value={filters.operatorId} onChange={(event) => updateFilter("operatorId", event.target.value)}>
+              <option value="">Tüm operatörler</option>
+              {filterOptions.operators.map((operator) => (
+                <option key={operator.id} value={operator.id}>
+                  {operator.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Rota
+            <select value={filters.routeId} onChange={(event) => updateFilter("routeId", event.target.value)}>
+              <option value="">Tüm rotalar</option>
+              {filterOptions.routes.map((route) => (
+                <option key={route.id} value={route.id}>
+                  {route.product?.code ? `${route.product.code} - ` : ""}
+                  {route.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Durum
+            <select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
+              <option value="">Tüm durumlar</option>
+              {WORK_ORDER_STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="secondary-button report-clear-button" onClick={clearReportFilters}>
+            Filtreleri Temizle
+          </button>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="summary-grid">
+      <section className="summary-grid report-summary-grid">
         {summaryCards.map(([label, value]) => (
           <article key={label}>
             <span>{label}</span>
@@ -226,6 +406,156 @@ export default function Reports() {
             <p>Üretim, fire, gecikme ve duruş verileri normal eşiklerin altında görünüyor.</p>
           </article>
         )}
+      </section>
+
+      <section className="operations-grid">
+        <article className="panel chart-panel">
+          <h2>OEE Bileşenleri</h2>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={oeeComponentData}>
+              <CartesianGrid stroke="#edf1f5" vertical={false} />
+              <XAxis dataKey="name" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip />
+              <Bar dataKey="value" name="Oran" fill="#256f6c" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </article>
+
+        <article className="panel">
+          <h2>Makine Bazlı OEE</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Makine</th>
+                  <th>Ad</th>
+                  <th>OEE</th>
+                  <th>Kullanılabilirlik</th>
+                  <th>Performans</th>
+                  <th>Kalite</th>
+                  <th>Duruş</th>
+                </tr>
+              </thead>
+              <tbody>
+                {oeeByMachineData.slice(0, 10).map((item) => (
+                  <tr key={item.machineId}>
+                    <td>{item.machineCode}</td>
+                    <td>{item.machineName}</td>
+                    <td>{item.oee}%</td>
+                    <td>{item.availability}%</td>
+                    <td>{item.performance}%</td>
+                    <td>{item.quality}%</td>
+                    <td>{item.downtimeMinutes} dk</td>
+                  </tr>
+                ))}
+                {!isLoading && oeeByMachineData.length === 0 ? (
+                  <tr>
+                    <td colSpan="7">Henüz OEE için yeterli makine verisi yok.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section className="panel">
+        <h2>Operasyon Bazlı OEE</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Operasyon</th>
+                <th>OEE</th>
+                <th>Kullanılabilirlik</th>
+                <th>Performans</th>
+                <th>Kalite</th>
+                <th>Operasyon</th>
+                <th>Üretim</th>
+                <th>Fire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {oeeByOperationData.slice(0, 10).map((item) => (
+                <tr key={item.operationKey}>
+                  <td>{item.operationName}</td>
+                  <td>{item.oee}%</td>
+                  <td>{item.availability}%</td>
+                  <td>{item.performance}%</td>
+                  <td>{item.quality}%</td>
+                  <td>{item.operationCount}</td>
+                  <td>{item.producedQuantity}</td>
+                  <td>{item.scrapQuantity}</td>
+                </tr>
+              ))}
+              {!isLoading && oeeByOperationData.length === 0 ? (
+                <tr>
+                  <td colSpan="8">Henüz operasyon bazlı OEE verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="operations-grid">
+        <article className="panel chart-panel">
+          <h2>Planlanan / Gerçekleşen Üretim</h2>
+          {planActualData.length ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={planActualData}>
+                <CartesianGrid stroke="#edf1f5" vertical={false} />
+                <XAxis dataKey="label" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="plannedQuantity" name="Planlanan" fill="#64748b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="producedQuantity" name="Gerçekleşen" fill="#256f6c" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="gapQuantity" name="Kalan" fill="#d97706" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="empty-state">Seçili dönemde plan/gerçekleşen verisi yok.</p>
+          )}
+        </article>
+
+        <article className="panel">
+          <h2>Aylık Plan Takibi</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dönem</th>
+                  <th>İş Emri</th>
+                  <th>Tamamlanan</th>
+                  <th>Plan</th>
+                  <th>Gerçekleşen</th>
+                  <th>Kalan</th>
+                  <th>Oran</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planActualData.map((item) => (
+                  <tr key={item.period}>
+                    <td>{item.label}</td>
+                    <td>{item.workOrderCount}</td>
+                    <td>{item.completedWorkOrderCount}</td>
+                    <td>{item.plannedQuantity}</td>
+                    <td>{item.producedQuantity}</td>
+                    <td>{item.gapQuantity}</td>
+                    <td>{item.completionRate}%</td>
+                  </tr>
+                ))}
+                {!isLoading && planActualData.length === 0 ? (
+                  <tr>
+                    <td colSpan="7">Henüz aylık plan verisi yok.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
       <section className="panel chart-panel report-wide-chart">
@@ -565,7 +895,7 @@ export default function Reports() {
                 <th>Fire Oranı</th>
                 <th>Operatör</th>
                 <th>Makine</th>
-                <th>Kayıt</th>
+                <th>Üretim Girişi</th>
               </tr>
             </thead>
             <tbody>
@@ -602,7 +932,7 @@ export default function Reports() {
                 <th>Üretim</th>
                 <th>Fire</th>
                 <th>Fire Oranı</th>
-                <th>Kayıt</th>
+                <th>Üretim Girişi</th>
               </tr>
             </thead>
             <tbody>
@@ -638,7 +968,7 @@ export default function Reports() {
                 <th>Üretim</th>
                 <th>Fire</th>
                 <th>Fire Oranı</th>
-                <th>Kayıt</th>
+                <th>Üretim Girişi</th>
               </tr>
             </thead>
             <tbody>
@@ -906,7 +1236,7 @@ export default function Reports() {
                 <th>Üretim</th>
                 <th>Fire</th>
                 <th>Fire Oranı</th>
-                <th>Kayıt</th>
+                <th>Üretim Girişi</th>
               </tr>
             </thead>
             <tbody>
