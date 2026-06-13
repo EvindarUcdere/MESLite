@@ -471,6 +471,94 @@ body {
   min-height: 320px;
 }
 
+.report-chart-grid {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  align-items: stretch;
+}
+
+.report-chart-card {
+  min-height: 330px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  box-shadow: 0 14px 34px rgb(15 31 46 / 5%);
+}
+
+.report-chart-card h2,
+.report-wide-chart h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+  color: #0f1f2e;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.report-chart-card h2::after,
+.report-wide-chart h2::after {
+  content: "Seçili dönem";
+  padding: 5px 8px;
+  color: #66788a;
+  background: #f8fafc;
+  border: 1px solid #edf1f5;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reason-bar-list {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-top: 6px;
+}
+
+.reason-bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.reason-bar-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #33424d;
+  font-size: 13px;
+}
+
+.reason-bar-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reason-bar-label strong {
+  color: #0f1f2e;
+  font-size: 13px;
+}
+
+.reason-bar-track {
+  height: 12px;
+  overflow: hidden;
+  background: #edf2f5;
+  border-radius: 999px;
+}
+
+.reason-bar-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.reason-bar-row small {
+  color: #66788a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .report-filter-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -935,6 +1023,15 @@ body {
   .report-filter-bar,
   .report-kpi-grid {
     grid-template-columns: 1fr;
+  }
+
+  .report-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-chart-card h2,
+  .report-wide-chart h2 {
+    display: grid;
   }
 
   .report-download-button {

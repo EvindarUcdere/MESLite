@@ -153,6 +153,37 @@ function getPresetRange(months) {
   };
 }
 
+function ReasonBarList({ data, emptyText, getColor }) {
+  const maxValue = Math.max(...data.map((item) => item.value), 0);
+  const totalValue = data.reduce((sum, item) => sum + item.value, 0);
+
+  if (!data.length) {
+    return <p className="empty-state">{emptyText}</p>;
+  }
+
+  return (
+    <div className="reason-bar-list">
+      {data.slice(0, 6).map((item, index) => {
+        const width = maxValue ? Math.max((item.value / maxValue) * 100, 6) : 0;
+        const rate = totalValue ? ((item.value / totalValue) * 100).toFixed(1) : "0.0";
+
+        return (
+          <div className="reason-bar-row" key={`${item.status}-${item.name}`}>
+            <div className="reason-bar-label">
+              <span>{item.name}</span>
+              <strong>{rate}%</strong>
+            </div>
+            <div className="reason-bar-track">
+              <span style={{ width: `${width}%`, background: getColor(item, index) }} />
+            </div>
+            <small>{item.value} kayıt</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Reports() {
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -642,8 +673,8 @@ export default function Reports() {
         </div>
       </section>
 
-      <section className="operations-grid">
-        <article className="panel chart-panel">
+      <section className="operations-grid report-chart-grid">
+        <article className="panel chart-panel report-chart-card">
           <h2>Planlanan / Gerçekleşen Üretim</h2>
           {planActualData.length ? (
             <ResponsiveContainer width="100%" height={280}>
@@ -721,7 +752,7 @@ export default function Reports() {
       </section>
 
       <section className="operations-grid">
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Vardiya Performansı</h2>
           {shiftPerformanceData.length ? (
             <ResponsiveContainer width="100%" height={280}>
@@ -740,7 +771,7 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Makine Performansı</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={machinePerformanceData}>
@@ -755,7 +786,7 @@ export default function Reports() {
           </ResponsiveContainer>
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Ürün Performansı</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={productPerformanceData}>
@@ -770,7 +801,7 @@ export default function Reports() {
           </ResponsiveContainer>
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>İş Emri Durumları</h2>
           {workOrderStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
@@ -789,7 +820,7 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Kalite Sonuçları</h2>
           {qualityStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
@@ -827,64 +858,34 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Fire Nedenleri</h2>
-          {scrapReasonData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={scrapReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {scrapReasonData.map((entry) => (
-                    <Cell key={entry.status} fill={SCRAP_REASON_COLORS[entry.status] ?? "#64748b"} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="empty-state">Fire nedeni verisi yok.</p>
-          )}
+          <ReasonBarList
+            data={scrapReasonData}
+            emptyText="Fire nedeni verisi yok."
+            getColor={(item) => SCRAP_REASON_COLORS[item.status] ?? "#64748b"}
+          />
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Operasyon Duruş Nedenleri</h2>
-          {operationDowntimeReasonData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={operationDowntimeReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {operationDowntimeReasonData.map((entry, index) => (
-                    <Cell key={entry.status} fill={DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="empty-state">Operasyon duruş nedeni verisi yok.</p>
-          )}
+          <ReasonBarList
+            data={operationDowntimeReasonData}
+            emptyText="Operasyon duruş nedeni verisi yok."
+            getColor={(_item, index) => DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]}
+          />
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Makine Duruş Nedenleri</h2>
-          {machineDowntimeReasonData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={machineDowntimeReasonData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {machineDowntimeReasonData.map((entry, index) => (
-                    <Cell key={entry.status} fill={DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="empty-state">Makine duruş nedeni verisi yok.</p>
-          )}
+          <ReasonBarList
+            data={machineDowntimeReasonData}
+            emptyText="Makine duruş nedeni verisi yok."
+            getColor={(_item, index) => DOWNTIME_REASON_COLORS[index % DOWNTIME_REASON_COLORS.length]}
+          />
         </article>
 
-        <article className="panel chart-panel">
+        <article className="panel chart-panel report-chart-card">
           <h2>Makine Durumları</h2>
           {machineStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
