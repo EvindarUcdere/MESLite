@@ -1,4 +1,18 @@
 import { useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ClipboardList,
+  Download,
+  Factory,
+  FileText,
+  Filter,
+  Gauge,
+  Layers,
+  Recycle,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
@@ -239,6 +253,24 @@ export default function Reports() {
     ["Hurda Kararı", summary.qualityScrapDecisionCount ?? 0],
     ["Şartlı Kabul", summary.qualityConditionalAcceptCount ?? 0]
   ];
+  const oeeValue = summary.oee ?? 0;
+  const reportMetricCards = [
+    { label: "İş Emri", value: summary.workOrderCount ?? 0, icon: FileText },
+    { label: "Üretim Kaydı", value: summary.productionLogCount ?? 0, icon: ClipboardList },
+    { label: "Makine", value: summary.machineCount ?? 0, icon: Factory },
+    { label: "Kalan Üretim", value: summary.productionGapQuantity ?? 0, icon: Gauge },
+    { label: "Kalite Kararı", value: summary.qualityDecisionCount ?? 0, icon: ShieldCheck },
+    { label: "Geri İşleme", value: summary.qualityReworkCount ?? 0, icon: Recycle },
+    { label: "Hurda Kararı", value: summary.qualityScrapDecisionCount ?? 0, icon: Trash2 },
+    { label: "Şartlı Kabul", value: summary.qualityConditionalAcceptCount ?? 0, icon: CheckCircle2 }
+  ];
+  const reportUpdatedAt = new Date().toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
   const workOrderStatusData = mapCountsToChartData(report?.workOrderStatusCounts);
   const machineStatusData = mapCountsToChartData(report?.machineStatusCounts);
   const qualityStatusData = mapCountsToChartData(report?.qualityStatusCounts);
@@ -285,10 +317,16 @@ export default function Reports() {
 
   return (
     <div className="page-stack">
-      <header className="page-header report-page-header">
+      <header className="report-dashboard-header">
+        <div className="report-topline">
         <div className="report-page-title">
           <h1>Raporlar</h1>
-          <p>Üretim, fire, makine ve kalite performansını özetleyin.</p>
+          <p>Üretim performansınızı özetleyin</p>
+        </div>
+          <button type="button" className="secondary-button report-download-button" onClick={() => window.print()}>
+            <Download size={16} />
+            Raporu İndir
+          </button>
         </div>
         <div className="report-filter-bar">
           <div className="period-preset-row" aria-label="Hazır rapor dönemleri">
@@ -373,19 +411,105 @@ export default function Reports() {
               ))}
             </select>
           </label>
+          <button type="button" className="report-filter-submit" onClick={() => setFilters((current) => ({ ...current }))}>
+            <Filter size={16} />
+            Filtrele
+          </button>
           <button type="button" className="secondary-button report-clear-button" onClick={clearReportFilters}>
-            Filtreleri Temizle
+            Temizle
           </button>
         </div>
       </header>
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="summary-grid report-summary-grid">
-        {summaryCards.map(([label, value]) => (
+      <section className="report-kpi-grid">
+        <article className="report-kpi-card report-oee-card">
+          <div className="report-card-heading">
+            <span>OEE</span>
+          </div>
+          <strong>{isLoading ? "..." : `${oeeValue}%`}</strong>
+          <div className="report-oee-track">
+            <span style={{ width: `${Math.min(oeeValue, 100)}%` }} />
+          </div>
+          <div className="report-oee-foot">
+            <small>Hedef: 85%</small>
+            <small className={oeeValue >= 85 ? "positive" : "warning"}>{oeeValue >= 85 ? "Hedef üstü" : "İyileştirme gerekli"}</small>
+          </div>
+        </article>
+
+        <article className="report-kpi-card">
+          <div className="report-card-heading">
+            <Layers size={18} />
+            <span>Üretim</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Toplam Üretim</dt>
+              <dd>{isLoading ? "..." : summary.producedQuantity ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Planlanan Adet</dt>
+              <dd>{isLoading ? "..." : summary.plannedQuantity ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Plan Gerçekleşme</dt>
+              <dd>{isLoading ? "..." : `${summary.planCompletionRate ?? 0}%`}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="report-kpi-card">
+          <div className="report-card-heading">
+            <ArrowUpRight size={18} />
+            <span>Verimlilik</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Performans</dt>
+              <dd>{isLoading ? "..." : `${summary.performance ?? 0}%`}</dd>
+            </div>
+            <div>
+              <dt>Kullanılabilirlik</dt>
+              <dd>{isLoading ? "..." : `${summary.availability ?? 0}%`}</dd>
+            </div>
+            <div>
+              <dt>Kalite Performansı</dt>
+              <dd>{isLoading ? "..." : `${summary.quality ?? 0}%`}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="report-kpi-card">
+          <div className="report-card-heading">
+            <ShieldCheck size={18} />
+            <span>Kalite</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Kalite</dt>
+              <dd>{isLoading ? "..." : `${summary.quality ?? 0}%`}</dd>
+            </div>
+            <div>
+              <dt>Fire Oranı</dt>
+              <dd className="danger-text">{isLoading ? "..." : `${summary.scrapRate ?? 0}%`}</dd>
+            </div>
+            <div>
+              <dt>Hatalı Adet</dt>
+              <dd className="danger-text">{isLoading ? "..." : summary.defectQuantity ?? 0}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section className="report-metric-strip">
+        {reportMetricCards.map(({ label, value, icon: Icon }) => (
           <article key={label}>
-            <span>{label}</span>
-            <strong>{isLoading ? "..." : value}</strong>
+            <Icon size={18} />
+            <div>
+              <span>{label}</span>
+              <strong>{isLoading ? "..." : value}</strong>
+            </div>
           </article>
         ))}
       </section>
