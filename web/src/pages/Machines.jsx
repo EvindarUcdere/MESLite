@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Activity, Factory, Plus, Settings, Wrench } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createMachine, createProductionLine, getMachines, getProductionLines, updateMachineStatus } from "../api/masterData.api.js";
 
@@ -149,9 +149,57 @@ export default function Machines() {
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="operations-grid">
-        <article className="panel">
-          <h2>Üretim Hattı Oluştur</h2>
+      <section className="master-summary-grid">
+        <article className="master-summary-card">
+          <span className="master-summary-icon">
+            <Factory size={22} />
+          </span>
+          <div>
+            <small>Üretim Hattı</small>
+            <strong>{isLoading ? "..." : productionLines.length}</strong>
+            <em>Makine parkının bağlı olduğu hatlar</em>
+          </div>
+        </article>
+        <article className="master-summary-card">
+          <span className="master-summary-icon master-summary-icon-blue">
+            <Settings size={22} />
+          </span>
+          <div>
+            <small>Toplam Makine</small>
+            <strong>{isLoading ? "..." : machines.length}</strong>
+            <em>Sisteme tanımlı ekipman</em>
+          </div>
+        </article>
+        <article className="master-summary-card">
+          <span className="master-summary-icon master-summary-icon-green">
+            <Activity size={22} />
+          </span>
+          <div>
+            <small>Çalışan</small>
+            <strong>{isLoading ? "..." : machines.filter((machine) => machine.status === "RUNNING").length}</strong>
+            <em>Anlık üretimde görünen makineler</em>
+          </div>
+        </article>
+        <article className="master-summary-card">
+          <span className="master-summary-icon master-summary-icon-amber">
+            <Wrench size={22} />
+          </span>
+          <div>
+            <small>Duruş/Bakım</small>
+            <strong>{isLoading ? "..." : machines.filter((machine) => ["STOPPED", "MAINTENANCE"].includes(machine.status)).length}</strong>
+            <em>Takip gerektiren ekipman</em>
+          </div>
+        </article>
+      </section>
+
+      <section className="operations-grid master-form-grid">
+        <article className="panel master-form-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Üretim Hattı Oluştur</h2>
+              <p>Makineleri gruplayacağınız üretim alanını veya hattı tanımlayın.</p>
+            </div>
+          </div>
           <form className="stack-form" onSubmit={handleCreateLine}>
             <label>
               Ad
@@ -168,8 +216,13 @@ export default function Machines() {
           </form>
         </article>
 
-        <article className="panel">
-          <h2>Makine Oluştur</h2>
+        <article className="panel master-form-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Makine Oluştur</h2>
+              <p>Makine kodu, hattı ve başlangıç durumuyla yeni ekipman kartı açın.</p>
+            </div>
+          </div>
           <form className="stack-form" onSubmit={handleCreateMachine}>
             <label>
               Kod
@@ -207,10 +260,16 @@ export default function Machines() {
         </article>
       </section>
 
-      <section className="panel">
-        <h2>Makine Listesi</h2>
-        <div className="table-wrap">
-          <table>
+      <section className="panel production-log-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Makine Listesi</h2>
+            <p>Makine durumlarını güncelleyin; duruş/bakım için nedeni kayıt altına alın.</p>
+          </div>
+          <span className="record-count">{machines.length} makine</span>
+        </div>
+        <div className="table-wrap dashboard-table-wrap">
+          <table className="dashboard-data-table master-data-table">
             <thead>
               <tr>
                 <th>Kod</th>
@@ -224,9 +283,13 @@ export default function Machines() {
             <tbody>
               {machines.map((machine) => (
                 <tr key={machine.id}>
-                  <td>{machine.code}</td>
-                  <td>{machine.name}</td>
-                  <td>{machine.productionLine?.name ?? "-"}</td>
+                  <td>
+                    <strong className="table-primary">{machine.code}</strong>
+                  </td>
+                  <td>
+                    <span className="table-secondary">{machine.name}</span>
+                  </td>
+                  <td>{machine.productionLine?.name ? <span className="machine-code-chip">{machine.productionLine.name}</span> : "-"}</td>
                   <td>
                     <span className={`status-pill status-${machine.status.toLowerCase()}`}>{STATUS_LABELS[machine.status] ?? machine.status}</span>
                   </td>

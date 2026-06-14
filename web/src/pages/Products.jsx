@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { CheckCircle2, Clock3, Package, Plus, Ruler } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createProduct, getProducts } from "../api/masterData.api.js";
 
@@ -84,16 +84,58 @@ export default function Products() {
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="panel info-panel">
-        <h2>Bu ekranda ne tutulur?</h2>
-        <p>
-          Ürün kartı stok deposu değildir. Burada üretilecek mamul veya yarı mamulün kodu, adı, ölçü birimi ve hedef çevrim süresi tutulur.
-          Rota, makine operasyonları ve iş emirleri bu kart üzerinden bağlanır.
-        </p>
+      <section className="master-summary-grid">
+        <article className="master-summary-card">
+          <span className="master-summary-icon">
+            <Package size={22} />
+          </span>
+          <div>
+            <small>Toplam Ürün</small>
+            <strong>{isLoading ? "..." : products.length}</strong>
+            <em>İş emri ve rota ana verisi</em>
+          </div>
+        </article>
+        <article className="master-summary-card">
+          <span className="master-summary-icon master-summary-icon-green">
+            <CheckCircle2 size={22} />
+          </span>
+          <div>
+            <small>Aktif Ürün</small>
+            <strong>{isLoading ? "..." : products.filter((product) => product.isActive).length}</strong>
+            <em>Üretime açılmış ürün kartları</em>
+          </div>
+        </article>
+        <article className="master-summary-card">
+          <span className="master-summary-icon master-summary-icon-blue">
+            <Clock3 size={22} />
+          </span>
+          <div>
+            <small>Çevrim Tanımlı</small>
+            <strong>{isLoading ? "..." : products.filter((product) => product.targetCycleTime).length}</strong>
+            <em>Planlama için hedef süre girilmiş</em>
+          </div>
+        </article>
       </section>
 
-      <section className="panel">
-        <h2>Ürün Oluştur</h2>
+      <section className="panel info-panel master-info-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Bu ekranda ne tutulur?</h2>
+            <p>
+              Ürün kartı stok deposu değildir. Burada üretilecek mamul veya yarı mamulün kodu, adı, ölçü birimi ve hedef çevrim süresi tutulur.
+              Rota, makine operasyonları ve iş emirleri bu kart üzerinden bağlanır.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel master-form-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Ürün Oluştur</h2>
+            <p>Yeni ürün kartı açarak rotalara ve iş emirlerine bağlanabilir hale getirin.</p>
+          </div>
+        </div>
         <form className="work-order-form" onSubmit={handleSubmit}>
           <label>
             Ürün Kodu
@@ -118,10 +160,16 @@ export default function Products() {
         </form>
       </section>
 
-      <section className="panel">
-        <h2>Ürün Listesi</h2>
-        <div className="table-wrap">
-          <table>
+      <section className="panel production-log-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Ürün Listesi</h2>
+            <p>Üretimde kullanılacak ürün ana verilerini ve planlama parametrelerini görüntüleyin.</p>
+          </div>
+          <span className="record-count">{products.length} ürün</span>
+        </div>
+        <div className="table-wrap dashboard-table-wrap">
+          <table className="dashboard-data-table master-data-table">
             <thead>
               <tr>
                 <th>Kod</th>
@@ -134,10 +182,19 @@ export default function Products() {
             <tbody>
               {products.map((product) => (
                 <tr key={product.id}>
-                  <td>{product.code}</td>
-                  <td>{product.name}</td>
-                  <td>{product.unit}</td>
-                  <td>{product.targetCycleTime ? `${product.targetCycleTime} sn` : "-"}</td>
+                  <td>
+                    <strong className="table-primary">{product.code}</strong>
+                  </td>
+                  <td>
+                    <span className="table-secondary">{product.name}</span>
+                  </td>
+                  <td>
+                    <span className="machine-code-chip">
+                      <Ruler size={13} />
+                      {product.unit}
+                    </span>
+                  </td>
+                  <td>{product.targetCycleTime ? <span className="quantity-chip quantity-produced">{product.targetCycleTime} sn</span> : "-"}</td>
                   <td>
                     <span className={`status-pill ${product.isActive ? "quality-passed" : "status-cancelled"}`}>{product.isActive ? "Aktif" : "Pasif"}</span>
                   </td>

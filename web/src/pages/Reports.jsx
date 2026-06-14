@@ -184,6 +184,55 @@ function ReasonBarList({ data, emptyText, getColor }) {
   );
 }
 
+function ReportDetailSection({ title, description, count, children }) {
+  return (
+    <details className="report-detail-panel">
+      <summary>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <span className="report-section-count">{count} kayıt</span>
+      </summary>
+      {children}
+    </details>
+  );
+}
+
+function QualityDecisionBadge({ decision }) {
+  return <span className={`report-badge decision-${decision?.toLowerCase?.().replaceAll("_", "-") ?? "unknown"}`}>{QUALITY_DECISION_LABELS[decision] ?? decision}</span>;
+}
+
+function MachineBadge({ children }) {
+  if (!children || children === "-") {
+    return "-";
+  }
+
+  return <span className="report-machine-badge">{children}</span>;
+}
+
+function NumberBadge({ children, tone = "neutral" }) {
+  return <span className={`report-number-badge report-number-${tone}`}>{children}</span>;
+}
+
+function ReasonChips({ counts, labels }) {
+  const entries = Object.entries(counts ?? {});
+
+  if (!entries.length) {
+    return "-";
+  }
+
+  return (
+    <span className="report-reason-chip-list">
+      {entries.map(([reason, count]) => (
+        <span key={reason} className="report-reason-chip">
+          {labels[reason] ?? reason}: {count}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function Reports() {
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -614,7 +663,7 @@ export default function Reports() {
               <tbody>
                 {oeeByMachineData.slice(0, 10).map((item) => (
                   <tr key={item.machineId}>
-                    <td>{item.machineCode}</td>
+                    <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                     <td>{item.machineName}</td>
                     <td>{item.oee}%</td>
                     <td>{item.availability}%</td>
@@ -905,10 +954,14 @@ export default function Reports() {
         </article>
       </section>
 
-      <section className="panel">
-        <h2>Operasyon Bazlı Kalite Kararları</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection
+        title="Operasyon Bazlı Kalite Kararları"
+        description="Hangi iş emri ve operasyonlarda kalite kararı yoğunlaşıyor?"
+        count={qualityDecisionByOperation.length}
+        defaultOpen
+      >
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>İş Emri</th>
@@ -925,15 +978,17 @@ export default function Reports() {
             <tbody>
               {qualityDecisionByOperation.map((item) => (
                 <tr key={item.operationId}>
-                  <td>{item.orderNo}</td>
+                  <td>
+                    <span className="report-order-link">{item.orderNo}</span>
+                  </td>
                   <td>{item.productCode}</td>
                   <td>{item.operationName}</td>
-                  <td>{item.machineCode}</td>
-                  <td>{item.totalCount}</td>
-                  <td>{item.reworkCount}</td>
-                  <td>{item.scrapCount}</td>
-                  <td>{item.conditionalAcceptCount}</td>
-                  <td>{item.criticalCount}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
+                  <td><NumberBadge>{item.totalCount}</NumberBadge></td>
+                  <td><NumberBadge tone="info">{item.reworkCount}</NumberBadge></td>
+                  <td><NumberBadge tone="danger">{item.scrapCount}</NumberBadge></td>
+                  <td><NumberBadge tone="warning">{item.conditionalAcceptCount}</NumberBadge></td>
+                  <td><NumberBadge tone={item.criticalCount > 0 ? "danger" : "neutral"}>{item.criticalCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && qualityDecisionByOperation.length === 0 ? (
@@ -944,12 +999,15 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Makine Bazlı Kalite Kararları</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection
+        title="Makine Bazlı Kalite Kararları"
+        description="Kalite kararlarının makine parkına göre dağılımını gösterir."
+        count={qualityDecisionByMachine.length}
+      >
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Makine</th>
@@ -964,13 +1022,13 @@ export default function Reports() {
             <tbody>
               {qualityDecisionByMachine.map((item) => (
                 <tr key={item.machineId}>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.machineName}</td>
-                  <td>{item.totalCount}</td>
-                  <td>{item.reworkCount}</td>
-                  <td>{item.scrapCount}</td>
-                  <td>{item.conditionalAcceptCount}</td>
-                  <td>{item.criticalCount}</td>
+                  <td><NumberBadge>{item.totalCount}</NumberBadge></td>
+                  <td><NumberBadge tone="info">{item.reworkCount}</NumberBadge></td>
+                  <td><NumberBadge tone="danger">{item.scrapCount}</NumberBadge></td>
+                  <td><NumberBadge tone="warning">{item.conditionalAcceptCount}</NumberBadge></td>
+                  <td><NumberBadge tone={item.criticalCount > 0 ? "danger" : "neutral"}>{item.criticalCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && qualityDecisionByMachine.length === 0 ? (
@@ -981,12 +1039,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Son Kalite Kararları</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Son Kalite Kararları" description="Kalite ekibinin en son verdiği karar kayıtları." count={recentQualityDecisions.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>İş Emri</th>
@@ -1002,13 +1059,15 @@ export default function Reports() {
             <tbody>
               {recentQualityDecisions.map((item) => (
                 <tr key={item.id}>
-                  <td>{item.orderNo}</td>
+                  <td>
+                    <span className="report-order-link">{item.orderNo}</span>
+                  </td>
                   <td>{item.productCode}</td>
-                  <td>{QUALITY_DECISION_LABELS[item.decision] ?? item.decision}</td>
+                  <td><QualityDecisionBadge decision={item.decision} /></td>
                   <td>{item.operationName}</td>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.operatorName}</td>
-                  <td>{item.note ?? "-"}</td>
+                  <td title={item.note ?? ""} className="report-truncate-cell">{item.note ?? "-"}</td>
                   <td>
                     {item.updatedAt
                       ? new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(item.updatedAt))
@@ -1024,12 +1083,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Vardiya Performans Detayı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Vardiya Performans Detayı" description="Vardiya bazında üretim, fire, operatör ve makine yoğunluğu." count={shiftPerformanceData.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Vardiya</th>
@@ -1047,12 +1105,12 @@ export default function Reports() {
                 <tr key={shift.shiftId}>
                   <td>{shift.shiftName}</td>
                   <td>{shift.shiftTimeRange}</td>
-                  <td>{shift.producedQuantity}</td>
-                  <td>{shift.scrapQuantity}</td>
-                  <td>{shift.scrapRate}%</td>
-                  <td>{shift.operatorCount}</td>
-                  <td>{shift.machineCount}</td>
-                  <td>{shift.logCount}</td>
+                  <td><NumberBadge tone="success">{shift.producedQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={shift.scrapQuantity > 0 ? "danger" : "neutral"}>{shift.scrapQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={shift.scrapRate > 3 ? "warning" : "success"}>{shift.scrapRate}%</NumberBadge></td>
+                  <td><NumberBadge>{shift.operatorCount}</NumberBadge></td>
+                  <td><NumberBadge>{shift.machineCount}</NumberBadge></td>
+                  <td><NumberBadge>{shift.logCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && shiftPerformanceData.length === 0 ? (
@@ -1063,12 +1121,15 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Vardiya Bazlı Operatör Performansı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection
+        title="Vardiya Bazlı Operatör Performansı"
+        description="Operatör üretim ve fire sonuçlarını vardiya kırılımında gösterir."
+        count={operatorShiftPerformanceData.length}
+      >
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Vardiya</th>
@@ -1084,10 +1145,10 @@ export default function Reports() {
                 <tr key={`${item.shiftId}-${item.operatorId}`}>
                   <td>{item.shiftName}</td>
                   <td>{item.operatorName}</td>
-                  <td>{item.producedQuantity}</td>
-                  <td>{item.scrapQuantity}</td>
-                  <td>{item.scrapRate}%</td>
-                  <td>{item.logCount}</td>
+                  <td><NumberBadge tone="success">{item.producedQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={item.scrapQuantity > 0 ? "danger" : "neutral"}>{item.scrapQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={item.scrapRate > 3 ? "warning" : "success"}>{item.scrapRate}%</NumberBadge></td>
+                  <td><NumberBadge>{item.logCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && operatorShiftPerformanceData.length === 0 ? (
@@ -1098,12 +1159,15 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Vardiya Bazlı Makine Performansı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection
+        title="Vardiya Bazlı Makine Performansı"
+        description="Makine üretim performansını vardiya bazında karşılaştırır."
+        count={machineShiftPerformanceData.length}
+      >
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Vardiya</th>
@@ -1119,12 +1183,12 @@ export default function Reports() {
               {machineShiftPerformanceData.map((item) => (
                 <tr key={`${item.shiftId}-${item.machineId}`}>
                   <td>{item.shiftName}</td>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.machineName}</td>
-                  <td>{item.producedQuantity}</td>
-                  <td>{item.scrapQuantity}</td>
-                  <td>{item.scrapRate}%</td>
-                  <td>{item.logCount}</td>
+                  <td><NumberBadge tone="success">{item.producedQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={item.scrapQuantity > 0 ? "danger" : "neutral"}>{item.scrapQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={item.scrapRate > 3 ? "warning" : "success"}>{item.scrapRate}%</NumberBadge></td>
+                  <td><NumberBadge>{item.logCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && machineShiftPerformanceData.length === 0 ? (
@@ -1135,12 +1199,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Vardiya Bazlı Duruş Analizi</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Vardiya Bazlı Duruş Analizi" description="Duruş kayıtlarının vardiyalara göre yoğunlaştığı noktalar." count={operationDowntimeByShift.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Vardiya</th>
@@ -1152,12 +1215,8 @@ export default function Reports() {
               {operationDowntimeByShift.map((item) => (
                 <tr key={item.shiftId}>
                   <td>{item.shiftName}</td>
-                  <td>{item.totalCount}</td>
-                  <td>
-                    {Object.entries(item.reasonCounts)
-                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
-                      .join(", ")}
-                  </td>
+                  <td><NumberBadge tone={item.totalCount > 0 ? "warning" : "neutral"}>{item.totalCount}</NumberBadge></td>
+                  <td><ReasonChips counts={item.reasonCounts} labels={DOWNTIME_REASON_LABELS} /></td>
                 </tr>
               ))}
               {!isLoading && operationDowntimeByShift.length === 0 ? (
@@ -1168,12 +1227,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Makine Bazlı Duruş Analizi</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Makine Bazlı Duruş Analizi" description="Hangi makinelerde hangi duruş nedenleri öne çıkıyor?" count={operationDowntimeByMachine.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Makine</th>
@@ -1185,14 +1243,10 @@ export default function Reports() {
             <tbody>
               {operationDowntimeByMachine.map((item) => (
                 <tr key={item.machineId}>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.machineName}</td>
-                  <td>{item.totalCount}</td>
-                  <td>
-                    {Object.entries(item.reasonCounts)
-                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
-                      .join(", ")}
-                  </td>
+                  <td><NumberBadge tone={item.totalCount > 0 ? "warning" : "neutral"}>{item.totalCount}</NumberBadge></td>
+                  <td><ReasonChips counts={item.reasonCounts} labels={DOWNTIME_REASON_LABELS} /></td>
                 </tr>
               ))}
               {!isLoading && operationDowntimeByMachine.length === 0 ? (
@@ -1203,12 +1257,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Operasyon Bazlı Duruş Analizi</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Operasyon Bazlı Duruş Analizi" description="Duruşların iş emri ve operasyon adımı bazında dağılımı." count={operationDowntimeByOperation.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>İş Emri</th>
@@ -1221,15 +1274,11 @@ export default function Reports() {
             <tbody>
               {operationDowntimeByOperation.map((item) => (
                 <tr key={item.operationId}>
-                  <td>{item.orderNo}</td>
+                  <td><span className="report-order-link">{item.orderNo}</span></td>
                   <td>{item.productCode}</td>
                   <td>{item.operationName}</td>
-                  <td>{item.totalCount}</td>
-                  <td>
-                    {Object.entries(item.reasonCounts)
-                      .map(([reason, count]) => `${DOWNTIME_REASON_LABELS[reason] ?? reason}: ${count}`)
-                      .join(", ")}
-                  </td>
+                  <td><NumberBadge tone={item.totalCount > 0 ? "warning" : "neutral"}>{item.totalCount}</NumberBadge></td>
+                  <td><ReasonChips counts={item.reasonCounts} labels={DOWNTIME_REASON_LABELS} /></td>
                 </tr>
               ))}
               {!isLoading && operationDowntimeByOperation.length === 0 ? (
@@ -1240,12 +1289,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>En Çok Geciken Operasyonlar</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="En Çok Geciken Operasyonlar" description="Hedef süreye göre en fazla sapma oluşturan operasyonlar." count={delayedOperations.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>İş Emri</th>
@@ -1263,16 +1311,16 @@ export default function Reports() {
             <tbody>
               {delayedOperations.map((item) => (
                 <tr key={item.operationId}>
-                  <td>{item.orderNo}</td>
+                  <td><span className="report-order-link">{item.orderNo}</span></td>
                   <td>{item.productCode}</td>
                   <td>{item.operationName}</td>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.operatorName}</td>
-                  <td>{item.plannedMinutes} dk</td>
-                  <td>{item.actualMinutes} dk</td>
-                  <td>{item.downtimeMinutes} dk</td>
-                  <td>{item.netMinutes} dk</td>
-                  <td>+{item.delayMinutes} dk</td>
+                  <td><NumberBadge>{item.plannedMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.actualMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.downtimeMinutes > 0 ? "warning" : "neutral"}>{item.downtimeMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.netMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.delayMinutes > 0 ? "danger" : "success"}>+{item.delayMinutes} dk</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && delayedOperations.length === 0 ? (
@@ -1283,12 +1331,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Makine Bazlı Süre Performansı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Makine Bazlı Süre Performansı" description="Makine bazında hedef, gerçek, duruş ve gecikme süreleri." count={operationTimeByMachine.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Makine</th>
@@ -1306,16 +1353,16 @@ export default function Reports() {
             <tbody>
               {operationTimeByMachine.map((item) => (
                 <tr key={item.machineId}>
-                  <td>{item.machineCode}</td>
+                  <td><MachineBadge>{item.machineCode}</MachineBadge></td>
                   <td>{item.machineName}</td>
-                  <td>{item.operationCount}</td>
-                  <td>{item.completedOperationCount}</td>
-                  <td>{item.plannedMinutes} dk</td>
-                  <td>{item.actualMinutes} dk</td>
-                  <td>{item.downtimeMinutes} dk</td>
-                  <td>{item.netMinutes} dk</td>
-                  <td>{item.delayMinutes} dk</td>
-                  <td>{item.avgDelayMinutes} dk</td>
+                  <td><NumberBadge>{item.operationCount}</NumberBadge></td>
+                  <td><NumberBadge tone="success">{item.completedOperationCount}</NumberBadge></td>
+                  <td><NumberBadge>{item.plannedMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.actualMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.downtimeMinutes > 0 ? "warning" : "neutral"}>{item.downtimeMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.netMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.delayMinutes > 0 ? "danger" : "success"}>{item.delayMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.avgDelayMinutes > 0 ? "warning" : "success"}>{item.avgDelayMinutes} dk</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && operationTimeByMachine.length === 0 ? (
@@ -1326,12 +1373,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Operatör Bazlı Süre Performansı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Operatör Bazlı Süre Performansı" description="Operatör bazında tamamlanan operasyon ve süre sapmaları." count={operationTimeByOperator.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Operatör</th>
@@ -1349,14 +1395,14 @@ export default function Reports() {
               {operationTimeByOperator.map((item) => (
                 <tr key={item.operatorId}>
                   <td>{item.operatorName}</td>
-                  <td>{item.operationCount}</td>
-                  <td>{item.completedOperationCount}</td>
-                  <td>{item.plannedMinutes} dk</td>
-                  <td>{item.actualMinutes} dk</td>
-                  <td>{item.downtimeMinutes} dk</td>
-                  <td>{item.netMinutes} dk</td>
-                  <td>{item.delayMinutes} dk</td>
-                  <td>{item.avgDelayMinutes} dk</td>
+                  <td><NumberBadge>{item.operationCount}</NumberBadge></td>
+                  <td><NumberBadge tone="success">{item.completedOperationCount}</NumberBadge></td>
+                  <td><NumberBadge>{item.plannedMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.actualMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.downtimeMinutes > 0 ? "warning" : "neutral"}>{item.downtimeMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge>{item.netMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.delayMinutes > 0 ? "danger" : "success"}>{item.delayMinutes} dk</NumberBadge></td>
+                  <td><NumberBadge tone={item.avgDelayMinutes > 0 ? "warning" : "success"}>{item.avgDelayMinutes} dk</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && operationTimeByOperator.length === 0 ? (
@@ -1367,12 +1413,11 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
 
-      <section className="panel">
-        <h2>Makine Performans Detayı</h2>
-        <div className="table-wrap">
-          <table>
+      <ReportDetailSection title="Makine Performans Detayı" description="Makine bazında üretim girişi, fire ve fire oranı detayı." count={machinePerformanceData.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
             <thead>
               <tr>
                 <th>Makine</th>
@@ -1386,12 +1431,12 @@ export default function Reports() {
             <tbody>
               {machinePerformanceData.map((machine) => (
                 <tr key={machine.machineId}>
-                  <td>{machine.machineCode}</td>
+                  <td><MachineBadge>{machine.machineCode}</MachineBadge></td>
                   <td>{machine.machineName}</td>
-                  <td>{machine.producedQuantity}</td>
-                  <td>{machine.scrapQuantity}</td>
-                  <td>{machine.scrapRate}%</td>
-                  <td>{machine.logCount}</td>
+                  <td><NumberBadge tone="success">{machine.producedQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={machine.scrapQuantity > 0 ? "danger" : "neutral"}>{machine.scrapQuantity}</NumberBadge></td>
+                  <td><NumberBadge tone={machine.scrapRate > 3 ? "warning" : "success"}>{machine.scrapRate}%</NumberBadge></td>
+                  <td><NumberBadge>{machine.logCount}</NumberBadge></td>
                 </tr>
               ))}
               {!isLoading && machinePerformanceData.length === 0 ? (
@@ -1402,7 +1447,7 @@ export default function Reports() {
             </tbody>
           </table>
         </div>
-      </section>
+      </ReportDetailSection>
     </div>
   );
 }
