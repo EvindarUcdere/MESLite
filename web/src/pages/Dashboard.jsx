@@ -615,10 +615,16 @@ export default function Dashboard() {
         </article>
       </section>
 
-      <section className="panel">
-        <h2>Son Üretim Kayıtları</h2>
-        <div className="table-wrap">
-          <table>
+      <section className="panel production-log-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Son Üretim Kayıtları</h2>
+            <p>Operatörlerin sahadan girdiği son üretim, fire, görsel ve not kayıtları.</p>
+          </div>
+          <span className="record-count">{live?.recentProductionLogs?.length ?? 0} kayıt</span>
+        </div>
+        <div className="table-wrap dashboard-table-wrap">
+          <table className="dashboard-data-table">
             <thead>
               <tr>
                 <th>İş Emri</th>
@@ -635,17 +641,28 @@ export default function Dashboard() {
             <tbody>
               {(live?.recentProductionLogs ?? []).map((log) => (
                 <tr key={log.id}>
-                  <td>{log.workOrder.orderNo}</td>
-                  <td>{log.workOrder.product.name}</td>
-                  <td>{log.machine.code}</td>
+                  <td>
+                    <strong className="table-primary">{log.workOrder.orderNo}</strong>
+                  </td>
+                  <td>
+                    <span className="table-secondary">{log.workOrder.product.name}</span>
+                  </td>
+                  <td>
+                    <span className="machine-code-chip">{log.machine.code}</span>
+                  </td>
                   <td>{log.operator.name}</td>
-                  <td>{log.producedQuantity}</td>
-                  <td>{log.scrapQuantity}</td>
-                  <td>{log.scrapQuantity > 0 ? SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason : "-"}</td>
+                  <td>
+                    <span className="quantity-chip quantity-produced">+{log.producedQuantity}</span>
+                  </td>
+                  <td>
+                    <span className={`quantity-chip ${log.scrapQuantity > 0 ? "quantity-scrap" : "quantity-zero"}`}>{log.scrapQuantity}</span>
+                  </td>
+                  <td>{log.scrapQuantity > 0 ? <span className="reason-chip">{SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason}</span> : "-"}</td>
                   <td>
                     {log.attachments?.[0] ? (
-                      <a href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
+                      <a className="image-proof-link" href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
                         <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
+                        Aç
                       </a>
                     ) : (
                       "-"

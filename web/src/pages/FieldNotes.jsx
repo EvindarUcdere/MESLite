@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Camera, Filter, FileText, Image, ImageOff, Package, Search, StickyNote, UserRound, Wrench } from "lucide-react";
 import { getProductionLogs } from "../api/productionLogs.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 
@@ -112,30 +113,53 @@ export default function FieldNotes() {
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="summary-grid">
-        <article>
-          <span>Toplam Not</span>
-          <strong>{isLoading ? "..." : logs.length}</strong>
+      <section className="field-note-summary-grid">
+        <article className="field-note-summary-card">
+          <span className="field-note-summary-icon">
+            <StickyNote size={22} />
+          </span>
+          <div>
+            <span>Toplam Not</span>
+            <strong>{isLoading ? "..." : logs.length}</strong>
+            <small>Sahadan gelen tüm notlar</small>
+          </div>
         </article>
-        <article>
-          <span>Görselli Not</span>
-          <strong>{isLoading ? "..." : notesWithImages}</strong>
+        <article className="field-note-summary-card">
+          <span className="field-note-summary-icon field-note-summary-icon-blue">
+            <Camera size={22} />
+          </span>
+          <div>
+            <span>Görselli Not</span>
+            <strong>{isLoading ? "..." : notesWithImages}</strong>
+            <small>Kanıt görseli eklenen kayıt</small>
+          </div>
         </article>
-        <article>
-          <span>Filtrelenen</span>
-          <strong>{isLoading ? "..." : filteredNotes.length}</strong>
+        <article className="field-note-summary-card">
+          <span className="field-note-summary-icon field-note-summary-icon-green">
+            <Filter size={22} />
+          </span>
+          <div>
+            <span>Filtrelenen</span>
+            <strong>{isLoading ? "..." : filteredNotes.length}</strong>
+            <small>Mevcut filtre sonucunda görünen</small>
+          </div>
         </article>
       </section>
 
-      <section className="panel">
+      <section className="panel field-note-filter-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Notları Filtrele</h2>
+            <p>İş emri, ürün, makine, operatör veya görsel durumuna göre saha notlarını daraltın.</p>
+          </div>
+        </div>
         <div className="note-filter-grid">
           <label>
             Arama
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Not, iş emri, ürün, makine veya operatör ara"
-            />
+            <span className="input-with-icon">
+              <Search size={16} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Not, iş emri, ürün, makine veya operatör ara" />
+            </span>
           </label>
           <label>
             Makine
@@ -172,32 +196,50 @@ export default function FieldNotes() {
 
       <section className="field-note-list">
         {filteredNotes.map((log) => (
-          <article key={log.id} className="field-note-card">
+          <article key={log.id} className={`field-note-card ${log.scrapQuantity > 0 ? "has-scrap" : ""}`}>
             <div className="field-note-main">
               <div className="operator-note-header">
-                <strong>{log.workOrder.orderNo}</strong>
+                <div>
+                  <span className="field-note-type">
+                    <FileText size={14} />
+                    Saha Notu
+                  </span>
+                  <strong>{log.workOrder.orderNo}</strong>
+                </div>
                 <span>{formatDateTime(log.createdAt)}</span>
               </div>
-              <p>{log.note}</p>
-              <div className="alert-context-grid">
+              <div className="field-note-message">
+                <p>{log.note}</p>
+              </div>
+              <div className="field-note-meta-grid">
                 <div>
-                  <span>Ürün</span>
+                  <span>
+                    <Package size={14} />
+                    Ürün
+                  </span>
                   <strong>{log.workOrder.product.name}</strong>
                 </div>
                 <div>
-                  <span>Makine</span>
+                  <span>
+                    <Wrench size={14} />
+                    Makine
+                  </span>
                   <strong>
                     {log.machine.code} - {log.machine.name}
                   </strong>
                 </div>
                 <div>
-                  <span>Operatör</span>
+                  <span>
+                    <UserRound size={14} />
+                    Operatör
+                  </span>
                   <strong>{log.operator.name}</strong>
                 </div>
-                <div>
+                <div className="field-note-quantity-box">
                   <span>Üretim / Fire</span>
                   <strong>
-                    {log.producedQuantity} / {log.scrapQuantity}
+                    <em>{log.producedQuantity}</em>
+                    <i>{log.scrapQuantity}</i>
                   </strong>
                 </div>
               </div>
@@ -205,8 +247,17 @@ export default function FieldNotes() {
             {log.attachments?.[0] ? (
               <a className="field-note-image-link" href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
                 <img src={getAttachmentUrl(log.attachments[0])} alt="Saha notu görseli" />
+                <span>
+                  <Image size={15} />
+                  Görseli aç
+                </span>
               </a>
-            ) : null}
+            ) : (
+              <div className="field-note-image-empty">
+                <ImageOff size={28} />
+                <span>Görsel yok</span>
+              </div>
+            )}
           </article>
         ))}
         {!isLoading && filteredNotes.length === 0 ? <p className="empty-state">Filtreye uygun saha notu yok.</p> : null}
