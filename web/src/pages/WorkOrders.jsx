@@ -169,7 +169,7 @@ function getOperationTransferQuantity(operation, workOrder) {
     return workOrder.plannedQuantity;
   }
 
-  return Math.max(previousOperation.producedQuantity - previousOperation.scrapQuantity, 0);
+  return Math.max(previousOperation.producedQuantity, 0);
 }
 
 function canCompleteOperation(operation, workOrder, user) {
