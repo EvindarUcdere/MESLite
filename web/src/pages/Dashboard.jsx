@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Activity, AlertTriangle, ArrowRight, Award, Bell, CheckCircle2, Factory, Flame, Gauge, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
 import { useSocket } from "../hooks/useSocket.js";
@@ -105,6 +106,32 @@ function getMachineLabel(machine) {
   return `${machine.code} - ${machine.name}`;
 }
 
+function CockpitCard({ card, isLoading }) {
+  const Icon = card.icon;
+
+  return (
+    <Link className={`cockpit-card cockpit-${card.tone}`} to={card.to}>
+      <span className="cockpit-icon">
+        <Icon size={20} />
+      </span>
+      <span className="cockpit-label">{card.label}</span>
+      <strong>{isLoading ? "..." : card.value}</strong>
+      <small>{card.hint}</small>
+    </Link>
+  );
+}
+
+function EmptyDashboardVisual({ icon: Icon = Award, text }) {
+  return (
+    <div className="dashboard-empty-visual">
+      <span>
+        <Icon size={54} strokeWidth={1.5} />
+      </span>
+      <p>{text}</p>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const [summary, setSummary] = useState(null);
@@ -197,56 +224,64 @@ export default function Dashboard() {
       label: "Aktif İş Emri",
       value: summary?.activeWorkOrders ?? 0,
       hint: `${summary?.pausedWorkOrders ?? 0} duraklatıldı`,
-      tone: "neutral",
+      tone: "teal",
+      icon: Activity,
       to: "/work-orders"
     },
     {
       label: "Geciken İş",
       value: summary?.overdueWorkOrders ?? overdueWorkOrders.length,
       hint: "Plan bitişi geçenler",
-      tone: (summary?.overdueWorkOrders ?? overdueWorkOrders.length) > 0 ? "danger" : "good",
+      tone: "red",
+      icon: Gauge,
       to: "/work-orders"
     },
     {
       label: "Kalite Bekleyen",
       value: pendingQualityOperations.length,
       hint: "Sonuç bekleyen kalite adımı",
-      tone: pendingQualityOperations.length > 0 ? "warning" : "good",
+      tone: "green",
+      icon: ShieldCheck,
       to: "/quality"
     },
     {
       label: "Kritik Uyarı",
       value: summary?.criticalAlerts ?? criticalAlerts.length,
       hint: `${summary?.openAlerts ?? openAlerts.length} açık uyarı`,
-      tone: (summary?.criticalAlerts ?? criticalAlerts.length) > 0 ? "danger" : "good",
+      tone: "amber",
+      icon: AlertTriangle,
       to: "/alerts"
     },
     {
       label: "Bugünkü Üretim",
       value: summary?.todayProducedQuantity ?? 0,
       hint: "Son adımdan çıkan bitmiş ürün",
-      tone: "neutral",
+      tone: "blue",
+      icon: PackageCheck,
       to: "/reports"
     },
     {
       label: "Makine İşlem Adedi",
       value: summary?.todayProcessProducedQuantity ?? 0,
       hint: "Bugün girilen operasyon kayıtları",
-      tone: "neutral",
+      tone: "violet",
+      icon: Factory,
       to: "/reports"
     },
     {
-      label: "Fire Orani",
+      label: "Fire Oranı",
       value: `${summary?.todayScrapRate ?? 0}%`,
       hint: `${summary?.todayFinalScrapQuantity ?? 0} final fire / ${summary?.todayScrapQuantity ?? 0} proses firesi`,
-      tone: (summary?.todayScrapRate ?? 0) > 5 ? "warning" : "good",
+      tone: "green",
+      icon: Flame,
       to: "/reports"
     },
     {
       label: "Çalışan Makine",
       value: summary?.runningMachines ?? 0,
       hint: `${summary?.stoppedMachines ?? 0} duruş/bakım`,
-      tone: "neutral",
+      tone: "teal",
+      icon: Factory,
       to: "/machines"
     }
   ];
@@ -271,13 +306,17 @@ export default function Dashboard() {
   const machineStatusData = mapCountsToChartData(summary?.machineStatusCounts);
   const workOrderStatusData = mapCountsToChartData(summary?.workOrderStatusCounts);
   const qualityStatusData = mapCountsToChartData(summary?.qualityStatusCounts);
+  const machineStatusTotal = machineStatusData.reduce((total, item) => total + item.value, 0);
+  const workOrderStatusTotal = workOrderStatusData.reduce((total, item) => total + item.value, 0);
+  const qualityStatusTotal = qualityStatusData.reduce((total, item) => total + item.value, 0);
 
   return (
     <div className="page-stack dashboard-page">
       <header className="page-header dashboard-header">
         <div>
-          <h1>Üretim Kokpiti</h1>
-          <p>{user?.name ?? "Canlı üretim genel görünümü"}</p>
+          <span className="dashboard-eyebrow">Üretim Kokpiti</span>
+          <h1>MES Lite Admin</h1>
+          <p>Hoş geldiniz, üretim akışını buradan takip edebilirsiniz.</p>
         </div>
         <div className="dashboard-header-actions">
           <div className="live-indicator">
@@ -285,6 +324,7 @@ export default function Dashboard() {
             {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
           </div>
           <button className="secondary-action" type="button" onClick={() => loadDashboard({ showLoading: true })} disabled={isLoading}>
+            <RefreshCw size={16} />
             Yenile
           </button>
         </div>
@@ -294,11 +334,7 @@ export default function Dashboard() {
 
       <section className="cockpit-grid">
         {cockpitCards.map((card) => (
-          <Link className={`cockpit-card cockpit-${card.tone}`} key={card.label} to={card.to}>
-            <span>{card.label}</span>
-            <strong>{isLoading ? "..." : card.value}</strong>
-            <small>{card.hint}</small>
-          </Link>
+          <CockpitCard card={card} isLoading={isLoading} key={card.label} />
         ))}
       </section>
 
@@ -310,7 +346,7 @@ export default function Dashboard() {
               <p className="muted-text">Geciken veya duraklayan işler önce ele alınmalı.</p>
             </div>
             <Link className="text-link" to="/work-orders">
-              İş emirleri
+              İş emirleri <ArrowRight size={15} />
             </Link>
           </div>
           <div className="priority-list">
@@ -337,7 +373,7 @@ export default function Dashboard() {
               <p className="muted-text">Üretim tamamlanmış, kalite sonucu bekleyen operasyonlar.</p>
             </div>
             <Link className="text-link" to="/quality">
-              Kalite
+              Kalite <ArrowRight size={15} />
             </Link>
           </div>
           <div className="priority-list">
@@ -355,7 +391,7 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
-            {!isLoading && pendingQualityOperations.length === 0 ? <p className="empty-state">Kalite bekleyen operasyon yok.</p> : null}
+            {!isLoading && pendingQualityOperations.length === 0 ? <EmptyDashboardVisual icon={Award} text="Kalite bekleyen operasyon yok." /> : null}
           </div>
         </article>
       </section>
@@ -368,35 +404,26 @@ export default function Dashboard() {
           </div>
           <div className="link-group">
             <Link className="text-link" to="/alerts">
-              Uyarılar
+              Uyarılar <ArrowRight size={15} />
             </Link>
             <Link className="text-link" to="/field-notes">
-              Tüm notlar
+              Tüm notlar <ArrowRight size={15} />
             </Link>
           </div>
         </div>
         <div className="dashboard-signal-grid">
           <article className="signal-summary-card">
+            <Bell size={34} strokeWidth={1.5} />
             <span>Açık uyarı</span>
             <strong>{isLoading ? "..." : openAlerts.length}</strong>
             <small>{criticalAlerts.length} kritik</small>
           </article>
-          <div className="compact-feed">
-            <h3>Son Uyarılar</h3>
-            {latestOpenAlerts.map((alert) => (
-              <div key={alert.id} className="compact-feed-row">
-                <span className={`severity-dot severity-${alert.severity.toLowerCase()}`} />
-                <div>
-                  <strong>{alert.workOrder.orderNo}</strong>
-                  <p>
-                    {alert.productionLog?.machine?.code ?? "-"} - {alert.message}
-                  </p>
-                </div>
-                <small>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</small>
-              </div>
-            ))}
-            {!isLoading && latestOpenAlerts.length === 0 ? <p className="empty-state">Açık uyarı yok.</p> : null}
-          </div>
+          <article className="signal-summary-card signal-success-card">
+            <CheckCircle2 size={34} strokeWidth={1.5} />
+            <span>Son İşlemler</span>
+            <strong>{isLoading ? "..." : live?.recentProductionLogs?.length ?? 0}</strong>
+            <small>Bugünkü saha kayıtları</small>
+          </article>
           <div className="compact-feed">
             <h3>Son Operatör Notları</h3>
             {latestOperatorNotes.map((log) => (
@@ -413,74 +440,128 @@ export default function Dashboard() {
             ))}
             {!isLoading && latestOperatorNotes.length === 0 ? <p className="empty-state">Henüz operatör notu yok.</p> : null}
           </div>
+          <div className="compact-feed">
+            <h3>Son Uyarılar</h3>
+            {latestOpenAlerts.map((alert) => (
+              <div key={alert.id} className="compact-feed-row">
+                <span className={`severity-dot severity-${alert.severity.toLowerCase()}`} />
+                <div>
+                  <strong>{alert.workOrder.orderNo}</strong>
+                  <p>
+                    {alert.productionLog?.machine?.code ?? "-"} - {alert.message}
+                  </p>
+                </div>
+                <small>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</small>
+              </div>
+            ))}
+            {!isLoading && latestOpenAlerts.length === 0 ? <p className="empty-state">Açık uyarı yok.</p> : null}
+          </div>
         </div>
       </section>
 
       <section className="operations-grid dashboard-chart-grid">
         <article className="panel chart-panel">
-          <h2>Üretim ve Fire</h2>
-          <ResponsiveContainer width="100%" height={260}>
+          <div className="chart-card-header">
+            <div>
+              <h2>Üretim ve Fire</h2>
+              <p>Bugünkü bitmiş ürün, proses kaydı ve toplam fire karşılaştırması.</p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={250}>
             <BarChart data={productionChartData}>
               <CartesianGrid stroke="#edf1f5" vertical={false} />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="produced" name="Üretim" fill="#256f6c" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="scrap" name="Fire" fill="#dc2626" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="produced" name="Üretim" fill="#0f766e" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="scrap" name="Fire" fill="#ef4444" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </article>
-        <article className="panel chart-panel">
-          <h2>Makine Durumları</h2>
+        <article className="panel chart-panel donut-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Makine Durumları</h2>
+              <p>Canlı makine parkı çalışma özeti.</p>
+            </div>
+          </div>
           {machineStatusData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={machineStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {machineStatusData.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="donut-chart-wrap">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={machineStatusData} dataKey="value" nameKey="name" innerRadius={64} outerRadius={92} paddingAngle={4}>
+                    {machineStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="donut-center-label">
+                <strong>{machineStatusTotal}</strong>
+                <span>Toplam</span>
+              </div>
+            </div>
           ) : (
             <p className="empty-state">Makine durum verisi yok.</p>
           )}
         </article>
-        <article className="panel chart-panel">
-          <h2>İş Emri Durumları</h2>
+        <article className="panel chart-panel donut-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>İş Emri Durumları</h2>
+              <p>Planlanan, üretimde, duraklatılan ve tamamlanan işler.</p>
+            </div>
+          </div>
           {workOrderStatusData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={workOrderStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {workOrderStatusData.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="donut-chart-wrap">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={workOrderStatusData} dataKey="value" nameKey="name" innerRadius={64} outerRadius={92} paddingAngle={4}>
+                    {workOrderStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="donut-center-label">
+                <strong>{workOrderStatusTotal}</strong>
+                <span>Toplam</span>
+              </div>
+            </div>
           ) : (
             <p className="empty-state">İş emri durum verisi yok.</p>
           )}
         </article>
-        <article className="panel chart-panel">
-          <h2>Kalite Sonuçları</h2>
+        <article className="panel chart-panel donut-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Kalite Sonuçları</h2>
+              <p>Geçti, kısmi kabul ve red dağılımı.</p>
+            </div>
+          </div>
           {qualityStatusData.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={qualityStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={92} paddingAngle={3}>
-                  {qualityStatusData.map((entry) => (
-                    <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="donut-chart-wrap">
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie data={qualityStatusData} dataKey="value" nameKey="name" innerRadius={64} outerRadius={92} paddingAngle={4}>
+                    {qualityStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? "#64748b"} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="donut-center-label">
+                <strong>{qualityStatusTotal}</strong>
+                <span>Toplam</span>
+              </div>
+            </div>
           ) : (
             <p className="empty-state">Kalite sonucu verisi yok.</p>
           )}
@@ -488,8 +569,13 @@ export default function Dashboard() {
       </section>
 
       <section className="operations-grid dashboard-list-grid">
-        <article className="panel">
-          <h2>Makineler</h2>
+        <article className="panel dashboard-list-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Makineler</h2>
+              <p>Makine parkının anlık saha durumu.</p>
+            </div>
+          </div>
           <div className="status-list">
             {(live?.machines ?? []).map((machine) => (
               <div key={machine.id} className="status-row">
@@ -502,16 +588,26 @@ export default function Dashboard() {
             ))}
           </div>
         </article>
-        <article className="panel">
-          <h2>Aktif İş Emirleri</h2>
+        <article className="panel dashboard-list-panel">
+          <div className="chart-card-header">
+            <div>
+              <h2>Aktif İş Emirleri</h2>
+              <p>Sahada devam eden işlerin ilerleme yüzdesi.</p>
+            </div>
+          </div>
           <div className="status-list">
             {activeWorkOrders.slice(0, 8).map((workOrder) => (
-              <div key={workOrder.id} className="status-row">
+              <div key={workOrder.id} className="status-row status-row-progress">
                 <div>
                   <strong>{workOrder.orderNo}</strong>
                   <span>{workOrder.product.name}</span>
                 </div>
-                <span>{workOrder.progressPercent}%</span>
+                <div className="mini-progress-cell">
+                  <span>{workOrder.progressPercent}%</span>
+                  <div className="mini-progress-track">
+                    <i style={{ width: `${Math.min(workOrder.progressPercent ?? 0, 100)}%` }} />
+                  </div>
+                </div>
               </div>
             ))}
             {!isLoading && activeWorkOrders.length === 0 ? <p className="empty-state">Aktif iş emri yok.</p> : null}
