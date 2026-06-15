@@ -499,7 +499,8 @@ body {
   gap: 7px;
 }
 
-.scrap-priority-badge {
+.scrap-priority-badge,
+.scrap-action-badge {
   min-height: 28px;
   display: inline-flex;
   align-items: center;
@@ -522,6 +523,24 @@ body {
 .scrap-priority-badge-info {
   color: #256f6c;
   background: #d9f2e8;
+}
+
+.scrap-action-created {
+  color: #14523f;
+  background: #dcfce7;
+  border: 1px solid #a7f3d0;
+}
+
+.scrap-action-pending {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.scrap-action-not_required {
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
 }
 
 .scrap-queue-metrics {

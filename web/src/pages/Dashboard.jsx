@@ -66,6 +66,12 @@ const SCRAP_PRIORITY_LABELS = {
   INFO: "Bilgi"
 };
 
+const SCRAP_ACTION_STATUS_LABELS = {
+  PENDING: "Aksiyon Bekliyor",
+  CREATED: "Aksiyon Oluştu",
+  NOT_REQUIRED: "Aksiyon Gerekmiyor"
+};
+
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function mapCountsToChartData(counts = {}) {
@@ -432,6 +438,7 @@ export default function Dashboard() {
                 </div>
                 <div className="scrap-queue-badges">
                   <span className={`scrap-priority-badge scrap-priority-badge-${item.priority.toLowerCase()}`}>{SCRAP_PRIORITY_LABELS[item.priority] ?? item.priority}</span>
+                  <span className={`scrap-action-badge scrap-action-${(item.scrapActionStatus ?? "PENDING").toLowerCase()}`}>{SCRAP_ACTION_STATUS_LABELS[item.scrapActionStatus] ?? item.scrapActionStatus}</span>
                   <span className="reason-chip">{SCRAP_DISPOSITION_LABELS[item.scrapDisposition] ?? item.scrapDisposition}</span>
                   <span className="reason-chip">{SCRAP_REASON_LABELS[item.scrapReason] ?? item.scrapReason}</span>
                 </div>
@@ -463,8 +470,11 @@ export default function Dashboard() {
                 <span>{item.machineCode ? `${item.machineCode} - ${item.machineName}` : "Makine yok"}</span>
                 <span>{item.operatorName ?? "Operat\u00f6r yok"}</span>
                 <span>{formatDateShort(item.createdAt)}</span>
+                {item.scrapActionWorkOrderNo ? <span>{item.scrapActionWorkOrderNo}</span> : null}
               </div>
-              {item.scrapDispositionNote ? <p className="scrap-queue-note">{item.scrapDispositionNote}</p> : null}
+              {item.scrapDispositionNote || item.scrapActionNote ? (
+                <p className="scrap-queue-note">{[item.scrapDispositionNote, item.scrapActionNote].filter(Boolean).join(" / ")}</p>
+              ) : null}
             </Link>
           ))}
           {!isLoading && scrapTrackingQueue.length === 0 ? <p className="empty-state">{"Takip bekleyen fire kayd\u0131 yok."}</p> : null}

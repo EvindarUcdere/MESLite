@@ -129,6 +129,129 @@ function getOperationTransferQuantity(operation, previousOperation, workOrder) {
   return Math.max(previousOperation.producedQuantity, 0);
 }
 
+function buildScrapActionOrderNo(workOrder, disposition) {
+  const suffix = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  const token = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const type = disposition === "REWORK" ? "RWK" : "TELAFI";
+  return `${workOrder.orderNo}-${type}-${suffix}-${token}`;
+}
+
+async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data }) {
+  if (!data.scrapQuantity || !data.scrapDisposition) {
+    return {
+      status: "NOT_REQUIRED",
+      note: "Fire yok, aksiyon gerekmiyor."
+    };
+  }
+
+  if (data.scrapDisposition === "CONDITIONAL_ACCEPT") {
+    return {
+      status: "NOT_REQUIRED",
+      note: "Fire şartlı kabul edildi; ek üretim aksiyonu gerekmedi."
+    };
+  }
+
+  if (data.scrapDisposition === "PENDING_REVIEW") {
+    return {
+      status: "PENDING",
+      note: "Fire kararı inceleme bekliyor."
+    };
+  }
+
+  const actionQuantity = data.scrapResolutionQuantity > 0 ? data.scrapResolutionQuantity : data.scrapQuantity;
+  const orderNo = buildScrapActionOrderNo(workOrder, data.scrapDisposition);
+  const isRework = data.scrapDisposition === "REWORK";
+  const isScrapReplacement = data.scrapDisposition === "SCRAP";
+  const routeOperations = workOrder.route?.operations ?? [];
+
+  const actionWorkOrder = await tx.workOrder.create({
+    data: {
+      orderNo,
+      productId: workOrder.productId,
+      routeId: workOrder.routeId,
+      machineId: isRework ? operation?.machineId ?? data.machineId : workOrder.machineId,
+      assignedOperatorId: isRework ? operation?.assignedOperatorId ?? null : null,
+      plannedQuantity: actionQuantity,
+      plannedStartDate: new Date(),
+      createdById: actor.id
+    }
+  });
+
+  if (isRework && operation?.routeOperationId) {
+    await tx.workOrderOperation.create({
+      data: {
+        workOrderId: actionWorkOrder.id,
+        routeOperationId: operation.routeOperationId,
+        machineId: operation.machineId,
+        assignedOperatorId: operation.assignedOperatorId,
+        sequenceNo: 1,
+        operationName: `Yeniden İşlem - ${operation.operationName}`,
+        status: "READY"
+      }
+    });
+  } else if (!isRework && routeOperations.length) {
+    await tx.workOrderOperation.createMany({
+      data: routeOperations.map((routeOperation, index) => ({
+        workOrderId: actionWorkOrder.id,
+        routeOperationId: routeOperation.id,
+        machineId: routeOperation.defaultMachineId,
+        assignedOperatorId: null,
+        sequenceNo: routeOperation.sequenceNo,
+        operationName: routeOperation.operationName,
+        status: index === 0 ? "READY" : "WAITING"
+      }))
+    });
+  }
+
+  await createNotificationsForRoles(
+    ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+    {
+      type: isRework ? "SCRAP_REWORK_ORDER_CREATED" : "SCRAP_REPRODUCTION_ORDER_CREATED",
+      title: isRework ? "Yeniden işlem emri oluşturuldu" : "Telafi üretim emri oluşturuldu",
+      message: `${workOrder.orderNo} fire kararı için ${orderNo} iş emri oluşturuldu (${actionQuantity} adet).`,
+      entityType: "WorkOrder",
+      entityId: actionWorkOrder.id,
+      metadata: {
+        sourceWorkOrderId: workOrder.id,
+        sourceOrderNo: workOrder.orderNo,
+        sourceProductionLogId: log.id,
+        actionWorkOrderId: actionWorkOrder.id,
+        actionOrderNo: orderNo,
+        scrapDisposition: data.scrapDisposition,
+        actionQuantity
+      }
+    },
+    tx
+  );
+
+  await recordAuditLog(
+    {
+      actorId: actor.id,
+      action: isRework ? "SCRAP_REWORK_WORK_ORDER_CREATED" : "SCRAP_REPRODUCTION_WORK_ORDER_CREATED",
+      entityType: "WorkOrder",
+      entityId: actionWorkOrder.id,
+      summary: `${workOrder.orderNo} fire kararı için ${orderNo} telafi iş emri oluşturuldu`,
+      metadata: {
+        sourceWorkOrderId: workOrder.id,
+        sourceProductionLogId: log.id,
+        scrapDisposition: data.scrapDisposition,
+        scrapQuantity: data.scrapQuantity,
+        actionQuantity
+      }
+    },
+    tx
+  );
+
+  return {
+    status: "CREATED",
+    workOrderId: actionWorkOrder.id,
+    workOrderNo: orderNo,
+    note: isRework
+      ? `${actionQuantity} adet için yeniden işlem emri oluşturuldu.`
+      : `${actionQuantity} adet ${isScrapReplacement ? "hurda firesi" : "eksik üretim"} için telafi üretim emri oluşturuldu.`
+  };
+}
+
 export function findProductionLogs() {
   return prisma.productionLog.findMany({
     include: includeRelations,
@@ -166,7 +289,19 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(400, "Üretim kaydı operasyonu seçilen iş emrine ait olmalıdır");
     }
 
-    const workOrder = operation?.workOrder ?? (await tx.workOrder.findUnique({ where: { id: data.workOrderId } }));
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id: data.workOrderId },
+      include: {
+        product: true,
+        route: {
+          include: {
+            operations: {
+              orderBy: { sequenceNo: "asc" }
+            }
+          }
+        }
+      }
+    });
 
     if (!workOrder) {
       throw new ApiError(404, "İş emri bulunamadı");
@@ -227,7 +362,7 @@ export async function createProductionLog(actor, data) {
 
     const shiftId = await findShiftIdForLog(tx, data.shiftId, data.endedAt ? new Date(data.endedAt) : new Date());
 
-    const log = await tx.productionLog.create({
+    let log = await tx.productionLog.create({
       data: {
         workOrderId: data.workOrderId,
         workOrderOperationId: data.workOrderOperationId,
@@ -240,6 +375,7 @@ export async function createProductionLog(actor, data) {
         scrapDisposition: data.scrapQuantity > 0 ? data.scrapDisposition : null,
         scrapResolutionQuantity: data.scrapQuantity > 0 ? data.scrapResolutionQuantity ?? 0 : 0,
         scrapDispositionNote: data.scrapQuantity > 0 ? data.scrapDispositionNote : null,
+        scrapActionStatus: data.scrapQuantity > 0 ? "PENDING" : "NOT_REQUIRED",
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
         endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
         note: data.note
@@ -273,6 +409,19 @@ export async function createProductionLog(actor, data) {
         },
         tx
       );
+
+      const scrapAction = await createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data });
+
+      log = await tx.productionLog.update({
+        where: { id: log.id },
+        data: {
+          scrapActionStatus: scrapAction.status,
+          scrapActionWorkOrderId: scrapAction.workOrderId,
+          scrapActionWorkOrderNo: scrapAction.workOrderNo,
+          scrapActionNote: scrapAction.note
+        },
+        include: includeRelations
+      });
     }
 
     if (data.isCriticalAlert) {

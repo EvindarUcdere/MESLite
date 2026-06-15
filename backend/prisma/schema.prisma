@@ -94,6 +94,12 @@ enum ScrapDisposition {
   CONDITIONAL_ACCEPT
 }
 
+enum ScrapActionStatus {
+  PENDING
+  CREATED
+  NOT_REQUIRED
+}
+
 enum DowntimeReason {
   MACHINE_FAILURE
   MATERIAL_WAITING
@@ -442,6 +448,10 @@ model ProductionLog {
   scrapDisposition     ScrapDisposition?
   scrapResolutionQuantity Int                    @default(0)
   scrapDispositionNote String?
+  scrapActionStatus    ScrapActionStatus         @default(PENDING)
+  scrapActionWorkOrderId String?
+  scrapActionWorkOrderNo String?
+  scrapActionNote      String?
   startedAt            DateTime?
   endedAt              DateTime?
   note                 String?
