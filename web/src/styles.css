@@ -1771,6 +1771,13 @@ body {
   box-shadow: 0 10px 24px rgba(15, 31, 46, 0.035);
 }
 
+.report-detail-panel,
+.report-chart-card,
+.report-wide-chart,
+.report-insight-grid {
+  scroll-margin-top: 20px;
+}
+
 .report-detail-panel summary {
   display: flex;
   align-items: center;

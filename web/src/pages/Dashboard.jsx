@@ -226,7 +226,7 @@ export default function Dashboard() {
       hint: `${summary?.pausedWorkOrders ?? 0} duraklatıldı`,
       tone: "teal",
       icon: Activity,
-      to: "/work-orders"
+      to: "/reports#work-order-status"
     },
     {
       label: "Geciken İş",
@@ -234,7 +234,7 @@ export default function Dashboard() {
       hint: "Plan bitişi geçenler",
       tone: "red",
       icon: Gauge,
-      to: "/work-orders"
+      to: "/reports#delayed-operations"
     },
     {
       label: "Kalite Bekleyen",
@@ -242,7 +242,7 @@ export default function Dashboard() {
       hint: "Sonuç bekleyen kalite adımı",
       tone: "green",
       icon: ShieldCheck,
-      to: "/quality"
+      to: "/reports#quality-results"
     },
     {
       label: "Kritik Uyarı",
@@ -258,7 +258,7 @@ export default function Dashboard() {
       hint: "Son adımdan çıkan bitmiş ürün",
       tone: "blue",
       icon: PackageCheck,
-      to: "/reports"
+      to: "/reports#daily-production-trend"
     },
     {
       label: "Makine İşlem Adedi",
@@ -266,7 +266,7 @@ export default function Dashboard() {
       hint: "Bugün girilen operasyon kayıtları",
       tone: "violet",
       icon: Factory,
-      to: "/reports"
+      to: "/reports#machine-performance-detail"
     },
     {
       label: "Fire Oranı",
@@ -274,7 +274,7 @@ export default function Dashboard() {
       hint: `${summary?.todayFinalScrapQuantity ?? 0} final fire / ${summary?.todayScrapQuantity ?? 0} proses firesi`,
       tone: "green",
       icon: Flame,
-      to: "/reports"
+      to: "/reports#scrap-reasons"
     },
     {
       label: "Çalışan Makine",
@@ -282,7 +282,7 @@ export default function Dashboard() {
       hint: `${summary?.stoppedMachines ?? 0} duruş/bakım`,
       tone: "teal",
       icon: Factory,
-      to: "/machines"
+      to: "/reports#machine-status"
     }
   ];
 

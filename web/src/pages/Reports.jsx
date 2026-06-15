@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   ArrowUpRight,
   CheckCircle2,
@@ -184,9 +185,9 @@ function ReasonBarList({ data, emptyText, getColor }) {
   );
 }
 
-function ReportDetailSection({ title, description, count, children }) {
+function ReportDetailSection({ id, title, description, count, children }) {
   return (
-    <details className="report-detail-panel">
+    <details id={id} className="report-detail-panel">
       <summary>
         <div>
           <h2>{title}</h2>
@@ -234,6 +235,7 @@ function ReasonChips({ counts, labels }) {
 }
 
 export default function Reports() {
+  const location = useLocation();
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -312,6 +314,29 @@ export default function Reports() {
       isMounted = false;
     };
   }, [filters]);
+
+  useEffect(() => {
+    if (isLoading || !location.hash) {
+      return undefined;
+    }
+
+    const targetId = decodeURIComponent(location.hash.slice(1));
+    const timeoutId = window.setTimeout(() => {
+      const target = document.getElementById(targetId);
+
+      if (!target) {
+        return;
+      }
+
+      if (target.tagName.toLowerCase() === "details") {
+        target.setAttribute("open", "");
+      }
+
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoading, location.hash, report]);
 
   const summary = report?.summary ?? {};
   const summaryCards = [
@@ -602,7 +627,7 @@ export default function Reports() {
         ))}
       </section>
 
-      <section className="report-insight-grid">
+      <section id="management-insights" className="report-insight-grid">
         {managementInsights.length ? (
           managementInsights.map((insight) => (
             <article key={`${insight.type}-${insight.title}`} className={`report-insight-card insight-${insight.severity.toLowerCase()}`}>
@@ -723,7 +748,7 @@ export default function Reports() {
       </section>
 
       <section className="operations-grid report-chart-grid">
-        <article className="panel chart-panel report-chart-card">
+        <article id="plan-actual" className="panel chart-panel report-chart-card">
           <h2>Planlanan / Gerçekleşen Üretim</h2>
           {planActualData.length ? (
             <ResponsiveContainer width="100%" height={280}>
@@ -781,7 +806,7 @@ export default function Reports() {
         </article>
       </section>
 
-      <section className="panel chart-panel report-wide-chart">
+      <section id="daily-production-trend" className="panel chart-panel report-wide-chart">
         <h2>Günlük Üretim ve Fire Trendi</h2>
         {productionTrendData.length ? (
           <ResponsiveContainer width="100%" height={300}>
@@ -801,7 +826,7 @@ export default function Reports() {
       </section>
 
       <section className="operations-grid">
-        <article className="panel chart-panel report-chart-card">
+        <article id="shift-performance" className="panel chart-panel report-chart-card">
           <h2>Vardiya Performansı</h2>
           {shiftPerformanceData.length ? (
             <ResponsiveContainer width="100%" height={280}>
@@ -820,7 +845,7 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="machine-performance" className="panel chart-panel report-chart-card">
           <h2>Makine Performansı</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={machinePerformanceData}>
@@ -835,7 +860,7 @@ export default function Reports() {
           </ResponsiveContainer>
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="product-performance" className="panel chart-panel report-chart-card">
           <h2>Ürün Performansı</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={productPerformanceData}>
@@ -850,7 +875,7 @@ export default function Reports() {
           </ResponsiveContainer>
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="work-order-status" className="panel chart-panel report-chart-card">
           <h2>İş Emri Durumları</h2>
           {workOrderStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
@@ -869,7 +894,7 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="quality-results" className="panel chart-panel report-chart-card">
           <h2>Kalite Sonuçları</h2>
           {qualityStatusData.length ? (
             <ResponsiveContainer width="100%" height={260}>
@@ -907,7 +932,7 @@ export default function Reports() {
           )}
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="scrap-reasons" className="panel chart-panel report-chart-card">
           <h2>Fire Nedenleri</h2>
           <ReasonBarList
             data={scrapReasonData}
@@ -916,7 +941,7 @@ export default function Reports() {
           />
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="operation-downtime-reasons" className="panel chart-panel report-chart-card">
           <h2>Operasyon Duruş Nedenleri</h2>
           <ReasonBarList
             data={operationDowntimeReasonData}
@@ -925,7 +950,7 @@ export default function Reports() {
           />
         </article>
 
-        <article className="panel chart-panel report-chart-card">
+        <article id="machine-status" className="panel chart-panel report-chart-card">
           <h2>Makine Duruş Nedenleri</h2>
           <ReasonBarList
             data={machineDowntimeReasonData}
@@ -955,6 +980,7 @@ export default function Reports() {
       </section>
 
       <ReportDetailSection
+        id="quality-decisions-by-operation"
         title="Operasyon Bazlı Kalite Kararları"
         description="Hangi iş emri ve operasyonlarda kalite kararı yoğunlaşıyor?"
         count={qualityDecisionByOperation.length}
@@ -1002,6 +1028,7 @@ export default function Reports() {
       </ReportDetailSection>
 
       <ReportDetailSection
+        id="quality-decisions-by-machine"
         title="Makine Bazlı Kalite Kararları"
         description="Kalite kararlarının makine parkına göre dağılımını gösterir."
         count={qualityDecisionByMachine.length}
@@ -1041,7 +1068,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Son Kalite Kararları" description="Kalite ekibinin en son verdiği karar kayıtları." count={recentQualityDecisions.length}>
+      <ReportDetailSection id="recent-quality-decisions" title="Son Kalite Kararları" description="Kalite ekibinin en son verdiği karar kayıtları." count={recentQualityDecisions.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1085,7 +1112,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Vardiya Performans Detayı" description="Vardiya bazında üretim, fire, operatör ve makine yoğunluğu." count={shiftPerformanceData.length}>
+      <ReportDetailSection id="shift-performance-detail" title="Vardiya Performans Detayı" description="Vardiya bazında üretim, fire, operatör ve makine yoğunluğu." count={shiftPerformanceData.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1124,6 +1151,7 @@ export default function Reports() {
       </ReportDetailSection>
 
       <ReportDetailSection
+        id="operator-shift-performance"
         title="Vardiya Bazlı Operatör Performansı"
         description="Operatör üretim ve fire sonuçlarını vardiya kırılımında gösterir."
         count={operatorShiftPerformanceData.length}
@@ -1162,6 +1190,7 @@ export default function Reports() {
       </ReportDetailSection>
 
       <ReportDetailSection
+        id="machine-shift-performance"
         title="Vardiya Bazlı Makine Performansı"
         description="Makine üretim performansını vardiya bazında karşılaştırır."
         count={machineShiftPerformanceData.length}
@@ -1201,7 +1230,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Vardiya Bazlı Duruş Analizi" description="Duruş kayıtlarının vardiyalara göre yoğunlaştığı noktalar." count={operationDowntimeByShift.length}>
+      <ReportDetailSection id="shift-downtime-analysis" title="Vardiya Bazlı Duruş Analizi" description="Duruş kayıtlarının vardiyalara göre yoğunlaştığı noktalar." count={operationDowntimeByShift.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1229,7 +1258,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Makine Bazlı Duruş Analizi" description="Hangi makinelerde hangi duruş nedenleri öne çıkıyor?" count={operationDowntimeByMachine.length}>
+      <ReportDetailSection id="machine-downtime-analysis" title="Makine Bazlı Duruş Analizi" description="Hangi makinelerde hangi duruş nedenleri öne çıkıyor?" count={operationDowntimeByMachine.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1259,7 +1288,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Operasyon Bazlı Duruş Analizi" description="Duruşların iş emri ve operasyon adımı bazında dağılımı." count={operationDowntimeByOperation.length}>
+      <ReportDetailSection id="operation-downtime-analysis" title="Operasyon Bazlı Duruş Analizi" description="Duruşların iş emri ve operasyon adımı bazında dağılımı." count={operationDowntimeByOperation.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1291,7 +1320,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="En Çok Geciken Operasyonlar" description="Hedef süreye göre en fazla sapma oluşturan operasyonlar." count={delayedOperations.length}>
+      <ReportDetailSection id="delayed-operations" title="En Çok Geciken Operasyonlar" description="Hedef süreye göre en fazla sapma oluşturan operasyonlar." count={delayedOperations.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1333,7 +1362,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Makine Bazlı Süre Performansı" description="Makine bazında hedef, gerçek, duruş ve gecikme süreleri." count={operationTimeByMachine.length}>
+      <ReportDetailSection id="machine-time-performance" title="Makine Bazlı Süre Performansı" description="Makine bazında hedef, gerçek, duruş ve gecikme süreleri." count={operationTimeByMachine.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1375,7 +1404,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Operatör Bazlı Süre Performansı" description="Operatör bazında tamamlanan operasyon ve süre sapmaları." count={operationTimeByOperator.length}>
+      <ReportDetailSection id="operator-time-performance" title="Operatör Bazlı Süre Performansı" description="Operatör bazında tamamlanan operasyon ve süre sapmaları." count={operationTimeByOperator.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
@@ -1415,7 +1444,7 @@ export default function Reports() {
         </div>
       </ReportDetailSection>
 
-      <ReportDetailSection title="Makine Performans Detayı" description="Makine bazında üretim girişi, fire ve fire oranı detayı." count={machinePerformanceData.length}>
+      <ReportDetailSection id="machine-performance-detail" title="Makine Performans Detayı" description="Makine bazında üretim girişi, fire ve fire oranı detayı." count={machinePerformanceData.length}>
         <div className="table-wrap report-detail-table-wrap">
           <table className="report-detail-table">
             <thead>
