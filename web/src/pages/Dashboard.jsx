@@ -60,6 +60,12 @@ const ALERT_STATUS_LABELS = {
   RESOLVED: "Çözüldü"
 };
 
+const SCRAP_PRIORITY_LABELS = {
+  CRITICAL: "Aksiyon Gerekli",
+  WARNING: "Takip",
+  INFO: "Bilgi"
+};
+
 const API_ORIGIN = (import.meta.env.VITE_API_URL ?? "http://localhost:4000/api").replace(/\/api\/?$/, "");
 
 function mapCountsToChartData(counts = {}) {
@@ -226,6 +232,7 @@ export default function Dashboard() {
   const priorityWorkOrders = [...overdueWorkOrders, ...pausedWorkOrders.filter((workOrder) => !overdueWorkOrders.some((item) => item.id === workOrder.id))].slice(0, 5);
   const latestOperatorNotes = operatorNotes.slice(0, 4);
   const latestOpenAlerts = openAlerts.slice(0, 4);
+  const scrapTrackingQueue = live?.scrapTrackingQueue ?? [];
 
   const cockpitCards = [
     {
@@ -402,6 +409,66 @@ export default function Dashboard() {
             {!isLoading && pendingQualityOperations.length === 0 ? <EmptyDashboardVisual icon={Award} text="Kalite bekleyen operasyon yok." /> : null}
           </div>
         </article>
+      </section>
+
+      <section className="panel scrap-queue-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>{"Fire Takip Kuyru\u011fu"}</h2>
+            <p className="muted-text">{"Hurda, yeniden \u00fcretim ve onar\u0131m kararlar\u0131 teslim plan\u0131n\u0131 etkilemeden takip edilir."}</p>
+          </div>
+          <div className="scrap-queue-summary">
+            <span>{scrapTrackingQueue.filter((item) => item.priority === "CRITICAL").length} aksiyon</span>
+            <strong>{scrapTrackingQueue.length} {"kay\u0131t"}</strong>
+          </div>
+        </div>
+        <div className="scrap-queue-list">
+          {scrapTrackingQueue.slice(0, 6).map((item) => (
+            <Link className={`scrap-queue-item scrap-priority-${item.priority.toLowerCase()}`} key={item.id} to="/work-orders">
+              <div className="scrap-queue-main">
+                <div>
+                  <strong>{item.orderNo}</strong>
+                  <span>{item.productCode ? `${item.productCode} - ${item.productName}` : item.productName}</span>
+                </div>
+                <div className="scrap-queue-badges">
+                  <span className={`scrap-priority-badge scrap-priority-badge-${item.priority.toLowerCase()}`}>{SCRAP_PRIORITY_LABELS[item.priority] ?? item.priority}</span>
+                  <span className="reason-chip">{SCRAP_DISPOSITION_LABELS[item.scrapDisposition] ?? item.scrapDisposition}</span>
+                  <span className="reason-chip">{SCRAP_REASON_LABELS[item.scrapReason] ?? item.scrapReason}</span>
+                </div>
+              </div>
+              <div className="scrap-queue-metrics">
+                <span>
+                  <small>Plan</small>
+                  <strong>{item.plannedQuantity}</strong>
+                </span>
+                <span>
+                  <small>{"Sa\u011flam"}</small>
+                  <strong>{item.producedQuantity}</strong>
+                </span>
+                <span>
+                  <small>Fire</small>
+                  <strong>{item.logScrapQuantity}</strong>
+                </span>
+                <span>
+                  <small>Eksik</small>
+                  <strong>{item.missingQuantity}</strong>
+                </span>
+                <span>
+                  <small>{"\u00c7\u00f6z\u00fcm"}</small>
+                  <strong>{item.scrapResolutionQuantity}</strong>
+                </span>
+              </div>
+              <div className="scrap-queue-meta">
+                <span>{item.operationName ?? "Operasyon belirtilmemi\u015f"}</span>
+                <span>{item.machineCode ? `${item.machineCode} - ${item.machineName}` : "Makine yok"}</span>
+                <span>{item.operatorName ?? "Operat\u00f6r yok"}</span>
+                <span>{formatDateShort(item.createdAt)}</span>
+              </div>
+              {item.scrapDispositionNote ? <p className="scrap-queue-note">{item.scrapDispositionNote}</p> : null}
+            </Link>
+          ))}
+          {!isLoading && scrapTrackingQueue.length === 0 ? <p className="empty-state">{"Takip bekleyen fire kayd\u0131 yok."}</p> : null}
+        </div>
       </section>
 
       <section className="panel dashboard-signal-panel">

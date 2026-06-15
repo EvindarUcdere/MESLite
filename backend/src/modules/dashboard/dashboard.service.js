@@ -51,6 +51,43 @@ function isFinalProductLog(log) {
   return finalOperation?.id === log.workOrderOperationId;
 }
 
+function mapScrapTrackingItem(log) {
+  const plannedQuantity = log.workOrder?.plannedQuantity ?? 0;
+  const producedQuantity = log.workOrder?.producedQuantity ?? 0;
+  const missingQuantity = Math.max(plannedQuantity - producedQuantity, 0);
+  const disposition = log.scrapDisposition ?? "PENDING_REVIEW";
+
+  let priority = "INFO";
+  if (missingQuantity > 0 && ["SCRAP", "REPRODUCE", "PENDING_REVIEW"].includes(disposition)) {
+    priority = "CRITICAL";
+  } else if (log.scrapQuantity > 0) {
+    priority = "WARNING";
+  }
+
+  return {
+    id: log.id,
+    orderNo: log.workOrder?.orderNo,
+    productCode: log.workOrder?.product?.code,
+    productName: log.workOrder?.product?.name,
+    plannedQuantity,
+    producedQuantity,
+    workOrderScrapQuantity: log.workOrder?.scrapQuantity ?? 0,
+    missingQuantity,
+    logProducedQuantity: log.producedQuantity,
+    logScrapQuantity: log.scrapQuantity,
+    scrapReason: log.scrapReason ?? "UNKNOWN",
+    scrapDisposition: disposition,
+    scrapResolutionQuantity: log.scrapResolutionQuantity ?? 0,
+    scrapDispositionNote: log.scrapDispositionNote,
+    machineCode: log.machine?.code,
+    machineName: log.machine?.name,
+    operatorName: log.operator?.name,
+    operationName: log.workOrderOperation?.operationName,
+    createdAt: log.createdAt,
+    priority
+  };
+}
+
 export async function getSummary() {
   const { start, end } = getTodayRange();
   const now = new Date();
@@ -164,7 +201,7 @@ export async function getSummary() {
 export async function getLiveOverview() {
   const { start: operatorNotesStart } = getLast24HoursRange();
 
-  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks, pendingQualityOperations] = await Promise.all([
+  const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks, pendingQualityOperations, scrapTrackingLogs] = await Promise.all([
     prisma.workOrder.findMany({
       where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
       include: {
@@ -321,6 +358,31 @@ export async function getLiveOverview() {
       },
       orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }],
       take: 10
+    }),
+    prisma.productionLog.findMany({
+      where: {
+        scrapQuantity: { gt: 0 }
+      },
+      include: {
+        workOrder: {
+          include: {
+            product: true
+          }
+        },
+        workOrderOperation: true,
+        operator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        },
+        machine: true,
+        shift: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20
     })
   ]);
 
@@ -334,6 +396,7 @@ export async function getLiveOverview() {
     operatorNotes: operatorNotes.filter((log) => log.note?.trim()),
     openAlerts,
     recentQualityChecks,
-    pendingQualityOperations
+    pendingQualityOperations,
+    scrapTrackingQueue: scrapTrackingLogs.map(mapScrapTrackingItem)
   };
 }
