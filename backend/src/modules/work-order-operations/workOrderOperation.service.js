@@ -545,7 +545,8 @@ export async function completeOperation(actor, id) {
         status: { not: "COMPLETED" }
       }
     });
-    const isWorkOrderCompleted = !nextOperation && remainingOperationCount === 0;
+    const hasEnoughFinalProduction = current.workOrder.producedQuantity >= current.workOrder.plannedQuantity;
+    const isWorkOrderCompleted = !nextOperation && remainingOperationCount === 0 && hasEnoughFinalProduction;
 
     await tx.workOrder.update({
       where: { id: current.workOrderId },
@@ -554,6 +555,28 @@ export async function completeOperation(actor, id) {
         ...(isWorkOrderCompleted ? { actualEndDate: new Date() } : {})
       }
     });
+
+    if (!nextOperation && remainingOperationCount === 0 && !hasEnoughFinalProduction) {
+      await createNotificationsForRoles(
+        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        {
+          type: "WORK_ORDER_SHORT_PRODUCTION",
+          title: "İş emri eksik üretimle açık kaldı",
+          message: `${operation.workOrder.orderNo}: plan ${current.workOrder.plannedQuantity}, sağlam üretim ${current.workOrder.producedQuantity}. Fire/yeniden üretim kararı bekleniyor.`,
+          entityType: "WorkOrder",
+          entityId: current.workOrderId,
+          metadata: {
+            workOrderId: current.workOrderId,
+            orderNo: operation.workOrder.orderNo,
+            plannedQuantity: current.workOrder.plannedQuantity,
+            producedQuantity: current.workOrder.producedQuantity,
+            scrapQuantity: current.workOrder.scrapQuantity,
+            operationId: operation.id
+          }
+        },
+        tx
+      );
+    }
 
     let machine = null;
     if (current.machineId) {
@@ -579,6 +602,7 @@ export async function completeOperation(actor, id) {
           plannedQuantity: current.workOrder.plannedQuantity,
           transferQuantity,
           shortCompleted: operation.producedQuantity + operation.scrapQuantity < transferQuantity,
+          hasEnoughFinalProduction,
           nextOperationId: readyOperation?.id,
           workOrderCompleted: isWorkOrderCompleted
         }

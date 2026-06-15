@@ -86,6 +86,14 @@ enum ScrapReason {
   OTHER
 }
 
+enum ScrapDisposition {
+  PENDING_REVIEW
+  REWORK
+  SCRAP
+  REPRODUCE
+  CONDITIONAL_ACCEPT
+}
+
 enum DowntimeReason {
   MACHINE_FAILURE
   MATERIAL_WAITING
@@ -431,6 +439,9 @@ model ProductionLog {
   producedQuantity     Int
   scrapQuantity        Int                       @default(0)
   scrapReason          ScrapReason?
+  scrapDisposition     ScrapDisposition?
+  scrapResolutionQuantity Int                    @default(0)
+  scrapDispositionNote String?
   startedAt            DateTime?
   endedAt              DateTime?
   note                 String?

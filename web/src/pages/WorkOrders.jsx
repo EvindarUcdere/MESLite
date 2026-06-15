@@ -81,6 +81,14 @@ const SCRAP_REASONS = [
   { value: "OTHER", label: "Diğer" }
 ];
 
+const SCRAP_DISPOSITIONS = [
+  { value: "REPRODUCE", label: "Fire kadar yeniden üretilecek" },
+  { value: "REWORK", label: "Yeniden işlenecek / onarılacak" },
+  { value: "SCRAP", label: "Hurda ayrılacak" },
+  { value: "CONDITIONAL_ACCEPT", label: "Şartlı kabul" },
+  { value: "PENDING_REVIEW", label: "Kalite/yönetici inceleyecek" }
+];
+
 function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
@@ -337,6 +345,9 @@ export default function WorkOrders() {
     producedQuantity: 10,
     scrapQuantity: 0,
     scrapReason: "",
+    scrapDisposition: "REPRODUCE",
+    scrapResolutionQuantity: 0,
+    scrapDispositionNote: "",
     note: ""
   });
 
@@ -725,12 +736,33 @@ export default function WorkOrders() {
         return;
       }
 
+      if (Number(productionForm.scrapQuantity) > 0 && !productionForm.scrapDisposition) {
+        setError("Fire girildiğinde fire kararı seçilmelidir.");
+        return;
+      }
+
+      if (
+        Number(productionForm.scrapQuantity) > 0 &&
+        productionForm.scrapDisposition === "REPRODUCE" &&
+        Number(productionForm.scrapResolutionQuantity) <= 0
+      ) {
+        setError("Yeniden üretim kararı için yeniden üretilecek adet girilmelidir.");
+        return;
+      }
+
       await createProductionLog({
         workOrderId: selectedWorkOrder.id,
         machineId: selectedWorkOrder.machineId,
         producedQuantity: Number(productionForm.producedQuantity),
         scrapQuantity: Number(productionForm.scrapQuantity),
-        ...(Number(productionForm.scrapQuantity) > 0 ? { scrapReason: productionForm.scrapReason } : {}),
+        ...(Number(productionForm.scrapQuantity) > 0
+          ? {
+              scrapReason: productionForm.scrapReason,
+              scrapDisposition: productionForm.scrapDisposition,
+              scrapResolutionQuantity: Number(productionForm.scrapResolutionQuantity),
+              ...(productionForm.scrapDispositionNote ? { scrapDispositionNote: productionForm.scrapDispositionNote } : {})
+            }
+          : {}),
         ...(productionForm.note ? { note: productionForm.note } : {})
       });
 
@@ -739,6 +771,9 @@ export default function WorkOrders() {
         producedQuantity: 10,
         scrapQuantity: 0,
         scrapReason: "",
+        scrapDisposition: "REPRODUCE",
+        scrapResolutionQuantity: 0,
+        scrapDispositionNote: "",
         note: ""
       }));
       await loadData();
@@ -1235,20 +1270,73 @@ export default function WorkOrders() {
             </label>
             <label>
               Fire Adedi
-              <input value={productionForm.scrapQuantity} onChange={(event) => updateProductionForm("scrapQuantity", event.target.value)} type="number" min="0" required />
+              <input
+                value={productionForm.scrapQuantity}
+                onChange={(event) => {
+                  updateProductionForm("scrapQuantity", event.target.value);
+                  if (productionForm.scrapDisposition === "REPRODUCE") {
+                    updateProductionForm("scrapResolutionQuantity", event.target.value);
+                  }
+                }}
+                type="number"
+                min="0"
+                required
+              />
             </label>
             {Number(productionForm.scrapQuantity) > 0 ? (
-              <label>
-                Fire Nedeni
-                <select value={productionForm.scrapReason} onChange={(event) => updateProductionForm("scrapReason", event.target.value)} required>
-                  <option value="">Neden seçin</option>
-                  {SCRAP_REASONS.map((reason) => (
-                    <option key={reason.value} value={reason.value}>
-                      {reason.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label>
+                  Fire Nedeni
+                  <select value={productionForm.scrapReason} onChange={(event) => updateProductionForm("scrapReason", event.target.value)} required>
+                    <option value="">Neden seçin</option>
+                    {SCRAP_REASONS.map((reason) => (
+                      <option key={reason.value} value={reason.value}>
+                        {reason.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Fire Kararı
+                  <select
+                    value={productionForm.scrapDisposition}
+                    onChange={(event) => {
+                      updateProductionForm("scrapDisposition", event.target.value);
+                      if (event.target.value === "REPRODUCE") {
+                        updateProductionForm("scrapResolutionQuantity", productionForm.scrapQuantity);
+                      }
+                    }}
+                    required
+                  >
+                    {SCRAP_DISPOSITIONS.map((disposition) => (
+                      <option key={disposition.value} value={disposition.value}>
+                        {disposition.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {productionForm.scrapDisposition === "REPRODUCE" ? (
+                  <label>
+                    Yeniden Üretilecek Adet
+                    <input
+                      value={productionForm.scrapResolutionQuantity}
+                      onChange={(event) => updateProductionForm("scrapResolutionQuantity", event.target.value)}
+                      type="number"
+                      min="1"
+                      max={productionForm.scrapQuantity}
+                      required
+                    />
+                  </label>
+                ) : null}
+                <label>
+                  Fire Karar Notu
+                  <input
+                    value={productionForm.scrapDispositionNote}
+                    onChange={(event) => updateProductionForm("scrapDispositionNote", event.target.value)}
+                    placeholder="Örn: eksik adet yeniden üretime alınacak"
+                  />
+                </label>
+              </>
             ) : null}
             <label>
               Not

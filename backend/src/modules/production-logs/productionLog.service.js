@@ -237,6 +237,9 @@ export async function createProductionLog(actor, data) {
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
         scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
+        scrapDisposition: data.scrapQuantity > 0 ? data.scrapDisposition : null,
+        scrapResolutionQuantity: data.scrapQuantity > 0 ? data.scrapResolutionQuantity ?? 0 : 0,
+        scrapDispositionNote: data.scrapQuantity > 0 ? data.scrapDispositionNote : null,
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
         endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
         note: data.note
@@ -245,6 +248,32 @@ export async function createProductionLog(actor, data) {
     });
 
     let alert = null;
+
+    if (data.scrapQuantity > 0) {
+      await createNotificationsForRoles(
+        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        {
+          type: "SCRAP_RECORDED",
+          title: "Fire kararı girildi",
+          message: `${workOrder.orderNo}: ${data.scrapQuantity} fire - karar ${data.scrapDisposition}`,
+          entityType: "ProductionLog",
+          entityId: log.id,
+          metadata: {
+            workOrderId: workOrder.id,
+            orderNo: workOrder.orderNo,
+            productionLogId: log.id,
+            workOrderOperationId: data.workOrderOperationId,
+            machineId: data.machineId,
+            operatorId,
+            scrapQuantity: data.scrapQuantity,
+            scrapReason: data.scrapReason,
+            scrapDisposition: data.scrapDisposition,
+            scrapResolutionQuantity: data.scrapResolutionQuantity ?? 0
+          }
+        },
+        tx
+      );
+    }
 
     if (data.isCriticalAlert) {
       if (!data.note?.trim()) {
@@ -351,6 +380,9 @@ export async function createProductionLog(actor, data) {
           producedQuantity: data.producedQuantity,
           scrapQuantity: data.scrapQuantity,
           scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
+          scrapDisposition: data.scrapQuantity > 0 ? data.scrapDisposition : null,
+          scrapResolutionQuantity: data.scrapQuantity > 0 ? data.scrapResolutionQuantity ?? 0 : 0,
+          scrapDispositionNote: data.scrapQuantity > 0 ? data.scrapDispositionNote : null,
           hasNote: Boolean(data.note?.trim()),
           criticalAlert: Boolean(data.isCriticalAlert),
           transferQuantity,
@@ -498,8 +530,7 @@ export async function updateProductionLog(actor, id, data) {
   const nextOperation = currentOperationIndex >= 0 ? workOrder.operations[currentOperationIndex + 1] : null;
   if (nextOperation && (producedDelta !== 0 || scrapDelta !== 0)) {
     const updatedCurrentProduced = current.workOrderOperation.producedQuantity + producedDelta;
-    const updatedCurrentScrap = current.workOrderOperation.scrapQuantity + scrapDelta;
-    const updatedTransferQuantity = Math.max(updatedCurrentProduced - updatedCurrentScrap, 0);
+    const updatedTransferQuantity = Math.max(updatedCurrentProduced, 0);
 
     if (nextOperation.producedQuantity > updatedTransferQuantity) {
       throw new ApiError(400, `Next operation already exceeds updated transferable quantity (${updatedTransferQuantity})`);
@@ -514,6 +545,9 @@ export async function updateProductionLog(actor, id, data) {
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
         scrapReason: data.scrapQuantity === 0 ? null : data.scrapReason,
+        scrapDisposition: data.scrapQuantity === 0 ? null : data.scrapDisposition,
+        scrapResolutionQuantity: data.scrapQuantity === 0 ? 0 : data.scrapResolutionQuantity,
+        scrapDispositionNote: data.scrapQuantity === 0 ? null : data.scrapDispositionNote,
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
         endedAt: data.endedAt ? new Date(data.endedAt) : undefined,
         note: data.note
@@ -555,7 +589,9 @@ export async function updateProductionLog(actor, id, data) {
           previousProducedQuantity: current.producedQuantity,
           nextProducedQuantity: log.producedQuantity,
           previousScrapQuantity: current.scrapQuantity,
-          nextScrapQuantity: log.scrapQuantity
+          nextScrapQuantity: log.scrapQuantity,
+          scrapDisposition: log.scrapDisposition,
+          scrapResolutionQuantity: log.scrapResolutionQuantity
         }
       },
       tx

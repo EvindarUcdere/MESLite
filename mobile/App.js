@@ -146,6 +146,16 @@ const SCRAP_REASONS = [
   { value: "QUALITY_REJECT", label: "Kalite Reddi" },
   { value: "OTHER", label: "Diğer" }
 ];
+
+const SCRAP_DISPOSITIONS = [
+  { value: "REPRODUCE", label: "Fire kadar yeniden üretilecek" },
+  { value: "REWORK", label: "Yeniden işlenecek / onarılacak" },
+  { value: "SCRAP", label: "Hurda ayrılacak" },
+  { value: "CONDITIONAL_ACCEPT", label: "Şartlı kabul" },
+  { value: "PENDING_REVIEW", label: "Kalite/yönetici inceleyecek" }
+];
+
+const SCRAP_DISPOSITION_LABELS = Object.fromEntries(SCRAP_DISPOSITIONS.map((disposition) => [disposition.value, disposition.label]));
 const fullScreenHeight = Platform.OS === "web" ? "100vh" : "100%";
 
 function getErrorMessage(error, fallback) {
@@ -662,6 +672,9 @@ export default function App() {
   const [producedQuantity, setProducedQuantity] = useState("10");
   const [scrapQuantity, setScrapQuantity] = useState("0");
   const [scrapReason, setScrapReason] = useState("");
+  const [scrapDisposition, setScrapDisposition] = useState("REPRODUCE");
+  const [scrapResolutionQuantity, setScrapResolutionQuantity] = useState("0");
+  const [scrapDispositionNote, setScrapDispositionNote] = useState("");
   const [note, setNote] = useState("");
   const [isCriticalAlert, setIsCriticalAlert] = useState(false);
   const [alertSeverity, setAlertSeverity] = useState("WARNING");
@@ -1265,6 +1278,23 @@ export default function App() {
       return;
     }
 
+    if (scrap > 0 && !scrapDisposition) {
+      setError("Fire girildiğinde fire kararı seçilmelidir.");
+      return;
+    }
+
+    const resolutionQuantity = Number(scrapResolutionQuantity);
+
+    if (scrap > 0 && (!Number.isFinite(resolutionQuantity) || resolutionQuantity < 0 || resolutionQuantity > scrap)) {
+      setError(`Fire çözüm adedi 0 ile ${scrap} arasında olmalıdır.`);
+      return;
+    }
+
+    if (scrap > 0 && scrapDisposition === "REPRODUCE" && resolutionQuantity <= 0) {
+      setError("Yeniden üretim kararı için yeniden üretilecek adet girilmelidir.");
+      return;
+    }
+
     if (isCriticalAlert && !note.trim()) {
       setError("Kritik uyarı için not girilmelidir.");
       return;
@@ -1285,6 +1315,13 @@ export default function App() {
         producedQuantity: produced,
         scrapQuantity: scrap,
         ...(scrap > 0 ? { scrapReason } : {}),
+        ...(scrap > 0
+          ? {
+              scrapDisposition,
+              scrapResolutionQuantity: resolutionQuantity,
+              ...(scrapDispositionNote ? { scrapDispositionNote } : {})
+            }
+          : {}),
         ...(isCriticalAlert ? { isCriticalAlert, alertSeverity } : {}),
         ...(note ? { note } : {})
       });
@@ -1298,6 +1335,9 @@ export default function App() {
       setProducedQuantity("10");
       setScrapQuantity("0");
       setScrapReason("");
+      setScrapDisposition("REPRODUCE");
+      setScrapResolutionQuantity("0");
+      setScrapDispositionNote("");
       setNote("");
       setIsCriticalAlert(false);
       setAlertSeverity("WARNING");
@@ -2057,7 +2097,17 @@ export default function App() {
           ))}
         </View>
         <Text style={styles.label}>Fire Adedi</Text>
-        <TextInput style={styles.input} keyboardType="numeric" value={scrapQuantity} onChangeText={setScrapQuantity} />
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={scrapQuantity}
+          onChangeText={(value) => {
+            setScrapQuantity(value);
+            if (scrapDisposition === "REPRODUCE") {
+              setScrapResolutionQuantity(value);
+            }
+          }}
+        />
         {Number(scrapQuantity) > 0 ? (
           <>
             <Text style={styles.label}>Fire Nedeni</Text>
@@ -2071,6 +2121,42 @@ export default function App() {
                   <Text style={styles.choiceText}>{reason.label}</Text>
                 </Pressable>
               ))}
+            </View>
+            <Text style={styles.label}>Fire Kararı</Text>
+            <View style={styles.choiceList}>
+              {SCRAP_DISPOSITIONS.map((disposition) => (
+                <Pressable
+                  key={disposition.value}
+                  style={[styles.choiceButton, scrapDisposition === disposition.value ? styles.choiceButtonActive : null]}
+                  onPress={() => {
+                    setScrapDisposition(disposition.value);
+                    if (disposition.value === "REPRODUCE") {
+                      setScrapResolutionQuantity(scrapQuantity);
+                    }
+                  }}
+                >
+                  <Text style={styles.choiceText}>{disposition.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            {scrapDisposition === "REPRODUCE" ? (
+              <>
+                <Text style={styles.label}>Yeniden Üretilecek Adet</Text>
+                <TextInput style={styles.input} keyboardType="numeric" value={scrapResolutionQuantity} onChangeText={setScrapResolutionQuantity} />
+              </>
+            ) : null}
+            <Text style={styles.label}>Fire Karar Notu</Text>
+            <TextInput
+              style={styles.input}
+              value={scrapDispositionNote}
+              onChangeText={setScrapDispositionNote}
+              placeholder="Örn: 10 adet yeniden üretim planına alınacak"
+            />
+            <View style={styles.productionNotice}>
+              <Text style={styles.detailLabel}>Fire takip notu</Text>
+              <Text style={styles.muted}>
+                Bu fire kaydı {SCRAP_DISPOSITION_LABELS[scrapDisposition] ?? "karar bekliyor"} olarak saklanacak. Sağlam adet müşteriye gidecek üretimi, fire adedi proses kaybını gösterir.
+              </Text>
             </View>
           </>
         ) : null}

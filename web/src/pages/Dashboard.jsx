@@ -46,6 +46,14 @@ const SCRAP_REASON_LABELS = {
   UNKNOWN: "Belirtilmemiş"
 };
 
+const SCRAP_DISPOSITION_LABELS = {
+  PENDING_REVIEW: "İnceleme Bekliyor",
+  REWORK: "Yeniden İşlenecek",
+  SCRAP: "Hurda",
+  REPRODUCE: "Yeniden Üretilecek",
+  CONDITIONAL_ACCEPT: "Şartlı Kabul"
+};
+
 const ALERT_STATUS_LABELS = {
   OPEN: "Yeni",
   IN_REVIEW: "İnceleniyor",
@@ -634,6 +642,7 @@ export default function Dashboard() {
                 <th>Üretim</th>
                 <th>Fire</th>
                 <th>Fire Nedeni</th>
+                <th>Fire Kararı</th>
                 <th>Görsel</th>
                 <th>Not</th>
               </tr>
@@ -659,6 +668,16 @@ export default function Dashboard() {
                   </td>
                   <td>{log.scrapQuantity > 0 ? <span className="reason-chip">{SCRAP_REASON_LABELS[log.scrapReason ?? "UNKNOWN"] ?? log.scrapReason}</span> : "-"}</td>
                   <td>
+                    {log.scrapQuantity > 0 ? (
+                      <span className="reason-chip">
+                        {SCRAP_DISPOSITION_LABELS[log.scrapDisposition ?? "PENDING_REVIEW"] ?? log.scrapDisposition}
+                        {log.scrapResolutionQuantity > 0 ? ` (${log.scrapResolutionQuantity})` : ""}
+                      </span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td>
                     {log.attachments?.[0] ? (
                       <a className="image-proof-link" href={getAttachmentUrl(log.attachments[0])} target="_blank" rel="noreferrer">
                         <img className="table-thumb" src={getAttachmentUrl(log.attachments[0])} alt="Üretim görseli" />
@@ -673,7 +692,7 @@ export default function Dashboard() {
               ))}
               {!isLoading && (live?.recentProductionLogs ?? []).length === 0 ? (
                 <tr>
-                  <td colSpan="9">Henüz üretim kaydı yok.</td>
+                  <td colSpan="10">Henüz üretim kaydı yok.</td>
                 </tr>
               ) : null}
             </tbody>
