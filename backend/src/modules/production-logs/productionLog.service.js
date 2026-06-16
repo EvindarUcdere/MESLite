@@ -2,7 +2,7 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
-import { createNotificationsForRoles } from "../notifications/notification.service.js";
+import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
 import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
 
 const includeRelations = {
@@ -163,6 +163,7 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
   const isRework = data.scrapDisposition === "REWORK";
   const isScrapReplacement = data.scrapDisposition === "SCRAP";
   const routeOperations = workOrder.route?.operations ?? [];
+  const replacementFirstOperatorId = operation?.assignedOperatorId ?? (actor.role === "OPERATOR" ? actor.id : null);
 
   const actionWorkOrder = await tx.workOrder.create({
     data: {
@@ -195,7 +196,7 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
         workOrderId: actionWorkOrder.id,
         routeOperationId: routeOperation.id,
         machineId: routeOperation.defaultMachineId,
-        assignedOperatorId: null,
+        assignedOperatorId: index === 0 ? replacementFirstOperatorId : null,
         sequenceNo: routeOperation.sequenceNo,
         operationName: routeOperation.operationName,
         status: index === 0 ? "READY" : "WAITING"
@@ -223,6 +224,29 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
     },
     tx
   );
+
+  if (!isRework && replacementFirstOperatorId) {
+    await createNotification(
+      {
+        recipientId: replacementFirstOperatorId,
+        type: "SCRAP_REPRODUCTION_ASSIGNED",
+        title: "Telafi üretim atandı",
+        message: `${workOrder.orderNo} fire kararı için ${orderNo} telafi iş emrinin ilk operasyonu size atandı (${actionQuantity} adet).`,
+        entityType: "WorkOrder",
+        entityId: actionWorkOrder.id,
+        metadata: {
+          sourceWorkOrderId: workOrder.id,
+          sourceOrderNo: workOrder.orderNo,
+          sourceProductionLogId: log.id,
+          actionWorkOrderId: actionWorkOrder.id,
+          actionOrderNo: orderNo,
+          scrapDisposition: data.scrapDisposition,
+          actionQuantity
+        }
+      },
+      tx
+    );
+  }
 
   await recordAuditLog(
     {
