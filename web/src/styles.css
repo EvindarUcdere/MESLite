@@ -598,6 +598,92 @@ body {
   border-radius: 8px;
 }
 
+.scrap-action-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.35fr);
+  gap: 10px;
+  align-items: stretch;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fbfc 0%, #ecfdf8 100%);
+  border: 1px solid #dbeee8;
+  border-radius: 10px;
+}
+
+.scrap-action-source,
+.scrap-action-target {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #e5edf1;
+  border-radius: 9px;
+}
+
+.scrap-action-source small,
+.scrap-action-target small {
+  color: #66788a;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.scrap-action-source strong,
+.scrap-action-target strong {
+  color: #0f1f2e;
+  font-size: 15px;
+}
+
+.scrap-action-source span,
+.scrap-action-target p {
+  margin: 0;
+  color: #52606d;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.scrap-action-arrow {
+  align-self: center;
+  color: #0f7f78;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.scrap-action-target-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scrap-action-target-head span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  color: #11635e;
+  background: #d8f3ea;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.scrap-action-progress {
+  height: 8px;
+  overflow: hidden;
+  background: #e4edf1;
+  border-radius: 999px;
+}
+
+.scrap-action-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #0f7f78, #16a34a);
+  border-radius: inherit;
+}
+
 .priority-row strong {
   color: #0f1f2e;
 }
@@ -4617,12 +4703,18 @@ th {
   }
 
   .scrap-queue-main,
-  .scrap-queue-metrics {
+  .scrap-queue-metrics,
+  .scrap-action-flow {
     grid-template-columns: 1fr;
   }
 
   .scrap-queue-badges {
     justify-content: flex-start;
+  }
+
+  .scrap-action-arrow {
+    justify-self: start;
+    transform: rotate(90deg);
   }
 
   .dashboard-signal-grid {

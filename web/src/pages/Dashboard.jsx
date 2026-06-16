@@ -430,7 +430,11 @@ export default function Dashboard() {
         </div>
         <div className="scrap-queue-list">
           {scrapTrackingQueue.slice(0, 6).map((item) => (
-            <Link className={`scrap-queue-item scrap-priority-${item.priority.toLowerCase()}`} key={item.id} to="/work-orders">
+            <Link
+              className={`scrap-queue-item scrap-priority-${item.priority.toLowerCase()}`}
+              key={item.id}
+              to={item.scrapActionWorkOrderId ? `/work-orders?workOrderId=${item.scrapActionWorkOrderId}` : `/work-orders?workOrderId=${item.workOrderId ?? ""}`}
+            >
               <div className="scrap-queue-main">
                 <div>
                   <strong>{item.orderNo}</strong>
@@ -471,6 +475,41 @@ export default function Dashboard() {
                 <span>{item.operatorName ?? "Operat\u00f6r yok"}</span>
                 <span>{formatDateShort(item.createdAt)}</span>
                 {item.scrapActionWorkOrderNo ? <span>{item.scrapActionWorkOrderNo}</span> : null}
+              </div>
+              <div className="scrap-action-flow">
+                <div className="scrap-action-source">
+                  <small>Kaynak fire</small>
+                  <strong>{item.orderNo}</strong>
+                  <span>
+                    {item.logScrapQuantity} adet fire / {SCRAP_DISPOSITION_LABELS[item.scrapDisposition] ?? item.scrapDisposition}
+                  </span>
+                </div>
+                <div className="scrap-action-arrow">→</div>
+                <div className="scrap-action-target">
+                  <small>Telafi / rework iş emri</small>
+                  {item.scrapActionWorkOrder ? (
+                    <>
+                      <div className="scrap-action-target-head">
+                        <strong>{item.scrapActionWorkOrder.orderNo}</strong>
+                        <span>{STATUS_LABELS[item.scrapActionWorkOrder.status] ?? item.scrapActionWorkOrder.status}</span>
+                      </div>
+                      <div className="scrap-action-progress">
+                        <span style={{ width: `${item.scrapActionWorkOrder.progressPercent ?? 0}%` }} />
+                      </div>
+                      <p>
+                        {item.scrapActionWorkOrder.producedQuantity}/{item.scrapActionWorkOrder.plannedQuantity} adet tamamlandı,
+                        {" "}
+                        {item.scrapActionWorkOrder.remainingQuantity} adet kaldı.
+                      </p>
+                      <p>
+                        {item.scrapActionWorkOrder.currentOperationName ?? "Operasyon bekliyor"} ·{" "}
+                        {item.scrapActionWorkOrder.responsibleOperatorName ?? "Operatör atanmamış"}
+                      </p>
+                    </>
+                  ) : (
+                    <p>{item.scrapActionStatus === "NOT_REQUIRED" ? "Bu fire için ek iş emri gerekmiyor." : "Telafi iş emri henüz oluşmadı."}</p>
+                  )}
+                </div>
               </div>
               {item.scrapDispositionNote || item.scrapActionNote ? (
                 <p className="scrap-queue-note">{[item.scrapDispositionNote, item.scrapActionNote].filter(Boolean).join(" / ")}</p>

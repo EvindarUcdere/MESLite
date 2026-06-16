@@ -254,6 +254,26 @@ function getWorkOrderStatusLabel(workOrder) {
   return STATUS_LABELS[workOrder.status] ?? workOrder.status;
 }
 
+function getSpecialWorkOrderInfo(workOrder) {
+  const orderNo = workOrder?.orderNo ?? "";
+
+  if (orderNo.includes("-TELAFI-")) {
+    return {
+      label: "Telafi üretimi",
+      text: "Bu iş, önceki fire/eksik üretimi kapatmak için oluşturuldu."
+    };
+  }
+
+  if (orderNo.includes("-RWK-")) {
+    return {
+      label: "Yeniden işlem",
+      text: "Bu iş, fireli parçanın onarım veya yeniden işlem süreci için oluşturuldu."
+    };
+  }
+
+  return null;
+}
+
 function isShortCompletedOperation(operation, workOrder) {
   return Boolean(
     operation?.status === "COMPLETED" &&
@@ -802,9 +822,13 @@ export default function App() {
         : rawSelectedProductionOperation.assignedOperatorId !== user?.id
           ? "Bu operasyon size atanmadığı için üretim kaydı girilemez."
           : getOperationRemainingQuantity(rawSelectedProductionOperation, selectedProductionWorkOrder) <= 0
-            ? "Bu operasyon için kalan üretim yok. Fire telafisi gerekiyorsa oluşan telafi iş emrinden üretim girin."
+            ? getSpecialWorkOrderInfo(selectedProductionWorkOrder)
+              ? "Bu telafi operasyonunda üretilecek kalan adet yok."
+              : "Bu operasyon için kalan üretim yok. Fire telafisi gerekiyorsa oluşan telafi iş emrinden üretim girin."
             : ""
     : "Üretim girişi için bir operasyon seçin.";
+  const canCompleteProductionOperation =
+    Boolean(rawSelectedProductionOperation && selectedProductionWorkOrder && canCompleteOperation(rawSelectedProductionOperation, selectedProductionWorkOrder, user));
   const canSubmitProductionEntry = Boolean(selectedProductionOperation && !productionBlockReason && !isSubmitting);
 
   const plannedShiftCount = shiftAssignments.filter((assignment) => ["PLANNED", "CONFIRMED"].includes(assignment.status)).length;
@@ -1325,6 +1349,19 @@ export default function App() {
     );
   }
 
+  async function handleCompleteProductionOperation() {
+    if (!rawSelectedProductionOperation) {
+      setError("Tamamlanacak operasyon bulunamadı.");
+      return;
+    }
+
+    await handleOperationAction(
+      () => completeWorkOrderOperation(rawSelectedProductionOperation.id),
+      "Operasyon tamamlandı. Ürün sıradaki adıma devredildi.",
+      "Operasyon tamamlanamadı."
+    );
+  }
+
   async function handleOperationMessage(operationId) {
     const draft = operationMessageDrafts[operationId] ?? { message: "", severity: "INFO" };
     const message = draft.message.trim();
@@ -1710,6 +1747,7 @@ export default function App() {
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
                   </Text>
+                  {getSpecialWorkOrderInfo(workOrder) ? <Text style={styles.specialOrderBadge}>{getSpecialWorkOrderInfo(workOrder).label}</Text> : null}
                 </View>
                 <View style={styles.cardBadgeStack}>
                   {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
@@ -1742,6 +1780,7 @@ export default function App() {
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
                   </Text>
+                  {getSpecialWorkOrderInfo(workOrder) ? <Text style={styles.specialOrderBadge}>{getSpecialWorkOrderInfo(workOrder).label}</Text> : null}
                 </View>
                 <View style={styles.cardBadgeStack}>
                   {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
@@ -1773,6 +1812,7 @@ export default function App() {
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
                   </Text>
+                  {getSpecialWorkOrderInfo(workOrder) ? <Text style={styles.specialOrderBadge}>{getSpecialWorkOrderInfo(workOrder).label}</Text> : null}
                 </View>
                 <View style={styles.cardBadgeStack}>
                   {notificationCounts[workOrder.id] ? <Text style={styles.notificationBadge}>{notificationCounts[workOrder.id]}</Text> : null}
@@ -1799,6 +1839,13 @@ export default function App() {
             </View>
             <Text style={[styles.statusBadge, isShortClosedWorkOrder(selectedWorkOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(selectedWorkOrder)}</Text>
           </View>
+
+          {getSpecialWorkOrderInfo(selectedWorkOrder) ? (
+            <View style={styles.specialOrderNotice}>
+              <Text style={styles.specialOrderNoticeTitle}>{getSpecialWorkOrderInfo(selectedWorkOrder).label}</Text>
+              <Text style={styles.muted}>{getSpecialWorkOrderInfo(selectedWorkOrder).text}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.detailRow}>
             <View style={styles.detailBox}>
@@ -2151,6 +2198,7 @@ export default function App() {
                 ? `${productionContextOperation.sequenceNo}. ${productionContextOperation.operationName} - ${OPERATION_STATUS_LABELS[productionContextOperation.status] ?? productionContextOperation.status}`
                 : "Operasyon bulunamadı"}
             </Text>
+            {getSpecialWorkOrderInfo(selectedWorkOrder) ? <Text style={styles.specialOrderBadge}>{getSpecialWorkOrderInfo(selectedWorkOrder).label}</Text> : null}
           </View>
         ) : (
           <View style={styles.choiceList}>
@@ -2178,6 +2226,12 @@ export default function App() {
             <Text style={styles.muted}>{productionUnavailableReason}</Text>
           </View>
         ) : null}
+        {getSpecialWorkOrderInfo(productionContextWorkOrder) ? (
+          <View style={styles.specialOrderNotice}>
+            <Text style={styles.specialOrderNoticeTitle}>{getSpecialWorkOrderInfo(productionContextWorkOrder).label}</Text>
+            <Text style={styles.muted}>{getSpecialWorkOrderInfo(productionContextWorkOrder).text}</Text>
+          </View>
+        ) : null}
         {productionContextOperation && productionContextWorkOrder ? (
           <View style={styles.productionNotice}>
             <Text style={styles.detailLabel}>{selectedProductionOperation ? "Seçili operasyon" : "Operasyon bilgisi"}</Text>
@@ -2195,7 +2249,19 @@ export default function App() {
             </Text>
           </View>
         ) : null}
-        {productionBlockReason && displayedProductionCandidates.length ? <Text style={styles.error}>{productionBlockReason}</Text> : null}
+        {productionBlockReason && displayedProductionCandidates.length ? (
+          <View style={styles.productionActionNotice}>
+            <Text style={styles.error}>{productionBlockReason}</Text>
+            {canCompleteProductionOperation ? (
+              <>
+                <Text style={styles.muted}>Bu adımın üretim miktarı tamamlanmış. Ürünü sıradaki operasyona devretmek için operasyonu tamamlayın.</Text>
+                <Pressable style={styles.primaryButton} onPress={handleCompleteProductionOperation} disabled={isSubmitting}>
+                  <Text style={styles.primaryButtonText}>{isSubmitting ? "Tamamlanıyor..." : "Operasyonu Tamamla"}</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        ) : null}
         <Text style={styles.label}>Üretilen Adet</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={producedQuantity} onChangeText={setProducedQuantity} />
         <View style={styles.quickRow}>
@@ -2474,6 +2540,35 @@ const styles = StyleSheet.create({
     color: "#9a3412",
     backgroundColor: "#ffedd5"
   },
+  specialOrderBadge: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    color: "#075985",
+    backgroundColor: "#e0f2fe",
+    borderColor: "#bae6fd",
+    borderRadius: 999,
+    borderWidth: 1,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden"
+  },
+  specialOrderNotice: {
+    gap: 4,
+    padding: 12,
+    backgroundColor: "#eef6ff",
+    borderColor: "#bfdbfe",
+    borderLeftColor: "#2563eb",
+    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1
+  },
+  specialOrderNoticeTitle: {
+    color: "#075985",
+    fontSize: 13,
+    fontWeight: "900"
+  },
   detailRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2616,6 +2711,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#edfdfa",
     borderColor: "#9bd8c8",
     borderLeftColor: "#0f7f78",
+    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1
+  },
+  productionActionNotice: {
+    gap: 10,
+    padding: 12,
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderLeftColor: "#f97316",
     borderLeftWidth: 4,
     borderRadius: 14,
     borderWidth: 1

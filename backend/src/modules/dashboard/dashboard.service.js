@@ -51,11 +51,44 @@ function isFinalProductLog(log) {
   return finalOperation?.id === log.workOrderOperationId;
 }
 
-function mapScrapTrackingItem(log) {
+function calculateActionWorkOrderProgress(workOrder) {
+  if (!workOrder) {
+    return null;
+  }
+
+  const plannedQuantity = workOrder.plannedQuantity ?? 0;
+  const producedQuantity = workOrder.producedQuantity ?? 0;
+  const remainingQuantity = Math.max(plannedQuantity - producedQuantity, 0);
+  const progressPercent = plannedQuantity > 0 ? Math.min(Number(((producedQuantity / plannedQuantity) * 100).toFixed(2)), 100) : 0;
+  const sortedOperations = [...(workOrder.operations ?? [])].sort((first, second) => first.sequenceNo - second.sequenceNo);
+  const activeOperation =
+    sortedOperations.find((operation) => ["IN_PROGRESS", "READY", "PAUSED"].includes(operation.status)) ??
+    sortedOperations.find((operation) => operation.status === "WAITING") ??
+    sortedOperations.at(-1);
+
+  return {
+    id: workOrder.id,
+    orderNo: workOrder.orderNo,
+    status: workOrder.status,
+    plannedQuantity,
+    producedQuantity,
+    scrapQuantity: workOrder.scrapQuantity ?? 0,
+    remainingQuantity,
+    progressPercent,
+    currentOperationName: activeOperation?.operationName,
+    currentOperationStatus: activeOperation?.status,
+    responsibleOperatorName: activeOperation?.assignedOperator?.name ?? workOrder.assignedOperator?.name,
+    machineCode: activeOperation?.machine?.code ?? workOrder.machine?.code,
+    machineName: activeOperation?.machine?.name ?? workOrder.machine?.name
+  };
+}
+
+function mapScrapTrackingItem(log, actionWorkOrderMap = new Map()) {
   const plannedQuantity = log.workOrder?.plannedQuantity ?? 0;
   const producedQuantity = log.workOrder?.producedQuantity ?? 0;
   const missingQuantity = Math.max(plannedQuantity - producedQuantity, 0);
   const disposition = log.scrapDisposition ?? "PENDING_REVIEW";
+  const actionWorkOrder = log.scrapActionWorkOrderId ? actionWorkOrderMap.get(log.scrapActionWorkOrderId) : null;
 
   let priority = "INFO";
   if (missingQuantity > 0 && ["SCRAP", "REPRODUCE", "PENDING_REVIEW"].includes(disposition)) {
@@ -66,6 +99,7 @@ function mapScrapTrackingItem(log) {
 
   return {
     id: log.id,
+    workOrderId: log.workOrderId,
     orderNo: log.workOrder?.orderNo,
     productCode: log.workOrder?.product?.code,
     productName: log.workOrder?.product?.name,
@@ -82,6 +116,7 @@ function mapScrapTrackingItem(log) {
     scrapActionStatus: log.scrapActionStatus,
     scrapActionWorkOrderId: log.scrapActionWorkOrderId,
     scrapActionWorkOrderNo: log.scrapActionWorkOrderNo,
+    scrapActionWorkOrder: calculateActionWorkOrderProgress(actionWorkOrder),
     scrapActionNote: log.scrapActionNote,
     machineCode: log.machine?.code,
     machineName: log.machine?.name,
@@ -390,6 +425,42 @@ export async function getLiveOverview() {
     })
   ]);
 
+  const scrapActionWorkOrderIds = [
+    ...new Set(scrapTrackingLogs.map((log) => log.scrapActionWorkOrderId).filter(Boolean))
+  ];
+  const scrapActionWorkOrders = scrapActionWorkOrderIds.length
+    ? await prisma.workOrder.findMany({
+        where: { id: { in: scrapActionWorkOrderIds } },
+        include: {
+          product: true,
+          machine: true,
+          assignedOperator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true
+            }
+          },
+          operations: {
+            include: {
+              machine: true,
+              assignedOperator: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true
+                }
+              }
+            },
+            orderBy: { sequenceNo: "asc" }
+          }
+        }
+      })
+    : [];
+  const scrapActionWorkOrderMap = new Map(scrapActionWorkOrders.map((workOrder) => [workOrder.id, workOrder]));
+
   return {
     activeWorkOrders: activeWorkOrders.map((workOrder) => ({
       ...workOrder,
@@ -401,6 +472,6 @@ export async function getLiveOverview() {
     openAlerts,
     recentQualityChecks,
     pendingQualityOperations,
-    scrapTrackingQueue: scrapTrackingLogs.map(mapScrapTrackingItem)
+    scrapTrackingQueue: scrapTrackingLogs.map((log) => mapScrapTrackingItem(log, scrapActionWorkOrderMap))
   };
 }

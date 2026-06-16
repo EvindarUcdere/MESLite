@@ -163,6 +163,8 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
   const isRework = data.scrapDisposition === "REWORK";
   const isScrapReplacement = data.scrapDisposition === "SCRAP";
   const routeOperations = workOrder.route?.operations ?? [];
+  const sourceOperationByRouteOperationId = new Map((workOrder.operations ?? []).map((sourceOperation) => [sourceOperation.routeOperationId, sourceOperation]));
+  const sourceOperationBySequenceNo = new Map((workOrder.operations ?? []).map((sourceOperation) => [sourceOperation.sequenceNo, sourceOperation]));
   const replacementFirstOperatorId = operation?.assignedOperatorId ?? (actor.role === "OPERATOR" ? actor.id : null);
 
   const actionWorkOrder = await tx.workOrder.create({
@@ -192,15 +194,20 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
     });
   } else if (!isRework && routeOperations.length) {
     await tx.workOrderOperation.createMany({
-      data: routeOperations.map((routeOperation, index) => ({
-        workOrderId: actionWorkOrder.id,
-        routeOperationId: routeOperation.id,
-        machineId: routeOperation.defaultMachineId,
-        assignedOperatorId: index === 0 ? replacementFirstOperatorId : null,
-        sequenceNo: routeOperation.sequenceNo,
-        operationName: routeOperation.operationName,
-        status: index === 0 ? "READY" : "WAITING"
-      }))
+      data: routeOperations.map((routeOperation, index) => {
+        const sourceOperation =
+          sourceOperationByRouteOperationId.get(routeOperation.id) ?? sourceOperationBySequenceNo.get(routeOperation.sequenceNo);
+
+        return {
+          workOrderId: actionWorkOrder.id,
+          routeOperationId: routeOperation.id,
+          machineId: sourceOperation?.machineId ?? routeOperation.defaultMachineId,
+          assignedOperatorId: sourceOperation?.assignedOperatorId ?? (index === 0 ? replacementFirstOperatorId : null),
+          sequenceNo: routeOperation.sequenceNo,
+          operationName: routeOperation.operationName,
+          status: index === 0 ? "READY" : "WAITING"
+        };
+      })
     });
   }
 
@@ -323,6 +330,9 @@ export async function createProductionLog(actor, data) {
               orderBy: { sequenceNo: "asc" }
             }
           }
+        },
+        operations: {
+          orderBy: { sequenceNo: "asc" }
         }
       }
     });
