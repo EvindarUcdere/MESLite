@@ -195,6 +195,117 @@ async function getWorkOrderForEmit(workOrderId, tx = prisma) {
   });
 }
 
+async function closeSourceWorkOrdersIfScrapActionsCompleted(tx, actionWorkOrder, actor, completedAt = new Date()) {
+  if (actionWorkOrder.status !== "COMPLETED") {
+    return [];
+  }
+
+  const sourceLogs = await tx.productionLog.findMany({
+    where: {
+      scrapActionWorkOrderId: actionWorkOrder.id
+    },
+    include: {
+      workOrder: {
+        include: {
+          operations: true
+        }
+      }
+    }
+  });
+
+  const sourceWorkOrderIds = [...new Set(sourceLogs.map((log) => log.workOrderId).filter(Boolean))];
+  const closedWorkOrders = [];
+
+  for (const sourceWorkOrderId of sourceWorkOrderIds) {
+    const sourceWorkOrder = await tx.workOrder.findUnique({
+      where: { id: sourceWorkOrderId },
+      include: {
+        operations: true
+      }
+    });
+
+    if (!sourceWorkOrder || ["COMPLETED", "CANCELLED"].includes(sourceWorkOrder.status)) {
+      continue;
+    }
+
+    const sourceOperationsCompleted =
+      sourceWorkOrder.operations.length === 0 || sourceWorkOrder.operations.every((operation) => operation.status === "COMPLETED");
+
+    if (!sourceOperationsCompleted) {
+      continue;
+    }
+
+    const actionLogs = await tx.productionLog.findMany({
+      where: {
+        workOrderId: sourceWorkOrderId,
+        scrapActionStatus: "CREATED",
+        scrapActionWorkOrderId: { not: null },
+        scrapDisposition: { in: ["SCRAP", "REPRODUCE"] }
+      }
+    });
+
+    const actionWorkOrderIds = [...new Set(actionLogs.map((log) => log.scrapActionWorkOrderId).filter(Boolean))];
+    const actionWorkOrders = actionWorkOrderIds.length
+      ? await tx.workOrder.findMany({
+          where: {
+            id: { in: actionWorkOrderIds }
+          }
+        })
+      : [];
+
+    const allRequiredActionsCompleted = actionLogs.every((log) => {
+      const linkedAction = actionWorkOrders.find((item) => item.id === log.scrapActionWorkOrderId);
+      return linkedAction?.status === "COMPLETED";
+    });
+
+    if (!allRequiredActionsCompleted) {
+      continue;
+    }
+
+    const completedActionProducedQuantity = actionWorkOrders
+      .filter((linkedAction) => linkedAction.status === "COMPLETED")
+      .reduce((total, linkedAction) => total + linkedAction.producedQuantity, 0);
+    const coveredQuantity = sourceWorkOrder.producedQuantity + completedActionProducedQuantity;
+
+    if (coveredQuantity < sourceWorkOrder.plannedQuantity) {
+      continue;
+    }
+
+    const closedWorkOrder = await tx.workOrder.update({
+      where: { id: sourceWorkOrder.id },
+      data: {
+        status: "COMPLETED",
+        actualEndDate: sourceWorkOrder.actualEndDate ?? completedAt
+      }
+    });
+
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "WORK_ORDER_COMPLETED_BY_SCRAP_COMPENSATION",
+        entityType: "WorkOrder",
+        entityId: sourceWorkOrder.id,
+        summary: `${sourceWorkOrder.orderNo} iş emri bağlı telafi üretimleri tamamlandığı için kapatıldı`,
+        metadata: {
+          sourceWorkOrderId: sourceWorkOrder.id,
+          sourceOrderNo: sourceWorkOrder.orderNo,
+          actionWorkOrderIds,
+          plannedQuantity: sourceWorkOrder.plannedQuantity,
+          sourceProducedQuantity: sourceWorkOrder.producedQuantity,
+          completedActionProducedQuantity,
+          coveredQuantity
+        }
+      },
+      tx
+    );
+
+    const fullWorkOrder = await getWorkOrderForEmit(closedWorkOrder.id, tx);
+    closedWorkOrders.push(fullWorkOrder ?? closedWorkOrder);
+  }
+
+  return closedWorkOrders;
+}
+
 export function findWorkOrderOperations() {
   return prisma.workOrderOperation.findMany({
     include: operationInclude,
@@ -548,13 +659,17 @@ export async function completeOperation(actor, id) {
     const hasEnoughFinalProduction = current.workOrder.producedQuantity >= current.workOrder.plannedQuantity;
     const isWorkOrderCompleted = !nextOperation && remainingOperationCount === 0 && hasEnoughFinalProduction;
 
-    await tx.workOrder.update({
+    const updatedWorkOrder = await tx.workOrder.update({
       where: { id: current.workOrderId },
       data: {
         status: isWorkOrderCompleted ? "COMPLETED" : "IN_PROGRESS",
         ...(isWorkOrderCompleted ? { actualEndDate: new Date() } : {})
       }
     });
+
+    const closedSourceWorkOrders = isWorkOrderCompleted
+      ? await closeSourceWorkOrdersIfScrapActionsCompleted(tx, updatedWorkOrder, actor, new Date())
+      : [];
 
     if (!nextOperation && remainingOperationCount === 0 && !hasEnoughFinalProduction) {
       await createNotificationsForRoles(
@@ -611,7 +726,7 @@ export async function completeOperation(actor, id) {
     );
 
     const workOrder = await getWorkOrderForEmit(current.workOrderId, tx);
-    return { operation, readyOperation, workOrder, machine };
+    return { operation, readyOperation, workOrder, machine, closedSourceWorkOrders };
   });
 
   emitEvent("workOrderOperation:updated", result.operation);
@@ -619,6 +734,7 @@ export async function completeOperation(actor, id) {
     emitEvent("workOrderOperation:updated", result.readyOperation);
   }
   emitEvent("workOrder:updated", result.workOrder);
+  result.closedSourceWorkOrders.forEach((workOrder) => emitEvent("workOrder:updated", workOrder));
   if (result.machine) {
     emitEvent("machine:statusChanged", result.machine);
   }
