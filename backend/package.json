@@ -29,7 +29,8 @@
     "test:phase3:quality-pending": "node prisma/phase3-quality-pending-acceptance.js",
     "test:phase3:transfer": "node prisma/phase3-operation-transfer-acceptance.js",
     "test:phase3:notifications": "node prisma/phase3-notification-routing-acceptance.js",
-    "test:phase3:push": "node prisma/phase3-push-token-acceptance.js"
+    "test:phase3:push": "node prisma/phase3-push-token-acceptance.js",
+    "test:phase4:scrap": "node prisma/phase4-scrap-compensation-acceptance.js"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
