@@ -429,6 +429,56 @@ function hasCompletedOperationForUser(workOrder, userId) {
   return Boolean(userId && workOrder.operations?.some((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED"));
 }
 
+function getProductionUnavailableReason(workOrder, userId) {
+  if (!workOrder) {
+    return "Üretim girişi için bir iş emri seçin.";
+  }
+
+  if (isClosedWorkOrder(workOrder)) {
+    return "Bu iş emri kapalı olduğu için üretim girişi yapılamaz.";
+  }
+
+  if (isBeforePlannedStart(workOrder)) {
+    return "Bu iş emrinin planlanan başlangıç tarihi gelmedi.";
+  }
+
+  const myOperations = workOrder.operations?.filter((operation) => operation.assignedOperatorId === userId) ?? [];
+
+  if (!myOperations.length) {
+    const activeOperation = getOperationProgress(workOrder.operations).activeOperation;
+    const activeOperatorName = activeOperation?.assignedOperator?.name;
+
+    return activeOperation
+      ? `Bu iş emrinin şu anki adımı ${activeOperation.operationName}. Operatör: ${activeOperatorName ?? "atanmamış"}.`
+      : "Bu iş emrinde size atanmış operasyon yok.";
+  }
+
+  const activeMyOperation = myOperations.find((operation) => ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status));
+
+  if (!activeMyOperation) {
+    return "Bu iş emrindeki size atanmış adımlar tamamlanmış veya henüz sırada değil.";
+  }
+
+  if (!activeMyOperation.machineId) {
+    return `${activeMyOperation.operationName} için makine atanmamış. Üretim yöneticisi makine ataması yapmalı.`;
+  }
+
+  return "Bu iş emrinde şu anda üretim girişi yapılabilecek operasyon yok.";
+}
+
+function getProductionContextOperation(workOrder, userId) {
+  if (!workOrder?.operations?.length) {
+    return null;
+  }
+
+  return (
+    workOrder.operations.find((operation) => operation.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status)) ??
+    getOperationProgress(workOrder.operations).activeOperation ??
+    [...workOrder.operations].reverse().find((operation) => operation.assignedOperatorId === userId) ??
+    workOrder.operations[0]
+  );
+}
+
 function getMyCurrentOperationText(workOrder, userId) {
   const actionableOperation = workOrder.operations?.find((operation) => operation.assignedOperatorId === userId && ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status));
 
@@ -735,8 +785,13 @@ export default function App() {
   const displayedProductionCandidates = scopedProductionCandidates;
   const selectedDisplayQuantities = selectedWorkOrder ? getWorkOrderDisplayQuantities(selectedWorkOrder) : null;
   const selectedProgressPercent = selectedWorkOrder ? getProgressPercent(selectedWorkOrder) : 0;
+  const productionContextWorkOrder = selectedProductionWorkOrder ?? selectedWorkOrder;
+  const productionContextOperation = selectedProductionOperation ?? getProductionContextOperation(selectedWorkOrder, user?.id);
   const selectedProductionRemaining = selectedProductionOperation ? getOperationRemainingQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
   const selectedProductionTransferQuantity = selectedProductionOperation ? getOperationTransferQuantity(selectedProductionOperation, selectedProductionWorkOrder) : 0;
+  const productionContextTransferQuantity = productionContextOperation && productionContextWorkOrder ? getOperationTransferQuantity(productionContextOperation, productionContextWorkOrder) : 0;
+  const productionContextRemaining = productionContextOperation && productionContextWorkOrder ? getOperationRemainingQuantity(productionContextOperation, productionContextWorkOrder) : 0;
+  const productionUnavailableReason = !displayedProductionCandidates.length ? getProductionUnavailableReason(selectedWorkOrder, user?.id) : "";
   const runningWorkOrderCount = activeAssignedWorkOrders.filter((workOrder) => workOrder.status === "IN_PROGRESS").length;
   const totalRemainingQuantity = assignedWorkOrders.reduce((total, workOrder) => total + getRemainingQuantity(workOrder), 0);
   const productionBlockReason = rawSelectedProductionOperation
@@ -1808,7 +1863,7 @@ export default function App() {
                 </View>
                 <View style={styles.detailBox}>
                   <Text style={styles.detailLabel}>Bendeki Adım</Text>
-                  <Text style={styles.detailValue}>{mySelectedOperations.length}</Text>
+                  <Text style={styles.detailValue}>{getMyCurrentOperationText(selectedWorkOrder, user.id)}</Text>
                 </View>
               </View>
               {selectedWorkOrder.operations.map((operation, index) => {
@@ -2088,49 +2143,59 @@ export default function App() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Üretim Girişi</Text>
         <Text style={styles.label}>İş Emri</Text>
-        <View style={styles.choiceList}>
-          {displayedProductionCandidates.map((operation) => (
-            <Pressable
-              key={operation.id}
-              style={[styles.operationChoiceButton, selectedOperationId === operation.id ? styles.choiceButtonActive : null]}
-              onPress={() => {
-                setSelectedOperationId(operation.id);
-                setSelectedWorkOrderId(operation.workOrder.id);
-                setActiveMobileView("PRODUCTION");
-              }}
-            >
-              <Text style={styles.choiceText}>{operation.workOrder.orderNo}</Text>
-              <Text style={styles.muted}>
-                {operation.sequenceNo}. {operation.operationName} - {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {selectedWorkOrder ? (
+          <View style={[styles.operationChoiceButton, styles.choiceButtonActive]}>
+            <Text style={styles.choiceText}>{selectedWorkOrder.orderNo}</Text>
+            <Text style={styles.muted}>
+              {productionContextOperation
+                ? `${productionContextOperation.sequenceNo}. ${productionContextOperation.operationName} - ${OPERATION_STATUS_LABELS[productionContextOperation.status] ?? productionContextOperation.status}`
+                : "Operasyon bulunamadı"}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.choiceList}>
+            {displayedProductionCandidates.map((operation) => (
+              <Pressable
+                key={operation.id}
+                style={[styles.operationChoiceButton, selectedOperationId === operation.id ? styles.choiceButtonActive : null]}
+                onPress={() => {
+                  setSelectedOperationId(operation.id);
+                  setSelectedWorkOrderId(operation.workOrder.id);
+                  setActiveMobileView("PRODUCTION");
+                }}
+              >
+                <Text style={styles.choiceText}>{operation.workOrder.orderNo}</Text>
+                <Text style={styles.muted}>
+                  {operation.sequenceNo}. {operation.operationName} - {OPERATION_STATUS_LABELS[operation.status] ?? operation.status}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {!displayedProductionCandidates.length ? (
-          <Text style={styles.muted}>
-            {selectedWorkOrder
-              ? "Seçili iş emri için üretim girişi yapılabilecek operasyon yok."
-              : "Üretim girişi için size atanmış hazır, üretimde veya duraklatılmış operasyon yok."}
-          </Text>
-        ) : null}
-        {selectedProductionOperation && selectedProductionWorkOrder ? (
           <View style={styles.productionNotice}>
-            <Text style={styles.detailLabel}>Seçili operasyon</Text>
+            <Text style={styles.detailLabel}>Üretim girişi kapalı</Text>
+            <Text style={styles.muted}>{productionUnavailableReason}</Text>
+          </View>
+        ) : null}
+        {productionContextOperation && productionContextWorkOrder ? (
+          <View style={styles.productionNotice}>
+            <Text style={styles.detailLabel}>{selectedProductionOperation ? "Seçili operasyon" : "Operasyon bilgisi"}</Text>
             <Text style={styles.detailValue}>
-              {selectedProductionWorkOrder.orderNo} - {selectedProductionOperation.operationName}
+              {productionContextWorkOrder.orderNo} - {productionContextOperation.operationName}
             </Text>
             <Text style={styles.muted}>
-              Önceki adımdan gelen: {selectedProductionTransferQuantity} adet, kalan: {selectedProductionRemaining} adet
+              Önceki adımdan gelen: {selectedProductionOperation ? selectedProductionTransferQuantity : productionContextTransferQuantity} adet, kalan: {selectedProductionOperation ? selectedProductionRemaining : productionContextRemaining} adet
             </Text>
             <Text style={styles.muted}>
-              Makine: {selectedProductionOperation.machine?.name ?? selectedProductionOperation.machine?.code}
+              Makine: {productionContextOperation.machine?.name ?? productionContextOperation.machine?.code ?? "Makine atanmamış"}
             </Text>
             <Text style={styles.muted}>
-              Operasyon üretim/fire: {selectedProductionOperation.producedQuantity}/{selectedProductionOperation.scrapQuantity}
+              Operasyon üretim/fire: {productionContextOperation.producedQuantity}/{productionContextOperation.scrapQuantity}
             </Text>
           </View>
         ) : null}
-        {productionBlockReason ? <Text style={styles.error}>{productionBlockReason}</Text> : null}
+        {productionBlockReason && displayedProductionCandidates.length ? <Text style={styles.error}>{productionBlockReason}</Text> : null}
         <Text style={styles.label}>Üretilen Adet</Text>
         <TextInput style={styles.input} keyboardType="numeric" value={producedQuantity} onChangeText={setProducedQuantity} />
         <View style={styles.quickRow}>
