@@ -89,6 +89,20 @@ const SCRAP_DISPOSITIONS = [
   { value: "PENDING_REVIEW", label: "Kalite/yönetici inceleyecek" }
 ];
 
+const MACHINE_FAMILY_RULES = [
+  { family: "PRS", operationTokens: ["pres", "presleme"], machineTokens: ["prs", "pres"] },
+  { family: "LZR", operationTokens: ["lazer", "kesim"], machineTokens: ["lzr", "lazer"] },
+  { family: "BKM", operationTokens: ["büküm", "bukum", "abkant"], machineTokens: ["bkm", "büküm", "bukum", "abkant"] },
+  { family: "CNC", operationTokens: ["cnc", "torna", "tornalama", "freze", "frezeleme"], machineTokens: ["cnc", "torna", "freze"] },
+  { family: "DRL", operationTokens: ["delik", "delme", "delik delme"], machineTokens: ["drl", "delik"] },
+  { family: "KYN", operationTokens: ["kaynak", "robot kaynak"], machineTokens: ["kyn", "kaynak"] },
+  { family: "MNT", operationTokens: ["montaj"], machineTokens: ["mnt", "montaj"] },
+  { family: "TST", operationTokens: ["fonksiyon test", "test"], machineTokens: ["tst", "test"] },
+  { family: "KLT", operationTokens: ["kalite", "kontrol", "final kontrol", "ölçüm", "olcum"], machineTokens: ["klt", "kalite", "kontrol", "ölçüm", "olcum"] },
+  { family: "BOY", operationTokens: ["boya", "toz boya"], machineTokens: ["boy", "boya"] },
+  { family: "PKT", operationTokens: ["paket", "paketleme", "etiket"], machineTokens: ["pkt", "paket", "etiket"] }
+];
+
 function getApiErrorMessage(error, fallback) {
   return error?.response?.data?.message ?? fallback;
 }
@@ -308,6 +322,42 @@ function formatDate(value) {
 
 function normalize(value) {
   return value?.toLocaleLowerCase("tr-TR") ?? "";
+}
+
+function compactMachineText(machine) {
+  return normalize([machine?.code, machine?.name, machine?.productionLine?.name].filter(Boolean).join(" "));
+}
+
+function getMachineFamilies(machine) {
+  const text = compactMachineText(machine);
+  return MACHINE_FAMILY_RULES.filter((rule) => rule.machineTokens.some((token) => text.includes(token))).map((rule) => rule.family);
+}
+
+function getOperationFamilies(operationName) {
+  const text = normalize(operationName);
+  return MACHINE_FAMILY_RULES.filter((rule) => rule.operationTokens.some((token) => text.includes(token))).map((rule) => rule.family);
+}
+
+function isMachineCompatibleWithOperation(operation, machine) {
+  if (!operation || !machine) {
+    return false;
+  }
+
+  if (operation.defaultMachineId && machine.id === operation.defaultMachineId) {
+    return true;
+  }
+
+  const allowedFamilies = new Set([
+    ...getOperationFamilies(operation.operationName),
+    ...getMachineFamilies(operation.defaultMachine)
+  ]);
+
+  if (!allowedFamilies.size) {
+    return true;
+  }
+
+  const machineFamilies = getMachineFamilies(machine);
+  return machineFamilies.some((family) => allowedFamilies.has(family));
 }
 
 export default function WorkOrders() {
@@ -921,6 +971,9 @@ export default function WorkOrders() {
               {operationAssignments.map((assignment) => {
                 const availableOperators = availableOperatorsByOperation[assignment.routeOperationId] ?? [];
                 const selectableOperators = availableOperators.filter((operator) => operator.isAvailable);
+                const routeOperation = selectedRoute.operations.find((operation) => operation.id === assignment.routeOperationId);
+                const compatibleMachines = activeMachines.filter((machine) => isMachineCompatibleWithOperation(routeOperation, machine));
+                const machineOptions = compatibleMachines.length ? compatibleMachines : activeMachines.filter((machine) => machine.id === routeOperation?.defaultMachineId);
 
                 return (
                   <div className="operation-assignment-row" key={assignment.routeOperationId}>
@@ -933,7 +986,7 @@ export default function WorkOrders() {
                       Makine
                       <select value={assignment.machineId} onChange={(event) => updateOperationAssignment(assignment.routeOperationId, "machineId", event.target.value)}>
                         <option value="">Makine seçin</option>
-                        {activeMachines.map((machine) => (
+                        {machineOptions.map((machine) => (
                           <option key={machine.id} value={machine.id}>
                             {machine.code} - {machine.name}
                           </option>
@@ -960,6 +1013,9 @@ export default function WorkOrders() {
                     ) : null}
                     {assignment.machineId && !availableOperators.length ? (
                       <p className="form-error">Bu makine için aktif operatör bulunamadı. Kullanıcı ve vardiya planı ekranından operatör/yetkinlik ekleyin.</p>
+                    ) : null}
+                    {!machineOptions.length ? (
+                      <p className="form-error">Bu operasyon tipi için uygun aktif makine bulunamadı. Rota üzerindeki varsayılan makineyi veya makine tanımlarını kontrol edin.</p>
                     ) : null}
                   </div>
                 );

@@ -101,6 +101,20 @@ const workOrderInclude = {
   }
 };
 
+const MACHINE_FAMILY_RULES = [
+  { family: "PRS", operationTokens: ["pres", "presleme"], machineTokens: ["prs", "pres"] },
+  { family: "LZR", operationTokens: ["lazer", "kesim"], machineTokens: ["lzr", "lazer"] },
+  { family: "BKM", operationTokens: ["büküm", "bukum", "abkant"], machineTokens: ["bkm", "büküm", "bukum", "abkant"] },
+  { family: "CNC", operationTokens: ["cnc", "torna", "tornalama", "freze", "frezeleme"], machineTokens: ["cnc", "torna", "freze"] },
+  { family: "DRL", operationTokens: ["delik", "delme", "delik delme"], machineTokens: ["drl", "delik"] },
+  { family: "KYN", operationTokens: ["kaynak", "robot kaynak"], machineTokens: ["kyn", "kaynak"] },
+  { family: "MNT", operationTokens: ["montaj"], machineTokens: ["mnt", "montaj"] },
+  { family: "TST", operationTokens: ["fonksiyon test", "test"], machineTokens: ["tst", "test"] },
+  { family: "KLT", operationTokens: ["kalite", "kontrol", "final kontrol", "ölçüm", "olcum"], machineTokens: ["klt", "kalite", "kontrol", "ölçüm", "olcum"] },
+  { family: "BOY", operationTokens: ["boya", "toz boya"], machineTokens: ["boy", "boya"] },
+  { family: "PKT", operationTokens: ["paket", "paketleme", "etiket"], machineTokens: ["pkt", "paket", "etiket"] }
+];
+
 function isOperator(actor) {
   return actor?.role === "OPERATOR";
 }
@@ -188,6 +202,41 @@ function dateOnlyFromDate(value) {
   const date = new Date(value);
   date.setUTCHours(0, 0, 0, 0);
   return date;
+}
+
+function normalizeText(value) {
+  return value?.toLocaleLowerCase("tr-TR") ?? "";
+}
+
+function getMachineFamilies(machine) {
+  const text = normalizeText([machine?.code, machine?.name, machine?.productionLine?.name].filter(Boolean).join(" "));
+  return MACHINE_FAMILY_RULES.filter((rule) => rule.machineTokens.some((token) => text.includes(token))).map((rule) => rule.family);
+}
+
+function getOperationFamilies(operationName) {
+  const text = normalizeText(operationName);
+  return MACHINE_FAMILY_RULES.filter((rule) => rule.operationTokens.some((token) => text.includes(token))).map((rule) => rule.family);
+}
+
+function isMachineCompatibleWithOperation(operation, machine) {
+  if (!operation || !machine) {
+    return false;
+  }
+
+  if (operation.defaultMachineId && machine.id === operation.defaultMachineId) {
+    return true;
+  }
+
+  const allowedFamilies = new Set([
+    ...getOperationFamilies(operation.operationName),
+    ...getMachineFamilies(operation.defaultMachine)
+  ]);
+
+  if (!allowedFamilies.size) {
+    return true;
+  }
+
+  return getMachineFamilies(machine).some((family) => allowedFamilies.has(family));
 }
 
 function formatIstanbulDate(value = new Date()) {
@@ -396,6 +445,13 @@ export async function createWorkOrder(userId, data) {
         where: { id: data.routeId },
         include: {
           operations: {
+            include: {
+              defaultMachine: {
+                include: {
+                  productionLine: true
+                }
+              }
+            },
             orderBy: { sequenceNo: "asc" }
           }
         }
@@ -427,6 +483,21 @@ export async function createWorkOrder(userId, data) {
         const assignment = assignmentMap.get(operation.id);
         const machineId = assignment?.machineId ?? operation.defaultMachineId ?? data.machineId;
         const operatorId = assignment?.assignedOperatorId ?? data.assignedOperatorId;
+
+        if (machineId) {
+          const machine = await tx.machine.findUnique({
+            where: { id: machineId },
+            include: { productionLine: true }
+          });
+
+          if (!machine || !machine.isActive) {
+            throw new ApiError(400, `${operation.operationName} operasyonu için aktif makine seçilmelidir`);
+          }
+
+          if (!isMachineCompatibleWithOperation(operation, machine)) {
+            throw new ApiError(400, `${operation.operationName} operasyonu ${machine.code} makinesinde planlanamaz`);
+          }
+        }
 
         if (!operatorId) {
           continue;
