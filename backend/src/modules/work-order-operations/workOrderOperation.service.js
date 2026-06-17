@@ -1,5 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { DOMAIN_EVENTS } from "../../events/domainEvents.js";
+import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
@@ -729,6 +731,12 @@ export async function completeOperation(actor, id) {
     return { operation, readyOperation, workOrder, machine, closedSourceWorkOrders };
   });
 
+  emitDomainEvent(DOMAIN_EVENTS.OPERATION_COMPLETED, {
+    operation: result.operation,
+    workOrder: result.workOrder,
+    readyOperation: result.readyOperation,
+    closedSourceWorkOrders: result.closedSourceWorkOrders
+  });
   emitEvent("workOrderOperation:updated", result.operation);
   if (result.readyOperation) {
     emitEvent("workOrderOperation:updated", result.readyOperation);

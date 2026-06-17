@@ -1,5 +1,7 @@
 import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { DOMAIN_EVENTS } from "../../events/domainEvents.js";
+import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
@@ -419,6 +421,8 @@ export async function createProductionLog(actor, data) {
 
     let alert = null;
 
+    let scrapAction = null;
+
     if (data.scrapQuantity > 0) {
       await createNotificationsForRoles(
         ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
@@ -444,7 +448,7 @@ export async function createProductionLog(actor, data) {
         tx
       );
 
-      const scrapAction = await createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data });
+      scrapAction = await createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data });
 
       log = await tx.productionLog.update({
         where: { id: log.id },
@@ -581,9 +585,28 @@ export async function createProductionLog(actor, data) {
       include: workOrderEmitInclude
     });
 
-    return { log, workOrder: fullWorkOrder ?? updatedWorkOrder, operation: updatedOperation, alert };
+    return { log, workOrder: fullWorkOrder ?? updatedWorkOrder, operation: updatedOperation, alert, scrapAction };
   });
 
+  if (result.scrapAction?.status === "CREATED") {
+    emitDomainEvent(DOMAIN_EVENTS.SCRAP_ACTION_WORK_ORDER_CREATED, {
+      sourceWorkOrderId: result.workOrder?.id,
+      sourceWorkOrderNo: result.workOrder?.orderNo,
+      productionLogId: result.log.id,
+      actionWorkOrderId: result.scrapAction.workOrderId,
+      actionWorkOrderNo: result.scrapAction.workOrderNo,
+      note: result.scrapAction.note
+    });
+  }
+
+  emitDomainEvent(DOMAIN_EVENTS.PRODUCTION_LOG_CREATED, {
+    productionLog: result.log,
+    workOrderId: result.workOrder?.id,
+    workOrderNo: result.workOrder?.orderNo,
+    workOrderOperationId: result.operation?.id,
+    producedQuantity: result.log.producedQuantity,
+    scrapQuantity: result.log.scrapQuantity
+  });
   emitEvent("production:logged", result.log);
   emitEvent("workOrder:updated", result.workOrder);
   if (result.operation) {
@@ -935,6 +958,13 @@ export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, d
     emitEvent("workOrder:updated", result.sourceWorkOrder);
   }
   if (result.actionWorkOrder) {
+    emitDomainEvent(DOMAIN_EVENTS.SCRAP_ACTION_WORK_ORDER_CREATED, {
+      sourceWorkOrderId: result.sourceWorkOrder?.id,
+      sourceWorkOrderNo: result.sourceWorkOrder?.orderNo,
+      actionWorkOrderId: result.actionWorkOrder.id,
+      actionWorkOrderNo: result.actionWorkOrder.orderNo,
+      grouped: true
+    });
     emitEvent("workOrder:updated", result.actionWorkOrder);
   }
 

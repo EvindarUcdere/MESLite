@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { corsOptions } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { initSocket } from "./config/socket.js";
+import { registerDomainEventHandlers } from "./events/registerDomainEventHandlers.js";
 import { notifyShiftStartWorkOrders } from "./modules/work-orders/workOrder.service.js";
 
 const app = createApp();
@@ -14,6 +15,7 @@ const io = new Server(httpServer, {
 });
 
 initSocket(io);
+registerDomainEventHandlers();
 
 io.on("connection", (socket) => {
   socket.on("join:dashboard", () => socket.join("dashboard"));

@@ -1,6 +1,6 @@
 import { prisma } from "../../config/db.js";
-import { emitEvent } from "../../config/socket.js";
-import { sendPushNotificationToUser } from "../push-tokens/pushToken.service.js";
+import { DOMAIN_EVENTS } from "../../events/domainEvents.js";
+import { emitDomainEvent } from "../../events/domainEventBus.js";
 
 const includeRecipient = {
   recipient: {
@@ -79,8 +79,12 @@ export async function createNotification(
     include: includeRecipient
   });
 
-  emitEvent("notification:created", notification);
-  void sendPushNotificationToUser(recipientId, notification);
+  emitDomainEvent(DOMAIN_EVENTS.NOTIFICATION_CREATED, {
+    notification,
+    recipientId,
+    notificationId: notification.id,
+    type
+  });
   return notification;
 }
 
