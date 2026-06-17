@@ -1,5 +1,7 @@
 ﻿import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { DOMAIN_EVENTS } from "../../events/domainEvents.js";
+import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotificationsForRoles } from "../notifications/notification.service.js";
@@ -408,6 +410,18 @@ export async function createQualityCheck(actor, data) {
     return { qualityCheck: created, alert };
   });
 
+  if (["FAILED", "PARTIAL"].includes(result.qualityCheck.status)) {
+    emitDomainEvent(DOMAIN_EVENTS.QUALITY_CHECK_FAILED, {
+      qualityCheck: result.qualityCheck,
+      productionAlert: result.alert,
+      workOrderId: result.qualityCheck.workOrderId,
+      workOrderOperationId: result.qualityCheck.workOrderOperationId,
+      status: result.qualityCheck.status,
+      defectQuantity: result.qualityCheck.defectQuantity,
+      defectReason: result.qualityCheck.defectReason,
+      checkedById: actor.id
+    });
+  }
   emitEvent("quality:checked", result.qualityCheck);
   if (result.alert) {
     emitEvent("productionAlert:created", result.alert);

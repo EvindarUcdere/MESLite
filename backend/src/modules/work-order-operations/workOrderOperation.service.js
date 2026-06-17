@@ -554,6 +554,18 @@ export async function pauseOperation(actor, id, data) {
     return { operation, downtime, workOrder, machine };
   });
 
+  emitDomainEvent(DOMAIN_EVENTS.OPERATION_PAUSED, {
+    operation: result.operation,
+    downtime: result.downtime,
+    workOrder: result.workOrder,
+    machine: result.machine,
+    workOrderId: result.operation.workOrderId,
+    workOrderNo: result.operation.workOrder?.orderNo,
+    operationId: result.operation.id,
+    operationName: result.operation.operationName,
+    downtimeReason: result.downtime.reason,
+    pausedById: actor.id
+  });
   emitEvent("workOrderOperation:updated", result.operation);
   emitEvent("operationDowntime:created", result.downtime);
   emitEvent("workOrder:updated", result.workOrder);

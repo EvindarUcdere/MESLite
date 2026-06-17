@@ -1,5 +1,7 @@
 ﻿import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
+import { DOMAIN_EVENTS } from "../../events/domainEvents.js";
+import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
@@ -352,6 +354,18 @@ export async function notifyShiftStartWorkOrders(now = new Date()) {
       }
     });
 
+    emitDomainEvent(DOMAIN_EVENTS.SHIFT_STARTED, {
+      workOrderId: operation.workOrderId,
+      workOrderNo: operation.workOrder.orderNo,
+      operationId: operation.id,
+      operationName: operation.operationName,
+      operatorId: operation.assignedOperatorId,
+      machineId: operation.machineId,
+      shiftId: assignment.shiftId,
+      shiftName: assignment.shift.name,
+      shiftStartAt: shiftStart
+    });
+
     createdCount += 1;
   }
 
@@ -594,6 +608,16 @@ export async function createWorkOrder(userId, data) {
     });
   });
 
+  emitDomainEvent(DOMAIN_EVENTS.WORK_ORDER_CREATED, {
+    workOrder: result,
+    workOrderId: result.id,
+    workOrderNo: result.orderNo,
+    productId: result.productId,
+    routeId: result.routeId,
+    plannedQuantity: result.plannedQuantity,
+    operationCount: result.operations?.length ?? 0,
+    createdById: userId
+  });
   emitEvent("workOrder:updated", result);
 
   const firstOperation = result.operations?.find((operation) => operation.sequenceNo === 1) ?? result.operations?.[0];
@@ -872,6 +896,16 @@ export async function startWorkOrder(id, actor) {
     return { workOrder: updated, operation, machine };
   });
 
+  emitDomainEvent(DOMAIN_EVENTS.WORK_ORDER_STARTED, {
+    workOrder: result.workOrder,
+    operation: result.operation,
+    machine: result.machine,
+    workOrderId: result.workOrder.id,
+    workOrderNo: result.workOrder.orderNo,
+    operationId: result.operation?.id,
+    operationName: result.operation?.operationName,
+    startedById: actor?.id
+  });
   if (result.operation) {
     emitEvent("workOrderOperation:updated", result.operation);
   }
@@ -973,6 +1007,16 @@ export async function pauseWorkOrder(id, actor) {
     return { workOrder: updated, operation, machine };
   });
 
+  emitDomainEvent(DOMAIN_EVENTS.WORK_ORDER_PAUSED, {
+    workOrder: result.workOrder,
+    operation: result.operation,
+    machine: result.machine,
+    workOrderId: result.workOrder.id,
+    workOrderNo: result.workOrder.orderNo,
+    operationId: result.operation?.id,
+    operationName: result.operation?.operationName,
+    pausedById: actor?.id
+  });
   if (result.operation) {
     emitEvent("workOrderOperation:updated", result.operation);
   }

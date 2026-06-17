@@ -24,9 +24,15 @@ Files:
 Registered events:
 
 - `notification.created`
+- `workOrder.created`
+- `workOrder.started`
+- `workOrder.paused`
 - `productionLog.created`
+- `operation.paused`
 - `operation.completed`
 - `scrapActionWorkOrder.created`
+- `qualityCheck.failed`
+- `shift.started`
 
 ## Current handlers
 
@@ -47,13 +53,24 @@ This is still an MVP/portfolio-scale MES. An in-process event bus is enough for 
 
 If MES Lite later grows into separate services, this event layer can be replaced with an out-of-process broker without rewriting every business service.
 
+## Event coverage
+
+The current coverage focuses on high-value factory moments:
+
+- work order planning and start/stop transitions,
+- operator shift start notifications,
+- operation pause/completion,
+- production entry,
+- scrap compensation/rework creation,
+- failed or partial quality decisions,
+- notification delivery.
+
 ## Next event candidates
 
-- `workOrder.created`
-- `workOrder.started`
-- `operation.paused`
-- `qualityCheck.failed`
-- `shift.started`
 - `machine.statusChanged`
+- `workOrder.completed`
+- `qualityCheck.passed`
+- `maintenance.created`
+- `operator.assigned`
 
 These can later feed audit trails, email/SMS, webhook integrations, reporting snapshots, or external ERP synchronization.
