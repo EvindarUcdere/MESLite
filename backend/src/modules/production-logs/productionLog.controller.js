@@ -15,6 +15,11 @@ export async function create(req, res) {
   res.status(201).json({ data: log });
 }
 
+export async function createScrapAction(req, res) {
+  const log = await productionLogService.createScrapActionForProductionLog(req.user, req.params.id, req.validated.body);
+  res.status(201).json({ data: log });
+}
+
 export async function addAttachment(req, res) {
   const attachment = await productionLogService.addProductionLogAttachment(req.user, req.params.id, req.file);
   res.status(201).json({ data: attachment });

@@ -646,6 +646,301 @@ export async function addProductionLogAttachment(actor, productionLogId, file) {
   return attachment;
 }
 
+export async function createScrapActionForProductionLog(actor, id, data) {
+  const result = await prisma.$transaction(async (tx) => {
+    const current = await tx.productionLog.findUnique({
+      where: { id },
+      include: {
+        workOrderOperation: true,
+        workOrder: {
+          include: {
+            product: true,
+            route: {
+              include: {
+                operations: {
+                  orderBy: { sequenceNo: "asc" }
+                }
+              }
+            },
+            operations: {
+              orderBy: { sequenceNo: "asc" }
+            }
+          }
+        }
+      }
+    });
+
+    if (!current) {
+      throw new ApiError(404, "Üretim kaydı bulunamadı");
+    }
+
+    if (current.scrapQuantity <= 0) {
+      throw new ApiError(400, "Telafi iş emri yalnızca fire kaydı için oluşturulabilir");
+    }
+
+    if (current.scrapActionStatus === "CREATED" && current.scrapActionWorkOrderId) {
+      throw new ApiError(400, "Bu fire kaydı için telafi/rework iş emri zaten oluşturulmuş");
+    }
+
+    const scrapDisposition = data.scrapDisposition ?? current.scrapDisposition ?? "REPRODUCE";
+    const scrapResolutionQuantity = (data.scrapResolutionQuantity ?? current.scrapResolutionQuantity) || current.scrapQuantity;
+
+    if (scrapResolutionQuantity > current.scrapQuantity) {
+      throw new ApiError(400, "Telafi miktarı fire adedini aşamaz");
+    }
+
+    const decisionData = {
+      scrapQuantity: current.scrapQuantity,
+      scrapReason: current.scrapReason,
+      scrapDisposition,
+      scrapResolutionQuantity,
+      scrapDispositionNote: data.scrapDispositionNote ?? current.scrapDispositionNote
+    };
+
+    const scrapAction = await createScrapActionWorkOrder(tx, {
+      actor,
+      workOrder: current.workOrder,
+      operation: current.workOrderOperation,
+      log: current,
+      data: decisionData
+    });
+
+    const updatedLog = await tx.productionLog.update({
+      where: { id },
+      data: {
+        scrapDisposition,
+        scrapResolutionQuantity,
+        scrapDispositionNote: decisionData.scrapDispositionNote,
+        scrapActionStatus: scrapAction.status,
+        scrapActionWorkOrderId: scrapAction.workOrderId,
+        scrapActionWorkOrderNo: scrapAction.workOrderNo,
+        scrapActionNote: scrapAction.note
+      },
+      include: includeRelations
+    });
+
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "SCRAP_ACTION_CREATED_FROM_LOG",
+        entityType: "ProductionLog",
+        entityId: id,
+        summary: `${current.workOrder.orderNo} fire kaydı için telafi/rework aksiyonu oluşturuldu`,
+        metadata: {
+          workOrderId: current.workOrderId,
+          workOrderOperationId: current.workOrderOperationId,
+          scrapQuantity: current.scrapQuantity,
+          scrapDisposition,
+          scrapResolutionQuantity,
+          scrapActionStatus: scrapAction.status,
+          scrapActionWorkOrderId: scrapAction.workOrderId
+        }
+      },
+      tx
+    );
+
+    const fullWorkOrder = await tx.workOrder.findUnique({
+      where: { id: current.workOrderId },
+      include: workOrderEmitInclude
+    });
+
+    return { log: updatedLog, workOrder: fullWorkOrder };
+  });
+
+  emitEvent("production:logged", result.log);
+  if (result.workOrder) {
+    emitEvent("workOrder:updated", result.workOrder);
+  }
+
+  return result.log;
+}
+
+export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, data) {
+  const result = await prisma.$transaction(async (tx) => {
+    const workOrder = await tx.workOrder.findUnique({
+      where: { id: workOrderId },
+      include: {
+        product: true,
+        route: {
+          include: {
+            operations: {
+              orderBy: { sequenceNo: "asc" }
+            }
+          }
+        },
+        operations: {
+          orderBy: { sequenceNo: "asc" }
+        },
+        productionLogs: {
+          where: {
+            scrapQuantity: { gt: 0 },
+            scrapActionStatus: { notIn: ["CREATED", "NOT_REQUIRED"] }
+          },
+          include: {
+            workOrderOperation: true
+          },
+          orderBy: { createdAt: "asc" }
+        }
+      }
+    });
+
+    if (!workOrder) {
+      throw new ApiError(404, "İş emri bulunamadı");
+    }
+
+    const actionableLogs = workOrder.productionLogs.filter((log) => !log.scrapActionWorkOrderId);
+
+    if (!actionableLogs.length) {
+      throw new ApiError(400, "Toplu telafi oluşturulacak açık fire kaydı yok");
+    }
+
+    if (!workOrder.routeId || !workOrder.route?.operations.length) {
+      throw new ApiError(400, "Toplu telafi için kaynak iş emrinde rota akışı olmalıdır");
+    }
+
+    const actionQuantity = actionableLogs.reduce(
+      (sum, log) => sum + (log.scrapResolutionQuantity > 0 ? log.scrapResolutionQuantity : log.scrapQuantity),
+      0
+    );
+
+    if (actionQuantity <= 0) {
+      throw new ApiError(400, "Toplu telafi miktarı sıfırdan büyük olmalıdır");
+    }
+
+    const scrapDisposition = data.scrapDisposition ?? "REPRODUCE";
+    const orderNo = buildScrapActionOrderNo(workOrder, scrapDisposition);
+    const sourceOperationByRouteOperationId = new Map(workOrder.operations.map((operation) => [operation.routeOperationId, operation]));
+    const sourceOperationBySequenceNo = new Map(workOrder.operations.map((operation) => [operation.sequenceNo, operation]));
+
+    const actionWorkOrder = await tx.workOrder.create({
+      data: {
+        orderNo,
+        productId: workOrder.productId,
+        routeId: workOrder.routeId,
+        machineId: workOrder.machineId,
+        assignedOperatorId: null,
+        plannedQuantity: actionQuantity,
+        plannedStartDate: new Date(),
+        createdById: actor.id
+      }
+    });
+
+    await tx.workOrderOperation.createMany({
+      data: workOrder.route.operations.map((routeOperation, index) => {
+        const sourceOperation =
+          sourceOperationByRouteOperationId.get(routeOperation.id) ?? sourceOperationBySequenceNo.get(routeOperation.sequenceNo);
+
+        return {
+          workOrderId: actionWorkOrder.id,
+          routeOperationId: routeOperation.id,
+          machineId: sourceOperation?.machineId ?? routeOperation.defaultMachineId,
+          assignedOperatorId: sourceOperation?.assignedOperatorId ?? null,
+          sequenceNo: routeOperation.sequenceNo,
+          operationName: routeOperation.operationName,
+          status: index === 0 ? "READY" : "WAITING"
+        };
+      })
+    });
+
+    for (const log of actionableLogs) {
+      const resolutionQuantity = log.scrapResolutionQuantity > 0 ? log.scrapResolutionQuantity : log.scrapQuantity;
+
+      await tx.productionLog.update({
+        where: { id: log.id },
+        data: {
+          scrapDisposition,
+          scrapResolutionQuantity: resolutionQuantity,
+          scrapDispositionNote: data.scrapDispositionNote ?? log.scrapDispositionNote,
+          scrapActionStatus: "CREATED",
+          scrapActionWorkOrderId: actionWorkOrder.id,
+          scrapActionWorkOrderNo: orderNo,
+          scrapActionNote: `${actionableLogs.length} fire kaydı tek telafi iş emrinde birleştirildi. Toplam telafi: ${actionQuantity} adet.`
+        }
+      });
+    }
+
+    await createNotificationsForRoles(
+      ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+      {
+        type: "GROUPED_SCRAP_REPRODUCTION_ORDER_CREATED",
+        title: "Toplu telafi üretim emri oluşturuldu",
+        message: `${workOrder.orderNo} iş emrindeki ${actionableLogs.length} fire kaydı için ${orderNo} telafi iş emri oluşturuldu (${actionQuantity} adet).`,
+        entityType: "WorkOrder",
+        entityId: actionWorkOrder.id,
+        metadata: {
+          sourceWorkOrderId: workOrder.id,
+          sourceOrderNo: workOrder.orderNo,
+          actionWorkOrderId: actionWorkOrder.id,
+          actionOrderNo: orderNo,
+          actionQuantity,
+          productionLogIds: actionableLogs.map((log) => log.id)
+        }
+      },
+      tx
+    );
+
+    const firstAssignedOperatorId = workOrder.operations.find((operation) => operation.assignedOperatorId)?.assignedOperatorId;
+    if (firstAssignedOperatorId) {
+      await createNotification(
+        {
+          recipientId: firstAssignedOperatorId,
+          type: "GROUPED_SCRAP_REPRODUCTION_ASSIGNED",
+          title: "Toplu telafi üretim atandı",
+          message: `${workOrder.orderNo} fire kayıtları için ${orderNo} telafi iş emrinin ilk operasyonu size atandı (${actionQuantity} adet).`,
+          entityType: "WorkOrder",
+          entityId: actionWorkOrder.id,
+          metadata: {
+            sourceWorkOrderId: workOrder.id,
+            sourceOrderNo: workOrder.orderNo,
+            actionWorkOrderId: actionWorkOrder.id,
+            actionOrderNo: orderNo,
+            actionQuantity
+          }
+        },
+        tx
+      );
+    }
+
+    await recordAuditLog(
+      {
+        actorId: actor.id,
+        action: "GROUPED_SCRAP_REPRODUCTION_WORK_ORDER_CREATED",
+        entityType: "WorkOrder",
+        entityId: actionWorkOrder.id,
+        summary: `${workOrder.orderNo} fire kayıtları için toplu telafi iş emri oluşturuldu`,
+        metadata: {
+          sourceWorkOrderId: workOrder.id,
+          actionWorkOrderId: actionWorkOrder.id,
+          actionOrderNo: orderNo,
+          actionQuantity,
+          productionLogIds: actionableLogs.map((log) => log.id)
+        }
+      },
+      tx
+    );
+
+    const sourceWorkOrder = await tx.workOrder.findUnique({
+      where: { id: workOrder.id },
+      include: workOrderEmitInclude
+    });
+    const fullActionWorkOrder = await tx.workOrder.findUnique({
+      where: { id: actionWorkOrder.id },
+      include: workOrderEmitInclude
+    });
+
+    return { sourceWorkOrder, actionWorkOrder: fullActionWorkOrder };
+  });
+
+  if (result.sourceWorkOrder) {
+    emitEvent("workOrder:updated", result.sourceWorkOrder);
+  }
+  if (result.actionWorkOrder) {
+    emitEvent("workOrder:updated", result.actionWorkOrder);
+  }
+
+  return result.actionWorkOrder;
+}
+
 export async function updateProductionLog(actor, id, data) {
   const current = await prisma.productionLog.findUnique({
     where: { id },

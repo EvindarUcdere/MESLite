@@ -48,7 +48,7 @@ const workOrderInclude = {
       attachments: true
     },
     orderBy: { createdAt: "desc" },
-    take: 5
+    take: 25
   },
   operations: {
     include: {

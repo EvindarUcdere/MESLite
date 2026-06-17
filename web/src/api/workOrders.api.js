@@ -39,3 +39,8 @@ export async function completeWorkOrder(workOrderId) {
   const response = await apiClient.post(`/work-orders/${workOrderId}/complete`);
   return response.data.data;
 }
+
+export async function createGroupedScrapAction(workOrderId, payload = {}) {
+  const response = await apiClient.post(`/work-orders/${workOrderId}/grouped-scrap-action`, payload);
+  return response.data.data;
+}

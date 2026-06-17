@@ -2,11 +2,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
-import { createProductionLog } from "../api/productionLogs.api.js";
+import { createProductionLog, createScrapAction } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
 import { getShifts } from "../api/shiftPlanning.api.js";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "../api/workOrderOperations.api.js";
-import { completeWorkOrder, createWorkOrder, getAvailableOperators, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
+import { completeWorkOrder, createGroupedScrapAction, createWorkOrder, getAvailableOperators, getWorkOrders, pauseWorkOrder, startWorkOrder } from "../api/workOrders.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -88,6 +88,15 @@ const SCRAP_DISPOSITIONS = [
   { value: "CONDITIONAL_ACCEPT", label: "Şartlı kabul" },
   { value: "PENDING_REVIEW", label: "Kalite/yönetici inceleyecek" }
 ];
+
+const SCRAP_REASON_LABELS = Object.fromEntries(SCRAP_REASONS.map((reason) => [reason.value, reason.label]));
+const SCRAP_DISPOSITION_LABELS = Object.fromEntries(SCRAP_DISPOSITIONS.map((disposition) => [disposition.value, disposition.label]));
+
+const SCRAP_ACTION_STATUS_LABELS = {
+  PENDING: "Aksiyon bekliyor",
+  CREATED: "Telafi oluşturuldu",
+  NOT_REQUIRED: "Ek aksiyon yok"
+};
 
 const MACHINE_FAMILY_RULES = [
   { family: "PRS", operationTokens: ["pres", "presleme"], machineTokens: ["prs", "pres"] },
@@ -260,6 +269,14 @@ function getWorkOrderDisplayQuantities(workOrder) {
     progressPercent,
     sourceOperation: source
   };
+}
+
+function getScrapLogs(workOrder) {
+  return (workOrder.productionLogs ?? []).filter((log) => log.scrapQuantity > 0);
+}
+
+function getPendingGroupedScrapLogs(workOrder) {
+  return getScrapLogs(workOrder).filter((log) => !log.scrapActionWorkOrderId && log.scrapActionStatus !== "NOT_REQUIRED");
 }
 
 function getFlowRiskLevel(workOrder) {
@@ -692,6 +709,30 @@ export default function WorkOrders() {
     }
   }
 
+  async function handleCreateScrapAction(log) {
+    await runAction(
+      () =>
+        createScrapAction(log.id, {
+          scrapDisposition: log.scrapDisposition && log.scrapDisposition !== "PENDING_REVIEW" ? log.scrapDisposition : "REPRODUCE",
+          scrapResolutionQuantity: log.scrapResolutionQuantity > 0 ? log.scrapResolutionQuantity : log.scrapQuantity,
+          scrapDispositionNote: log.scrapDispositionNote || "Fire miktarı kadar otomatik telafi üretim emri oluşturuldu."
+        }),
+      "Telafi iş emri oluşturulamadı."
+    );
+  }
+
+  async function handleCreateGroupedScrapAction(workOrder) {
+    const pendingLogs = getPendingGroupedScrapLogs(workOrder);
+    await runAction(
+      () =>
+        createGroupedScrapAction(workOrder.id, {
+          scrapDisposition: "REPRODUCE",
+          scrapDispositionNote: `${pendingLogs.length} fire kaydı tek telafi üretim emrinde birleştirildi.`
+        }),
+      "Toplu telafi iş emri oluşturulamadı."
+    );
+  }
+
   function updateOperationMessage(operationId, field, value) {
     setOperationMessages((current) => ({
       ...current,
@@ -1070,6 +1111,8 @@ export default function WorkOrders() {
                 const pauseDisabled = !canPause(workOrder);
                 const completeDisabled = !canComplete(workOrder);
                 const operationProgress = getOperationProgress(workOrder.operations);
+                const scrapLogs = getScrapLogs(workOrder);
+                const pendingGroupedScrapLogs = getPendingGroupedScrapLogs(workOrder);
 
                 return (
                   <Fragment key={workOrder.id}>
@@ -1273,6 +1316,59 @@ export default function WorkOrders() {
                               );
                             })}
                           </div>
+                          {scrapLogs.length ? (
+                            <div className="work-order-scrap-panel">
+                              <div className="work-order-scrap-head">
+                                <div>
+                                  <strong>Fire ve Telafi Kararları</strong>
+                                  <span>Bu iş emrinden doğan fire kararları ve oluşan telafi/rework işleri</span>
+                                </div>
+                                <div className="work-order-scrap-actions">
+                                  <em>{scrapLogs.length} kayıt</em>
+                                  {pendingGroupedScrapLogs.length > 1 ? (
+                                    <button type="button" onClick={() => handleCreateGroupedScrapAction(workOrder)}>
+                                      {pendingGroupedScrapLogs.length} fireyi tek telafi emrinde birleştir
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="work-order-scrap-list">
+                                {scrapLogs.map((log) => (
+                                  <article key={log.id} className={`work-order-scrap-card scrap-state-${(log.scrapActionStatus ?? "PENDING").toLowerCase()}`}>
+                                    <div>
+                                      <span className="scrap-card-kicker">{log.workOrderOperation?.operationName ?? "Operasyon"}</span>
+                                      <strong>
+                                        {log.scrapQuantity} fire / {SCRAP_DISPOSITION_LABELS[log.scrapDisposition] ?? log.scrapDisposition ?? "Karar yok"}
+                                      </strong>
+                                      <p>
+                                        Neden: {SCRAP_REASON_LABELS[log.scrapReason] ?? log.scrapReason ?? "-"}
+                                        {log.scrapResolutionQuantity > 0 ? ` · Telafi miktarı: ${log.scrapResolutionQuantity}` : ""}
+                                      </p>
+                                      {log.scrapDispositionNote || log.scrapActionNote ? (
+                                        <small>{[log.scrapDispositionNote, log.scrapActionNote].filter(Boolean).join(" / ")}</small>
+                                      ) : null}
+                                    </div>
+                                    <div className="scrap-card-action">
+                                      <span>{SCRAP_ACTION_STATUS_LABELS[log.scrapActionStatus] ?? log.scrapActionStatus}</span>
+                                      {log.scrapActionWorkOrderId ? (
+                                        <button type="button" onClick={() => focusWorkOrder(log.scrapActionWorkOrderId)}>
+                                          {log.scrapActionWorkOrderNo ?? "Telafi iş emrine git"}
+                                        </button>
+                                      ) : log.scrapActionStatus !== "NOT_REQUIRED" ? (
+                                        <button type="button" onClick={() => handleCreateScrapAction(log)}>
+                                          Telafi oluştur
+                                        </button>
+                                      ) : (
+                                        <small>
+                                          Ek üretim gerekmedi
+                                        </small>
+                                      )}
+                                    </div>
+                                  </article>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </td>
                       </tr>
                     ) : null}

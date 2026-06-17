@@ -48,3 +48,10 @@ export const assignMachineSchema = z.object({
     machineId: z.string().uuid()
   })
 });
+
+export const groupedScrapActionSchema = z.object({
+  body: z.object({
+    scrapDisposition: z.enum(["REPRODUCE", "SCRAP"]).default("REPRODUCE"),
+    scrapDispositionNote: z.string().max(1000).optional()
+  })
+});

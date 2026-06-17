@@ -4408,6 +4408,149 @@ th {
   background: #fee4e2;
 }
 
+.work-order-scrap-panel {
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fff7ed;
+}
+
+.work-order-scrap-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.work-order-scrap-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.work-order-scrap-head strong {
+  font-size: 16px;
+  color: #7c2d12;
+}
+
+.work-order-scrap-head span {
+  color: #9a3412;
+}
+
+.work-order-scrap-head em {
+  padding: 6px 10px;
+  font-style: normal;
+  font-weight: 800;
+  color: #9a3412;
+  white-space: nowrap;
+  background: #ffedd5;
+  border-radius: 999px;
+}
+
+.work-order-scrap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.work-order-scrap-actions button {
+  padding: 9px 12px;
+  font-weight: 800;
+  color: #ffffff;
+  cursor: pointer;
+  background: #0f766e;
+  border: 0;
+  border-radius: 9px;
+}
+
+.work-order-scrap-list {
+  display: grid;
+  gap: 10px;
+}
+
+.work-order-scrap-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.work-order-scrap-card strong,
+.work-order-scrap-card p,
+.work-order-scrap-card small {
+  overflow-wrap: anywhere;
+}
+
+.scrap-card-kicker {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f766e;
+  background: #ccfbf1;
+  border-radius: 999px;
+}
+
+.work-order-scrap-card strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #101828;
+}
+
+.work-order-scrap-card p,
+.work-order-scrap-card small {
+  margin: 0;
+  color: #475467;
+}
+
+.scrap-card-action {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.scrap-card-action span {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 999px;
+}
+
+.scrap-state-created .scrap-card-action span {
+  color: #14523f;
+  background: #d9f2e8;
+}
+
+.scrap-state-not_required .scrap-card-action span {
+  color: #344054;
+  background: #edf1f5;
+}
+
+.scrap-card-action button {
+  padding: 8px 12px;
+  font-weight: 800;
+  color: #ffffff;
+  cursor: pointer;
+  background: #0f766e;
+  border: 0;
+  border-radius: 8px;
+}
+
+.scrap-card-action small {
+  text-align: right;
+}
+
 .selected-row {
   background: #f0fdfa;
 }

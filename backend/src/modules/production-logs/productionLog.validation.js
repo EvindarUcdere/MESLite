@@ -79,3 +79,19 @@ export const updateProductionLogSchema = z.object({
     note: z.string().optional()
   })
 });
+
+export const createScrapActionSchema = z.object({
+  body: z.object({
+    scrapDisposition: scrapDispositionSchema.default("REPRODUCE"),
+    scrapResolutionQuantity: z.number().int().min(1).optional(),
+    scrapDispositionNote: z.string().max(1000).optional()
+  }).superRefine((body, ctx) => {
+    if (["PENDING_REVIEW", "CONDITIONAL_ACCEPT"].includes(body.scrapDisposition)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Telafi is emri icin yeniden uretim, yeniden islem veya hurda karari secilmelidir",
+        path: ["scrapDisposition"]
+      });
+    }
+  })
+});

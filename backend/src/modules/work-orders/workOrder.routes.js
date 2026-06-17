@@ -4,7 +4,7 @@ import { allowRoles } from "../../middlewares/role.middleware.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import * as workOrderController from "./workOrder.controller.js";
-import { assignMachineSchema, assignOperatorSchema, availableOperatorsSchema, createWorkOrderSchema, updateStatusSchema } from "./workOrder.validation.js";
+import { assignMachineSchema, assignOperatorSchema, availableOperatorsSchema, createWorkOrderSchema, groupedScrapActionSchema, updateStatusSchema } from "./workOrder.validation.js";
 
 export const workOrderRoutes = Router();
 
@@ -19,3 +19,9 @@ workOrderRoutes.patch("/:id/assign-machine", allowRoles("ADMIN", "PRODUCTION_MAN
 workOrderRoutes.post("/:id/start", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.start));
 workOrderRoutes.post("/:id/pause", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.pause));
 workOrderRoutes.post("/:id/complete", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.complete));
+workOrderRoutes.post(
+  "/:id/grouped-scrap-action",
+  allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"),
+  validate(groupedScrapActionSchema),
+  asyncHandler(workOrderController.createGroupedScrapAction)
+);

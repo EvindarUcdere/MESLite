@@ -1,4 +1,5 @@
 import * as workOrderService from "./workOrder.service.js";
+import { createGroupedScrapActionForWorkOrder } from "../production-logs/productionLog.service.js";
 
 export async function list(_req, res) {
   const workOrders = await workOrderService.findWorkOrders();
@@ -48,4 +49,9 @@ export async function pause(req, res) {
 export async function complete(req, res) {
   const workOrder = await workOrderService.completeWorkOrder(req.user, req.params.id);
   res.json({ data: workOrder });
+}
+
+export async function createGroupedScrapAction(req, res) {
+  const workOrder = await createGroupedScrapActionForWorkOrder(req.user, req.params.id, req.validated.body);
+  res.status(201).json({ data: workOrder });
 }
