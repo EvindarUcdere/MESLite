@@ -1,4 +1,5 @@
 import { prisma } from "../../config/db.js";
+import { getReportSqlAnalytics } from "./reportSql.service.js";
 
 function scrapRate(producedQuantity, scrapQuantity) {
   return producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
@@ -543,7 +544,17 @@ export async function getOverviewReport(query = {}) {
   const range = getReportRange(query);
   const filters = getReportFilters(query);
   const workOrderScope = buildRelatedWorkOrderFilter(filters);
-  const [workOrders, productionLogs, qualityChecks, productionAlerts, machines, machineStatusLogs, operationDowntimes, workOrderOperations] = await Promise.all([
+  const [
+    workOrders,
+    productionLogs,
+    qualityChecks,
+    productionAlerts,
+    machines,
+    machineStatusLogs,
+    operationDowntimes,
+    workOrderOperations,
+    sqlAnalytics
+  ] = await Promise.all([
     prisma.workOrder.findMany({
       where: buildWorkOrderWhere(range, filters),
       include: {
@@ -735,12 +746,13 @@ export async function getOverviewReport(query = {}) {
       },
       orderBy: { updatedAt: "desc" },
       take: 250
-    })
+    }),
+    getReportSqlAnalytics({ range, filters })
   ]);
 
   const finalProductLogs = productionLogs.filter(isFinalProductLog);
-  const processTotals = sumProductionLogs(productionLogs);
-  const finalProductTotals = sumProductionLogs(finalProductLogs);
+  const processTotals = sqlAnalytics.processTotals ?? sumProductionLogs(productionLogs);
+  const finalProductTotals = sqlAnalytics.finalProductTotals ?? sumProductionLogs(finalProductLogs);
   const producedQuantity = finalProductTotals.producedQuantity;
   const scrapQuantity = processTotals.scrapQuantity;
   const finalScrapQuantity = finalProductTotals.scrapQuantity;
@@ -885,7 +897,7 @@ export async function getOverviewReport(query = {}) {
       (downtimeByOperationMap[operationId].reasonCounts[downtime.reason] ?? 0) + 1;
   });
 
-  const operationTimePerformance = workOrderOperations.map((operation) => {
+  const prismaOperationTimePerformance = workOrderOperations.map((operation) => {
     const plannedMinutes = operation.routeOperation?.estimatedMinutes ?? 0;
     const actualMinutes = minutesBetween(operation.startedAt, operation.completedAt ?? now);
     const downtimeMinutes = sumDowntimeMinutes(operation.downtimes ?? [], operation.completedAt ?? now);
@@ -990,12 +1002,20 @@ export async function getOverviewReport(query = {}) {
     return item;
   });
 
-  const delayedOperations = operationTimePerformance.filter((operation) => operation.delayMinutes > 0).sort((first, second) => second.delayMinutes - first.delayMinutes);
-  const operationTimeByMachine = Object.values(timeByMachineMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
-  const operationTimeByOperator = Object.values(timeByOperatorMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
-  const oeeSummary = finalizeOeeGroup(oeeOverallGroup);
-  const oeeByMachine = Object.values(oeeByMachineMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
-  const oeeByOperation = Object.values(oeeByOperationMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
+  const prismaDelayedOperations = prismaOperationTimePerformance.filter((operation) => operation.delayMinutes > 0).sort((first, second) => second.delayMinutes - first.delayMinutes);
+  const prismaOperationTimeByMachine = Object.values(timeByMachineMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
+  const prismaOperationTimeByOperator = Object.values(timeByOperatorMap).map(finalizeTimeGroup).sort((first, second) => second.delayMinutes - first.delayMinutes);
+  const prismaOeeSummary = finalizeOeeGroup(oeeOverallGroup);
+  const prismaOeeByMachine = Object.values(oeeByMachineMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
+  const prismaOeeByOperation = Object.values(oeeByOperationMap).map(finalizeOeeGroup).sort((first, second) => second.oee - first.oee);
+
+  const operationTimePerformance = sqlAnalytics.operationTimePerformance.length ? sqlAnalytics.operationTimePerformance : prismaOperationTimePerformance;
+  const delayedOperations = sqlAnalytics.delayedOperations.length ? sqlAnalytics.delayedOperations : prismaDelayedOperations;
+  const operationTimeByMachine = sqlAnalytics.operationTimeByMachine.length ? sqlAnalytics.operationTimeByMachine : prismaOperationTimeByMachine;
+  const operationTimeByOperator = sqlAnalytics.operationTimeByOperator.length ? sqlAnalytics.operationTimeByOperator : prismaOperationTimeByOperator;
+  const oeeSummary = sqlAnalytics.oeeSummary.operationCount > 0 ? sqlAnalytics.oeeSummary : prismaOeeSummary;
+  const oeeByMachine = sqlAnalytics.oeeByMachine.length ? sqlAnalytics.oeeByMachine : prismaOeeByMachine;
+  const oeeByOperation = sqlAnalytics.oeeByOperation.length ? sqlAnalytics.oeeByOperation : prismaOeeByOperation;
 
   productionAlerts.forEach((alert) => {
     const operation = alert.reworkOperation ?? alert.productionLog.workOrderOperation;
@@ -1048,42 +1068,50 @@ export async function getOverviewReport(query = {}) {
     updatedAt: alert.updatedAt
   }));
 
-  const machinePerformance = Object.values(machinePerformanceMap).map((item) => ({
-    ...item,
-    scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
-  }));
+  const machinePerformance = sqlAnalytics.machinePerformance.length
+    ? sqlAnalytics.machinePerformance
+    : Object.values(machinePerformanceMap).map((item) => ({
+        ...item,
+        scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+      }));
 
   const productPerformance = Object.values(productPerformanceMap).map((item) => ({
     ...item,
     scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
   }));
 
-  const shiftPerformance = sortByProducedThenScrap(
-    Object.values(shiftPerformanceMap).map((item) => ({
-      ...item,
-      operatorCount: item.operatorIds.size,
-      machineCount: item.machineIds.size,
-      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity),
-      operatorIds: undefined,
-      machineIds: undefined
-    }))
-  );
+  const shiftPerformance = sqlAnalytics.shiftPerformance.length
+    ? sqlAnalytics.shiftPerformance
+    : sortByProducedThenScrap(
+        Object.values(shiftPerformanceMap).map((item) => ({
+          ...item,
+          operatorCount: item.operatorIds.size,
+          machineCount: item.machineIds.size,
+          scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity),
+          operatorIds: undefined,
+          machineIds: undefined
+        }))
+      );
 
-  const operatorShiftPerformance = sortByProducedThenScrap(
-    Object.values(operatorShiftPerformanceMap).map((item) => ({
-      ...item,
-      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
-    }))
-  );
+  const operatorShiftPerformance = sqlAnalytics.operatorShiftPerformance.length
+    ? sqlAnalytics.operatorShiftPerformance
+    : sortByProducedThenScrap(
+        Object.values(operatorShiftPerformanceMap).map((item) => ({
+          ...item,
+          scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+        }))
+      );
 
-  const machineShiftPerformance = sortByProducedThenScrap(
-    Object.values(machineShiftPerformanceMap).map((item) => ({
-      ...item,
-      scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
-    }))
-  );
+  const machineShiftPerformance = sqlAnalytics.machineShiftPerformance.length
+    ? sqlAnalytics.machineShiftPerformance
+    : sortByProducedThenScrap(
+        Object.values(machineShiftPerformanceMap).map((item) => ({
+          ...item,
+          scrapRate: scrapRate(item.producedQuantity, item.scrapQuantity)
+        }))
+      );
 
-  const planActualPerformance = buildPlanActualPerformance(workOrders, range);
+  const planActualPerformance = sqlAnalytics.planActualPerformance.length ? sqlAnalytics.planActualPerformance : buildPlanActualPerformance(workOrders, range);
   const plannedQuantity = planActualPerformance.reduce((sum, item) => sum + item.plannedQuantity, 0);
   const productionGapQuantity = Math.max(plannedQuantity - producedQuantity, 0);
   const planCompletionRate = plannedQuantity > 0 ? Number(((producedQuantity / plannedQuantity) * 100).toFixed(2)) : 0;
@@ -1111,9 +1139,19 @@ export async function getOverviewReport(query = {}) {
     qualityScrapDecisionCount,
     qualityConditionalAcceptCount
   };
-  const operationDowntimeByShift = Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount);
-  const operationDowntimeByMachine = Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount);
-  const productionTrend = groupDailyProduction(finalProductLogs);
+  const operationDowntimeReasonCounts = Object.keys(sqlAnalytics.operationDowntimeReasonCounts).length
+    ? sqlAnalytics.operationDowntimeReasonCounts
+    : countByReason(operationDowntimes);
+  const operationDowntimeByShift = sqlAnalytics.operationDowntimeByShift.length
+    ? sqlAnalytics.operationDowntimeByShift
+    : Object.values(downtimeByShiftMap).sort((first, second) => second.totalCount - first.totalCount);
+  const operationDowntimeByMachine = sqlAnalytics.operationDowntimeByMachine.length
+    ? sqlAnalytics.operationDowntimeByMachine
+    : Object.values(downtimeByMachineMap).sort((first, second) => second.totalCount - first.totalCount);
+  const operationDowntimeByOperation = sqlAnalytics.operationDowntimeByOperation.length
+    ? sqlAnalytics.operationDowntimeByOperation
+    : Object.values(downtimeByOperationMap).sort((first, second) => second.totalCount - first.totalCount);
+  const productionTrend = sqlAnalytics.productionTrend.length ? sqlAnalytics.productionTrend : groupDailyProduction(finalProductLogs);
   const managementInsights = buildManagementInsights({
     summary,
     shiftPerformance,
@@ -1136,10 +1174,10 @@ export async function getOverviewReport(query = {}) {
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
     machineDowntimeReasonCounts: countBy(machineStatusLogs, "reason"),
-    operationDowntimeReasonCounts: countByReason(operationDowntimes),
+    operationDowntimeReasonCounts,
     operationDowntimeByShift,
     operationDowntimeByMachine,
-    operationDowntimeByOperation: Object.values(downtimeByOperationMap).sort((first, second) => second.totalCount - first.totalCount),
+    operationDowntimeByOperation,
     recentOperationDowntimes: operationDowntimes.slice(0, 10),
     operationTimePerformance,
     delayedOperations: delayedOperations.slice(0, 10),
