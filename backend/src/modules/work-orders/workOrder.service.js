@@ -190,6 +190,125 @@ function dateOnlyFromDate(value) {
   return date;
 }
 
+function formatIstanbulDate(value = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(value);
+}
+
+function buildIstanbulShiftStart(workDate, startTime) {
+  const dateKey = workDate instanceof Date ? workDate.toISOString().slice(0, 10) : String(workDate).slice(0, 10);
+  const time = startTime?.slice(0, 5) || "00:00";
+  return new Date(`${dateKey}T${time}:00+03:00`);
+}
+
+export async function notifyShiftStartWorkOrders(now = new Date()) {
+  const todayKey = formatIstanbulDate(now);
+  const today = parseDateOnly(todayKey);
+
+  const operations = await prisma.workOrderOperation.findMany({
+    where: {
+      assignedOperatorId: { not: null },
+      status: { in: ["READY", "WAITING", "IN_PROGRESS", "PAUSED"] },
+      workOrder: {
+        status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] },
+        plannedStartDate: {
+          gte: today,
+          lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        }
+      },
+      assignedOperator: {
+        shiftAssignments: {
+          some: {
+            workDate: today,
+            status: { in: ["PLANNED", "CONFIRMED"] }
+          }
+        }
+      }
+    },
+    include: {
+      workOrder: {
+        include: {
+          product: true
+        }
+      },
+      machine: true,
+      assignedOperator: {
+        include: {
+          shiftAssignments: {
+            where: {
+              workDate: today,
+              status: { in: ["PLANNED", "CONFIRMED"] }
+            },
+            include: {
+              shift: true
+            },
+            take: 1
+          }
+        }
+      }
+    },
+    take: 100
+  });
+
+  let createdCount = 0;
+
+  for (const operation of operations) {
+    const assignment = operation.assignedOperator?.shiftAssignments?.[0];
+    if (!assignment) {
+      continue;
+    }
+
+    const shiftStart = buildIstanbulShiftStart(assignment.workDate, assignment.startTime ?? assignment.shift.startTime);
+    if (now < shiftStart) {
+      continue;
+    }
+
+    const existingNotification = await prisma.notification.findFirst({
+      where: {
+        recipientId: operation.assignedOperatorId,
+        type: "SHIFT_WORK_ORDER_START",
+        entityType: "WorkOrderOperation",
+        entityId: operation.id
+      },
+      select: { id: true }
+    });
+
+    if (existingNotification) {
+      continue;
+    }
+
+    await createNotification({
+      recipientId: operation.assignedOperatorId,
+      type: "SHIFT_WORK_ORDER_START",
+      title: "Vardiya iş emri başladı",
+      message: `${assignment.shift.name} başladı. ${operation.workOrder.orderNo} iş emrinde ${operation.operationName} operasyonu sizde.`,
+      entityType: "WorkOrderOperation",
+      entityId: operation.id,
+      metadata: {
+        workOrderId: operation.workOrderId,
+        orderNo: operation.workOrder.orderNo,
+        productName: operation.workOrder.product.name,
+        operationId: operation.id,
+        operationName: operation.operationName,
+        machineId: operation.machineId,
+        machineCode: operation.machine?.code,
+        machineName: operation.machine?.name,
+        shiftId: assignment.shiftId,
+        shiftName: assignment.shift.name,
+        shiftStartAt: shiftStart
+      }
+    });
+
+    createdCount += 1;
+  }
+
+  return { checked: operations.length, created: createdCount };
+}
+
 export async function findAvailableOperators({ workDate, shiftId, machineId }) {
   const date = parseDateOnly(workDate);
   const operators = await prisma.user.findMany({
