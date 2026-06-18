@@ -841,6 +841,12 @@ export default function App() {
   }, [selectedWorkOrderId]);
 
   useEffect(() => {
+    setActiveMobileView("WORKS");
+    setSelectedWorkOrderId("");
+    setSelectedOperationId("");
+  }, [user?.id]);
+
+  useEffect(() => {
     if (!productionCandidates.length) {
       if (selectedOperationId) {
         setSelectedOperationId("");
