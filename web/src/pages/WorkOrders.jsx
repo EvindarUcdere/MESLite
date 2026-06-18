@@ -337,6 +337,23 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function getDayKey(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getWorkOrderPlanDate(workOrder) {
+  return workOrder.plannedStartDate ?? workOrder.createdAt;
+}
+
 function normalize(value) {
   return value?.toLocaleLowerCase("tr-TR") ?? "";
 }
@@ -395,6 +412,7 @@ export default function WorkOrders() {
   const [operationDowntimes, setOperationDowntimes] = useState({});
   const [focusedWorkOrderId, setFocusedWorkOrderId] = useState("");
   const [focusedOperationId, setFocusedOperationId] = useState("");
+  const [quickWorkOrderView, setQuickWorkOrderView] = useState("today");
   const workOrderRowRefs = useRef(new Map());
   const [form, setForm] = useState({
     orderNo: "",
@@ -487,6 +505,98 @@ export default function WorkOrders() {
       return normalize(searchableText).includes(searchText);
     });
   }, [search, workOrders]);
+  const workOrderSections = useMemo(() => {
+    const todayKey = getDayKey(new Date());
+    const sections = [
+      {
+        key: "carryover",
+        title: "Geçmişten Kalan Açık İşler",
+        description: "Plan tarihi geçmiş, tamamlanmamış veya eksik kapanma riski taşıyan işler.",
+        tone: "danger",
+        items: []
+      },
+      {
+        key: "today",
+        title: "Bugünün İş Emirleri",
+        description: "Bugün üretime alınması veya takip edilmesi beklenen işler.",
+        tone: "success",
+        items: []
+      },
+      {
+        key: "upcoming",
+        title: "İleri Tarihli Planlar",
+        description: "Henüz plan günü gelmemiş işler. Operatör tarafında zamanı gelmeden başlatılamaz.",
+        tone: "info",
+        items: []
+      },
+      {
+        key: "completed",
+        title: "Tamamlanan İşler",
+        description: "Üretim akışı kapanmış işler. Gerekirse geçmiş izleme için burada tutulur.",
+        tone: "neutral",
+        items: []
+      }
+    ];
+    const byKey = Object.fromEntries(sections.map((section) => [section.key, section]));
+
+    filteredWorkOrders.forEach((workOrder) => {
+      const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
+      const isCompleted = workOrder.status === "COMPLETED";
+      const isPast = planKey && planKey < todayKey;
+      const isFuture = planKey && planKey > todayKey;
+      const hasShortOperation = (workOrder.operations ?? []).some((operation) => isShortCompletedOperation(operation, workOrder));
+
+      if (isCompleted) {
+        byKey.completed.items.push(workOrder);
+      } else if (isPast || hasShortOperation) {
+        byKey.carryover.items.push(workOrder);
+      } else if (isFuture) {
+        byKey.upcoming.items.push(workOrder);
+      } else {
+        byKey.today.items.push(workOrder);
+      }
+    });
+
+    return sections.filter((section) => section.items.length > 0);
+  }, [filteredWorkOrders]);
+  const quickWorkOrderBuckets = useMemo(() => {
+    const todayKey = getDayKey(new Date());
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = getDayKey(tomorrow);
+
+    const isOpen = (workOrder) => workOrder.status !== "COMPLETED" && workOrder.status !== "CANCELLED";
+    const hasShortOperation = (workOrder) => (workOrder.operations ?? []).some((operation) => isShortCompletedOperation(operation, workOrder));
+
+    const delayed = filteredWorkOrders.filter((workOrder) => {
+      const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
+      return isOpen(workOrder) && (planKey < todayKey || hasShortOperation(workOrder));
+    });
+
+    const today = filteredWorkOrders.filter((workOrder) => {
+      const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
+      return isOpen(workOrder) && planKey === todayKey;
+    });
+
+    const tomorrowItems = filteredWorkOrders.filter((workOrder) => {
+      const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
+      return isOpen(workOrder) && planKey === tomorrowKey;
+    });
+
+    return {
+      today,
+      delayed,
+      tomorrow: tomorrowItems,
+      all: filteredWorkOrders
+    };
+  }, [filteredWorkOrders]);
+  const quickWorkOrderTabs = [
+    { key: "today", label: "Bugün", count: quickWorkOrderBuckets.today.length },
+    { key: "delayed", label: "Geciken / Eksik", count: quickWorkOrderBuckets.delayed.length },
+    { key: "tomorrow", label: "Yarın", count: quickWorkOrderBuckets.tomorrow.length },
+    { key: "all", label: "Tüm İşler", count: quickWorkOrderBuckets.all.length }
+  ];
+  const quickWorkOrders = quickWorkOrderBuckets[quickWorkOrderView] ?? quickWorkOrderBuckets.today;
   const canCreateManualProductionLog = user?.role === ROLES.ADMIN;
 
   async function loadData() {
@@ -935,6 +1045,63 @@ export default function WorkOrders() {
         </div>
       </section>
 
+      <section className="panel work-order-quick-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>Operasyon Görünümü</h2>
+            <p className="muted-text">Günlük takip için önce bugünün, geciken/eksik kalan veya yarının iş emirlerini daraltılmış listede görün.</p>
+          </div>
+        </div>
+        <div className="work-order-view-tabs" role="tablist" aria-label="İş emri görünümü">
+          {quickWorkOrderTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              className={quickWorkOrderView === tab.key ? "is-active" : ""}
+              onClick={() => setQuickWorkOrderView(tab.key)}
+            >
+              <span>{tab.label}</span>
+              <strong>{tab.count}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="work-order-quick-list">
+          {quickWorkOrders.slice(0, 12).map((workOrder) => {
+            const displayQuantities = getWorkOrderDisplayQuantities(workOrder);
+            const operationProgress = getOperationProgress(workOrder.operations);
+            const activeOperation = operationProgress.activeOperation;
+
+            return (
+              <button key={workOrder.id} type="button" className="work-order-quick-card" onClick={() => focusWorkOrder(workOrder.id)}>
+                <div className="work-order-quick-main">
+                  <strong>{workOrder.orderNo}</strong>
+                  <span>{workOrder.product?.name ?? "-"}</span>
+                  <small>
+                    {workOrder.route?.name ?? "Rota yok"} • Plan: {formatDate(getWorkOrderPlanDate(workOrder))}
+                  </small>
+                </div>
+                <div className="work-order-quick-flow">
+                  <span>Şu anki adım</span>
+                  <strong>{activeOperation?.operationName ?? "Operasyon yok"}</strong>
+                  <small>
+                    {operationProgress.completed}/{operationProgress.total} adım • Operatör: {activeOperation?.assignedOperator?.name ?? "-"}
+                  </small>
+                </div>
+                <div className="work-order-quick-progress">
+                  <span className={`status-pill status-${workOrder.status.toLowerCase().replace("_", "-")}`}>{STATUS_LABELS[workOrder.status] ?? workOrder.status}</span>
+                  <strong>
+                    {displayQuantities.producedQuantity}/{workOrder.plannedQuantity}
+                  </strong>
+                  <small>{displayQuantities.progressPercent}%</small>
+                </div>
+              </button>
+            );
+          })}
+          {!isLoading && quickWorkOrders.length === 0 ? <p className="empty-state">Bu görünümde iş emri yok.</p> : null}
+          {quickWorkOrders.length > 12 ? <p className="muted-text">İlk 12 kayıt gösteriliyor. Detaylı arama için aşağıdaki tam listeyi kullanın.</p> : null}
+        </div>
+      </section>
+
       <section className="panel">
         <h2>İş Emri Oluştur</h2>
         <form className="work-order-form" onSubmit={handleCreate}>
@@ -1104,7 +1271,18 @@ export default function WorkOrders() {
               </tr>
             </thead>
             <tbody>
-              {filteredWorkOrders.map((workOrder) => {
+              {workOrderSections.map((section) => (
+                <Fragment key={section.key}>
+                  <tr className={`work-order-section-row work-order-section-${section.tone}`}>
+                    <td colSpan="9">
+                      <div>
+                        <strong>{section.title}</strong>
+                        <span>{section.description}</span>
+                      </div>
+                      <em>{section.items.length} iş emri</em>
+                    </td>
+                  </tr>
+                  {section.items.map((workOrder) => {
                 const displayQuantities = getWorkOrderDisplayQuantities(workOrder);
                 const startBlockReason = getStartBlockReason(workOrder);
                 const startDisabled = Boolean(startBlockReason);
@@ -1374,7 +1552,9 @@ export default function WorkOrders() {
                     ) : null}
                   </Fragment>
                 );
-              })}
+                  })}
+                </Fragment>
+              ))}
               {!isLoading && workOrders.length === 0 ? (
                 <tr>
                   <td colSpan="9">Henüz iş emri yok.</td>

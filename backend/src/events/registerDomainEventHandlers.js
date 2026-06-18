@@ -1,4 +1,5 @@
 import { emitEvent } from "../config/socket.js";
+import { recordDomainEventLog } from "../modules/domain-event-logs/domainEventLog.service.js";
 import { sendPushNotificationToUser } from "../modules/push-tokens/pushToken.service.js";
 import { DOMAIN_EVENTS } from "./domainEvents.js";
 import { onDomainEvent } from "./domainEventBus.js";
@@ -23,8 +24,11 @@ export function registerDomainEventHandlers() {
     await sendPushNotificationToUser(recipientId, notification);
   });
 
-  onDomainEvent("*", ({ type, id }) => {
+  onDomainEvent("*", async (event) => {
+    await recordDomainEventLog(event);
+
     if (process.env.DOMAIN_EVENT_DEBUG === "true") {
+      const { type, id } = event;
       console.log(`[domain-event] ${type} ${id}`);
     }
   });

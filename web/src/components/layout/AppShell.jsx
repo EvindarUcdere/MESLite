@@ -1,4 +1,4 @@
-import { AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getNotifications } from "../../api/notifications.api.js";
@@ -78,6 +78,12 @@ const navigationItems = [
     to: "/audit-logs",
     label: "İşlem Geçmişi",
     icon: History,
+    roles: ROLE_GROUPS.management
+  },
+  {
+    to: "/event-logs",
+    label: "Sistem Olayları",
+    icon: Activity,
     roles: ROLE_GROUPS.management
   },
   {

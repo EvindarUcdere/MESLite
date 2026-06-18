@@ -559,6 +559,23 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model DomainEventLog {
+  id         String   @id @default(uuid())
+  eventId    String   @unique
+  type       String
+  entityType String?
+  entityId   String?
+  summary    String?
+  payload    Json?
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([type])
+  @@index([occurredAt])
+  @@index([entityType, entityId])
+  @@map("domain_event_logs")
+}
+
 model Notification {
   id          String    @id @default(uuid())
   recipientId String

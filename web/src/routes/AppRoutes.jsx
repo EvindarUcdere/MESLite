@@ -3,6 +3,7 @@ import { AppShell } from "../components/layout/AppShell.jsx";
 import Alerts from "../pages/Alerts.jsx";
 import AuditLogs from "../pages/AuditLogs.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
+import EventLogs from "../pages/EventLogs.jsx";
 import FieldNotes from "../pages/FieldNotes.jsx";
 import Login from "../pages/Login.jsx";
 import Machines from "../pages/Machines.jsx";
@@ -45,6 +46,7 @@ export function AppRoutes() {
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.management} />}>
             <Route path="/reports" element={<Reports />} />
             <Route path="/audit-logs" element={<AuditLogs />} />
+            <Route path="/event-logs" element={<EventLogs />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.adminOnly} />}>
             <Route path="/users" element={<Users />} />
