@@ -154,6 +154,99 @@ PostgreSQL is the source of truth.
 
 This prevents UI-only state bugs. Even if the mobile or web UI behaves incorrectly, critical factory rules are enforced in the backend service layer.
 
+## Architecture Highlights
+
+MES Lite intentionally uses a hybrid backend architecture. The project does not force every database operation through the same pattern.
+
+### Prisma ORM for Business Workflows
+
+Prisma is used for transactional factory workflows where data consistency, relation handling and maintainable service-layer code are more important than raw aggregation speed.
+
+Prisma-backed areas:
+
+- authentication and users
+- work orders and operation assignments
+- production logs
+- notifications
+- downtime records
+- machines and operator skills
+- quality checks
+- shift planning
+
+Reason:
+
+```text
+These flows change core factory state.
+They need readable business rules, transactions and relation-safe writes.
+```
+
+### SQL for Reporting and Analytics
+
+Advanced reports use raw SQL through Prisma `$queryRaw` in:
+
+```text
+backend/src/modules/reports/reportSql.service.js
+```
+
+SQL-backed areas:
+
+- OEE dashboard metrics
+- production KPIs
+- shift performance analysis
+- monthly planned vs actual production
+- scrap/fire trends
+- machine efficiency reports
+- downtime and delay analysis
+- operator and machine performance reports
+
+Reason:
+
+```text
+Reports need grouping, date buckets, joins and aggregations.
+SQL is clearer and more efficient than loading large datasets into JavaScript.
+```
+
+The data-access strategy is:
+
+```text
+Prisma ORM = transactional business consistency
+Raw SQL    = analytical reporting and KPI aggregation
+PostgreSQL = source of truth
+```
+
+### Domain Event Layer
+
+MES Lite includes a lightweight domain event layer:
+
+```text
+backend/src/events/domainEventBus.js
+backend/src/events/domainEvents.js
+backend/src/events/registerDomainEventHandlers.js
+```
+
+Important backend actions emit domain events after database transactions are completed:
+
+- `workOrder.created`
+- `workOrder.started`
+- `workOrder.paused`
+- `productionLog.created`
+- `operation.paused`
+- `operation.completed`
+- `scrapActionWorkOrder.created`
+- `qualityCheck.failed`
+- `shift.started`
+- `notification.created`
+
+Reason:
+
+```text
+The business action and its side effects are separated.
+Notifications, realtime updates, push delivery, audit extensions and future ERP integrations
+can react to events without making the core services harder to maintain.
+```
+
+For this MVP, the event bus is in-process with Node.js `EventEmitter`. It is intentionally simple, but the structure can later evolve into RabbitMQ, Kafka or cloud queues if MES Lite becomes a multi-service system.
+
 ## Production Flow
 
 A work order can be linked to a route:
