@@ -5,6 +5,7 @@ import AuditLogs from "../pages/AuditLogs.jsx";
 import Dashboard from "../pages/Dashboard.jsx";
 import EventLogs from "../pages/EventLogs.jsx";
 import FieldNotes from "../pages/FieldNotes.jsx";
+import Inventory from "../pages/Inventory.jsx";
 import Login from "../pages/Login.jsx";
 import Machines from "../pages/Machines.jsx";
 import Notifications from "../pages/Notifications.jsx";
@@ -33,6 +34,7 @@ export function AppRoutes() {
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/work-orders" element={<WorkOrders />} />
+            <Route path="/inventory" element={<Inventory />} />
             <Route path="/routes" element={<RouteManagement />} />
             <Route path="/shift-planning" element={<ShiftPlanning />} />
           </Route>

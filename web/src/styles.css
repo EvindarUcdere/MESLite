@@ -2048,6 +2048,217 @@ body {
   gap: 5px;
 }
 
+.bom-panel {
+  display: grid;
+  gap: 18px;
+  box-shadow: 0 14px 34px rgba(15, 31, 46, 0.04);
+}
+
+.bom-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.bom-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.bom-toolbar label,
+.bom-row label {
+  display: grid;
+  gap: 7px;
+  color: #0f1f2e;
+  font-weight: 800;
+}
+
+.bom-toolbar select,
+.bom-row select,
+.bom-row input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  color: #102338;
+  background: #ffffff;
+  border: 1px solid #cbd8e4;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.bom-summary-card {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #eefdfa 0%, #ffffff 70%);
+  border: 1px solid #b7ede2;
+  border-radius: 8px;
+}
+
+.bom-summary-card span {
+  color: #60707d;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.bom-summary-card strong {
+  color: #092235;
+  font-size: 18px;
+}
+
+.bom-summary-card small {
+  color: #526677;
+  font-weight: 700;
+}
+
+.bom-row-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bom-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(100px, 0.55fr) minmax(90px, 0.45fr) minmax(90px, 0.45fr) minmax(180px, 1fr) 44px;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  background: #f8fbfd;
+  border: 1px solid #dbe6ee;
+  border-radius: 8px;
+}
+
+.bom-component-field,
+.bom-note-field {
+  min-width: 0;
+}
+
+.danger-icon-button {
+  color: #b42318;
+  background: #fff5f5;
+  border-color: #ffd2d2;
+}
+
+.bom-save-button {
+  justify-self: end;
+  min-width: 220px;
+}
+
+.empty-state-card {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  color: #52606d;
+  background: #f8fbfd;
+  border: 1px dashed #b8c8d6;
+  border-radius: 8px;
+}
+
+.empty-state-card strong {
+  color: #102338;
+}
+
+.form-success {
+  margin: 0;
+  color: #047857;
+  font-weight: 800;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.inventory-action-card {
+  display: grid;
+  gap: 16px;
+  box-shadow: 0 14px 34px rgba(15, 31, 46, 0.04);
+}
+
+.inventory-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.inventory-form label {
+  display: grid;
+  gap: 7px;
+  color: #0f1f2e;
+  font-weight: 800;
+}
+
+.inventory-form input,
+.inventory-form select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  color: #102338;
+  background: #ffffff;
+  border: 1px solid #cbd8e4;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.inventory-form button {
+  align-self: end;
+}
+
+.stock-movement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  color: #23445c;
+  background: #eef4f8;
+  border: 1px solid #d9e6ee;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.stock-movement-badge.is-inbound {
+  color: #047857;
+  background: #dcfce7;
+  border-color: #b7f3c7;
+}
+
+.stock-movement-badge.is-outbound {
+  color: #b42318;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.note-chip {
+  display: inline-flex;
+  max-width: 260px;
+  padding: 8px 10px;
+  overflow: hidden;
+  color: #31465a;
+  background: #f8fbfd;
+  border: 1px solid #dce7ef;
+  border-radius: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .bom-toolbar,
+  .bom-row,
+  .inventory-grid,
+  .inventory-form {
+    grid-template-columns: 1fr;
+  }
+
+  .bom-save-button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
 .report-detail-panel {
   display: grid;
   gap: 0;

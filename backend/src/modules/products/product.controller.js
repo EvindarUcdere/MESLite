@@ -19,3 +19,8 @@ export async function update(req, res) {
   const product = await productService.updateProduct(req.params.id, req.validated.body);
   res.json({ data: product });
 }
+
+export async function replaceBom(req, res) {
+  const product = await productService.replaceProductBom(req.params.id, req.validated.body.items);
+  res.json({ data: product });
+}

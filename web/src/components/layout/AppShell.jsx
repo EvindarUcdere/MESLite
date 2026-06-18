@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, Users } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, PackageSearch, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getNotifications } from "../../api/notifications.api.js";
@@ -18,6 +18,12 @@ const navigationItems = [
     to: "/work-orders",
     label: "İş Emirleri",
     icon: ClipboardList,
+    roles: ROLE_GROUPS.planning
+  },
+  {
+    to: "/inventory",
+    label: "Stok",
+    icon: PackageSearch,
     roles: ROLE_GROUPS.planning
   },
   {

@@ -10,6 +10,11 @@ export async function createProduct(payload) {
   return response.data.data;
 }
 
+export async function replaceProductBom(productId, items) {
+  const response = await apiClient.put(`/products/${productId}/bom`, { items });
+  return response.data.data;
+}
+
 export async function getMachines() {
   const response = await apiClient.get("/machines");
   return response.data.data;

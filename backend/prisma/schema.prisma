@@ -130,6 +130,15 @@ enum ShiftTemplatePattern {
   FOUR_ON_TWO_OFF
 }
 
+enum StockMovementType {
+  PURCHASE_IN
+  PRODUCTION_IN
+  CONSUMPTION_OUT
+  SCRAP_OUT
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+}
+
 model User {
   id                 String                 @id @default(uuid())
   name               String
@@ -166,6 +175,7 @@ model User {
   shiftAssignments   ShiftAssignment[]
   machineSkills      OperatorMachineSkill[]
   operatorGroups     OperatorGroupMember[]
+  stockMovements     StockMovement[]
 }
 
 model Product {
@@ -179,6 +189,64 @@ model Product {
   updatedAt       DateTime       @updatedAt
   workOrders      WorkOrder[]
   routes          ProductRoute[]
+  bomItems        ProductBomItem[] @relation("ProductBomParent")
+  usedInBomItems  ProductBomItem[] @relation("ProductBomComponent")
+  stockItem       StockItem?
+  stockMovements  StockMovement[]
+}
+
+model ProductBomItem {
+  id                 String   @id @default(uuid())
+  productId          String
+  componentProductId String
+  quantity           Decimal  @db.Decimal(12, 3)
+  unit               String
+  wastePercent       Decimal  @default(0) @db.Decimal(5, 2)
+  note               String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  product            Product  @relation("ProductBomParent", fields: [productId], references: [id], onDelete: Cascade)
+  componentProduct   Product  @relation("ProductBomComponent", fields: [componentProductId], references: [id])
+
+  @@unique([productId, componentProductId])
+  @@index([componentProductId])
+  @@map("product_bom_items")
+}
+
+model StockItem {
+  id               String          @id @default(uuid())
+  productId        String          @unique
+  quantityOnHand   Decimal         @default(0) @db.Decimal(14, 3)
+  reservedQuantity Decimal         @default(0) @db.Decimal(14, 3)
+  minimumQuantity  Decimal         @default(0) @db.Decimal(14, 3)
+  location         String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  movements        StockMovement[]
+
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id            String            @id @default(uuid())
+  stockItemId   String
+  productId     String
+  type          StockMovementType
+  quantity      Decimal           @db.Decimal(14, 3)
+  balanceAfter  Decimal           @db.Decimal(14, 3)
+  referenceType String?
+  referenceId   String?
+  note          String?
+  createdById   String
+  createdAt     DateTime          @default(now())
+  stockItem     StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  product       Product           @relation(fields: [productId], references: [id])
+  createdBy     User              @relation(fields: [createdById], references: [id])
+
+  @@index([productId, createdAt])
+  @@index([type])
+  @@map("stock_movements")
 }
 
 model ProductionLine {
