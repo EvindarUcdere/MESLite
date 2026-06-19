@@ -139,6 +139,15 @@ enum StockMovementType {
   ADJUSTMENT_OUT
 }
 
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  PLANNED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id                 String                 @id @default(uuid())
   name               String
@@ -176,6 +185,7 @@ model User {
   machineSkills      OperatorMachineSkill[]
   operatorGroups     OperatorGroupMember[]
   stockMovements     StockMovement[]
+  createdSalesOrders SalesOrder[]          @relation("CreatedSalesOrders")
 }
 
 model Product {
@@ -193,6 +203,44 @@ model Product {
   usedInBomItems  ProductBomItem[] @relation("ProductBomComponent")
   stockItem       StockItem?
   stockMovements  StockMovement[]
+  salesOrderItems SalesOrderItem[]
+}
+
+model SalesOrder {
+  id            String           @id @default(uuid())
+  orderNo       String           @unique
+  customerName  String
+  requestedDate DateTime?
+  dueDate       DateTime?
+  status        SalesOrderStatus @default(DRAFT)
+  note          String?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  createdBy     User             @relation("CreatedSalesOrders", fields: [createdById], references: [id])
+  items         SalesOrderItem[]
+  workOrders    WorkOrder[]
+
+  @@index([status, dueDate])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           String      @id @default(uuid())
+  salesOrderId String
+  productId    String
+  quantity     Int
+  unit         String      @default("adet")
+  note         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  salesOrder   SalesOrder  @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product      Product     @relation(fields: [productId], references: [id])
+  workOrders   WorkOrder[]
+
+  @@index([salesOrderId])
+  @@index([productId])
+  @@map("sales_order_items")
 }
 
 model ProductBomItem {
@@ -422,6 +470,8 @@ model WorkOrder {
   plannedEndDate     DateTime?
   actualStartDate    DateTime?
   actualEndDate      DateTime?
+  salesOrderId       String?
+  salesOrderItemId   String?
   createdById        String
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -430,11 +480,16 @@ model WorkOrder {
   machine            Machine?             @relation(fields: [machineId], references: [id])
   assignedOperator   User?                @relation("AssignedWorkOrders", fields: [assignedOperatorId], references: [id])
   createdBy          User                 @relation("CreatedWorkOrders", fields: [createdById], references: [id])
+  salesOrder         SalesOrder?          @relation(fields: [salesOrderId], references: [id])
+  salesOrderItem     SalesOrderItem?      @relation(fields: [salesOrderItemId], references: [id])
   productionLogs     ProductionLog[]
   productionAlerts   ProductionAlert[]
   qualityChecks      QualityCheck[]
   operations         WorkOrderOperation[]
   operationDowntimes OperationDowntime[]
+
+  @@index([salesOrderId])
+  @@index([salesOrderItemId])
 }
 
 model WorkOrderOperation {

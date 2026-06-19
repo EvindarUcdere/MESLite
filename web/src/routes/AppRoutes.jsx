@@ -13,6 +13,7 @@ import Products from "../pages/Products.jsx";
 import Quality from "../pages/Quality.jsx";
 import Reports from "../pages/Reports.jsx";
 import RouteManagement from "../pages/Routes.jsx";
+import SalesOrders from "../pages/SalesOrders.jsx";
 import ShiftPlanning from "../pages/ShiftPlanning.jsx";
 import Users from "../pages/Users.jsx";
 import WorkOrders from "../pages/WorkOrders.jsx";
@@ -34,6 +35,7 @@ export function AppRoutes() {
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
             <Route path="/work-orders" element={<WorkOrders />} />
+            <Route path="/sales-orders" element={<SalesOrders />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/routes" element={<RouteManagement />} />
             <Route path="/shift-planning" element={<ShiftPlanning />} />

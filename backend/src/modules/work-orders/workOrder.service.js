@@ -27,6 +27,12 @@ const workOrderInclude = {
       role: true
     }
   },
+  salesOrder: true,
+  salesOrderItem: {
+    include: {
+      product: true
+    }
+  },
   createdBy: {
     select: {
       id: true,
@@ -562,6 +568,8 @@ export async function createWorkOrder(userId, data) {
         plannedQuantity: data.plannedQuantity,
         plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : undefined,
         plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : undefined,
+        salesOrderId: data.salesOrderId,
+        salesOrderItemId: data.salesOrderItemId,
         createdById: userId
       }
     });
