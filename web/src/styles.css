@@ -598,6 +598,87 @@ body {
   border-radius: 8px;
 }
 
+.scrap-evidence-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.scrap-evidence-strip.has-evidence {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.scrap-evidence-strip.no-evidence {
+  border-style: dashed;
+}
+
+.scrap-evidence-strip > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.scrap-evidence-strip small {
+  color: #66788a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.scrap-evidence-strip strong {
+  color: #0f1f2e;
+  font-size: 14px;
+}
+
+.scrap-evidence-strip span {
+  color: #52606d;
+  font-size: 13px;
+}
+
+.scrap-evidence-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.scrap-evidence-thumb {
+  width: 116px;
+  display: grid;
+  gap: 5px;
+  color: inherit;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scrap-evidence-thumb img {
+  width: 116px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #b8dff2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scrap-evidence-thumb span {
+  overflow: hidden;
+  color: #256f6c;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .scrap-action-flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.35fr);
@@ -3422,6 +3503,95 @@ body {
   width: max-content;
 }
 
+.material-check-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.material-check-card.is-ready {
+  border-color: #99e5d1;
+  background: #f0fdfa;
+}
+
+.material-check-card.is-warning {
+  border-color: #f7c873;
+  background: #fff8e5;
+}
+
+.material-check-card.is-muted {
+  background: #f8fafc;
+}
+
+.material-check-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.material-check-header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.material-check-header span,
+.material-check-row span,
+.material-check-row small {
+  color: #60707d;
+  font-size: 13px;
+}
+
+.material-status-pill,
+.material-row-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.material-status-pill.is-ready,
+.material-row-pill.is-ready {
+  background: #d9f7ea;
+  color: #08724f;
+}
+
+.material-status-pill.is-warning,
+.material-row-pill.is-warning {
+  background: #ffe7c2;
+  color: #9a4a00;
+}
+
+.material-check-list {
+  display: grid;
+  gap: 8px;
+}
+
+.material-check-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.6fr) minmax(110px, 0.6fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5edf3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.material-check-row > div {
+  display: grid;
+  gap: 2px;
+}
+
 .form-field-title {
   display: block;
   margin-bottom: 8px;
@@ -4955,8 +5125,89 @@ th {
 
 .work-order-scrap-card strong,
 .work-order-scrap-card p,
-.work-order-scrap-card small {
+.work-order-scrap-card small,
+.work-order-scrap-card em {
   overflow-wrap: anywhere;
+}
+
+.scrap-card-flow {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) 56px minmax(220px, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.scrap-flow-node {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.scrap-flow-source {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+}
+
+.scrap-flow-target {
+  border-color: #99f6e4;
+  background: linear-gradient(135deg, #ecfdf8 0%, #ffffff 100%);
+}
+
+.scrap-flow-node small {
+  font-size: 11px;
+  font-weight: 800;
+  color: #667085;
+  text-transform: uppercase;
+}
+
+.scrap-flow-node strong {
+  margin: 0;
+  color: #0f172a;
+}
+
+.scrap-flow-node p {
+  margin: 0;
+  color: #475467;
+}
+
+.scrap-flow-node em {
+  width: fit-content;
+  padding: 7px 10px;
+  font-style: normal;
+  font-weight: 900;
+  color: #ffffff;
+  background: #0f766e;
+  border-radius: 9px;
+}
+
+.scrap-flow-connector {
+  position: relative;
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+}
+
+.scrap-flow-connector span {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #fb923c, #14b8a6);
+}
+
+.scrap-flow-connector strong {
+  z-index: 1;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #ffffff;
+  background: #0f766e;
+  border: 3px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.22);
 }
 
 .scrap-card-kicker {
@@ -4981,6 +5232,16 @@ th {
 .work-order-scrap-card small {
   margin: 0;
   color: #475467;
+}
+
+.scrap-card-note {
+  display: block;
+  margin-top: 10px !important;
+  padding: 10px 12px;
+  color: #7c2d12 !important;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
 }
 
 .scrap-card-action {
@@ -5318,7 +5579,9 @@ th {
 
   .scrap-queue-main,
   .scrap-queue-metrics,
-  .scrap-action-flow {
+  .scrap-action-flow,
+  .scrap-card-flow,
+  .work-order-scrap-card {
     grid-template-columns: 1fr;
   }
 
@@ -5329,6 +5592,15 @@ th {
   .scrap-action-arrow {
     justify-self: start;
     transform: rotate(90deg);
+  }
+
+  .scrap-flow-connector {
+    min-height: 34px;
+  }
+
+  .scrap-flow-connector span {
+    width: 2px;
+    height: 100%;
   }
 
   .dashboard-signal-grid {

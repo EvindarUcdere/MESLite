@@ -19,3 +19,10 @@ export const updateStockItemSchema = z.object({
     location: z.string().max(120).optional().nullable()
   })
 });
+
+export const materialCheckSchema = z.object({
+  query: z.object({
+    productId: z.string().uuid(),
+    quantity: z.coerce.number().positive()
+  })
+});

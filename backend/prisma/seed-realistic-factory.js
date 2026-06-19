@@ -124,6 +124,9 @@ async function cleanupOperationalData() {
   await prisma.shift.deleteMany({});
   await prisma.routeOperation.deleteMany({});
   await prisma.productRoute.deleteMany({});
+  await prisma.stockMovement.deleteMany({});
+  await prisma.stockItem.deleteMany({});
+  await prisma.productBomItem.deleteMany({});
   await prisma.machine.deleteMany({});
   await prisma.productionLine.deleteMany({});
   await prisma.product.deleteMany({});
@@ -245,17 +248,25 @@ async function seedFactoryMasterData() {
   }
 
   const productInputs = [
-    ["PRD-HVG-001", "Hidrolik Valf Gövdesi", 75],
-    ["PRD-AMB-120", "Ambalajlı Final Modül", 60],
-    ["PRD-BRK-045", "Bağlantı Braketi", 40],
-    ["PRD-MTK-210", "Motor Kapak Seti", 55],
-    ["PRD-KPN-330", "Kontrol Panel Kutusu", 90]
+    ["PRD-HVG-001", "Hidrolik Valf Gövdesi", "adet", 75],
+    ["PRD-AMB-120", "Ambalajlı Final Modül", "adet", 60],
+    ["PRD-BRK-045", "Bağlantı Braketi", "adet", 40],
+    ["PRD-MTK-210", "Motor Kapak Seti", "adet", 55],
+    ["PRD-KPN-330", "Kontrol Panel Kutusu", "adet", 90],
+    ["CMP-SAC-2MM", "2 mm DKP Sac Levha", "kg", null],
+    ["CMP-SAC-3MM", "3 mm DKP Sac Levha", "kg", null],
+    ["CMP-ALU-6061", "Alüminyum 6061 Blok", "kg", null],
+    ["CMP-VALF-KIT", "Valf Conta ve Yay Kiti", "set", null],
+    ["CMP-CIV-M6", "M6 Civata Seti", "set", null],
+    ["CMP-BOYA-GRI", "Gri Toz Boya", "kg", null],
+    ["CMP-ETIKET", "Ürün Etiketi", "adet", null],
+    ["CMP-KOLI", "Sevk Kolisi", "adet", null]
   ];
 
   const products = {};
-  for (const [code, name, targetCycleTime] of productInputs) {
+  for (const [code, name, unit, targetCycleTime] of productInputs) {
     products[code] = await prisma.product.create({
-      data: { code, name, unit: "adet", targetCycleTime }
+      data: { code, name, unit, targetCycleTime }
     });
   }
 
@@ -269,37 +280,132 @@ async function seedFactoryMasterData() {
   return { lines, machines, products, shifts };
 }
 
+async function seedBomAndInventory({ products, admin }) {
+  const bomDefinitions = [
+    ["PRD-HVG-001", [
+      ["CMP-ALU-6061", 2.4, "kg", 4],
+      ["CMP-VALF-KIT", 1, "set", 1],
+      ["CMP-ETIKET", 1, "adet", 0.5],
+      ["CMP-KOLI", 0.2, "adet", 0]
+    ]],
+    ["PRD-AMB-120", [
+      ["CMP-SAC-2MM", 1.6, "kg", 3],
+      ["CMP-CIV-M6", 1, "set", 1],
+      ["CMP-BOYA-GRI", 0.08, "kg", 2],
+      ["CMP-ETIKET", 1, "adet", 0.5],
+      ["CMP-KOLI", 1, "adet", 0]
+    ]],
+    ["PRD-BRK-045", [
+      ["CMP-SAC-3MM", 0.85, "kg", 5],
+      ["CMP-BOYA-GRI", 0.04, "kg", 2],
+      ["CMP-ETIKET", 1, "adet", 0.5]
+    ]],
+    ["PRD-MTK-210", [
+      ["CMP-SAC-2MM", 1.2, "kg", 4],
+      ["CMP-CIV-M6", 1, "set", 1],
+      ["CMP-ETIKET", 1, "adet", 0.5],
+      ["CMP-KOLI", 1, "adet", 0]
+    ]],
+    ["PRD-KPN-330", [
+      ["CMP-SAC-3MM", 2.1, "kg", 6],
+      ["CMP-BOYA-GRI", 0.12, "kg", 2],
+      ["CMP-CIV-M6", 2, "set", 1],
+      ["CMP-ETIKET", 1, "adet", 0.5],
+      ["CMP-KOLI", 1, "adet", 0]
+    ]]
+  ];
+
+  for (const [productCode, items] of bomDefinitions) {
+    await prisma.productBomItem.createMany({
+      data: items.map(([componentCode, quantity, unit, wastePercent]) => ({
+        productId: products[productCode].id,
+        componentProductId: products[componentCode].id,
+        quantity,
+        unit,
+        wastePercent,
+        note: "Standart metal parça üretim reçetesi"
+      }))
+    });
+  }
+
+  const stockDefinitions = [
+    ["CMP-SAC-2MM", 850, 250, "Hammadde Deposu / Sac Rafı A-01"],
+    ["CMP-SAC-3MM", 640, 220, "Hammadde Deposu / Sac Rafı A-02"],
+    ["CMP-ALU-6061", 420, 120, "Hammadde Deposu / Alüminyum Rafı B-01"],
+    ["CMP-VALF-KIT", 260, 80, "Montaj Deposu / Kutu V-03"],
+    ["CMP-CIV-M6", 920, 200, "Montaj Deposu / Bağlantı Elemanları"],
+    ["CMP-BOYA-GRI", 180, 50, "Boya Deposu / Toz Boya Alanı"],
+    ["CMP-ETIKET", 2400, 500, "Paketleme / Etiket Rafı"],
+    ["CMP-KOLI", 760, 150, "Paketleme / Koli Alanı"],
+    ["PRD-HVG-001", 36, 20, "Bitmiş Ürün Deposu"],
+    ["PRD-AMB-120", 48, 25, "Bitmiş Ürün Deposu"],
+    ["PRD-BRK-045", 140, 60, "Bitmiş Ürün Deposu"],
+    ["PRD-MTK-210", 72, 30, "Bitmiş Ürün Deposu"],
+    ["PRD-KPN-330", 24, 12, "Bitmiş Ürün Deposu"]
+  ];
+
+  for (const [productCode, quantityOnHand, minimumQuantity, location] of stockDefinitions) {
+    const stockItem = await prisma.stockItem.create({
+      data: {
+        productId: products[productCode].id,
+        quantityOnHand,
+        minimumQuantity,
+        location
+      }
+    });
+
+    await prisma.stockMovement.create({
+      data: {
+        stockItemId: stockItem.id,
+        productId: products[productCode].id,
+        type: productCode.startsWith("CMP-") ? "PURCHASE_IN" : "PRODUCTION_IN",
+        quantity: quantityOnHand,
+        balanceAfter: quantityOnHand,
+        referenceType: "FACTORY_SEED",
+        referenceId: "METAL_PARTS_FACTORY_PROFILE",
+        note: productCode.startsWith("CMP-") ? "Başlangıç hammadde stoğu" : "Başlangıç bitmiş ürün stoğu",
+        createdById: admin.id
+      }
+    });
+  }
+}
+
 async function seedRoutes({ products, machines }) {
   const definitions = [
     {
       product: products["PRD-HVG-001"],
-      name: "Valf Gövdesi CNC + Kalite Rotası",
+      name: "Hidrolik Valf Gövdesi İşleme Rotası",
       operations: [
-        ["Lazer Kesim", "LZR-01", 35, false],
-        ["CNC Tornalama", "CNC-01", 70, false],
-        ["CNC Frezeleme", "CNC-02", 65, false],
+        ["CNC Tornalama", "CNC-01", 72, false],
+        ["CNC Frezeleme", "CNC-02", 68, false],
+        ["Delik Delme ve Diş Açma", "DRL-01", 32, false],
         ["Fonksiyon Test", "TST-01", 30, true],
-        ["Final Kontrol", "KLT-02", 25, true]
+        ["Final Kalite Kontrol", "KLT-02", 24, true],
+        ["Paketleme ve Etiketleme", "PKT-01", 18, false]
       ]
     },
     {
       product: products["PRD-AMB-120"],
-      name: "Final Modül Montaj Rotası",
+      name: "Ambalajlı Final Modül Rotası",
       operations: [
-        ["Pres Hazırlık", "PRS-01", 30, false],
-        ["Manuel Montaj", "MNT-01", 55, false],
-        ["Fonksiyon Test", "TST-01", 35, true],
-        ["Paketleme", "PKT-01", 25, false]
+        ["Lazer Kesim", "LZR-01", 30, false],
+        ["Presleme", "PRS-01", 28, false],
+        ["Manuel Montaj", "MNT-01", 56, false],
+        ["Fonksiyon Test", "TST-01", 34, true],
+        ["Final Kalite Kontrol", "KLT-02", 20, true],
+        ["Paketleme ve Etiketleme", "PKT-01", 22, false]
       ]
     },
     {
       product: products["PRD-BRK-045"],
-      name: "Braket Kesim Büküm Rotası",
+      name: "Bağlantı Braketi Sac Şekillendirme Rotası",
       operations: [
         ["Lazer Kesim", "LZR-01", 28, false],
-        ["Abkant Büküm", "BKM-01", 35, false],
-        ["Robot Kaynak", "KYN-01", 45, false],
-        ["Final Kontrol", "KLT-01", 22, true]
+        ["Abkant Büküm", "BKM-01", 34, false],
+        ["Delik Delme ve Çapak Alma", "DRL-01", 26, false],
+        ["Toz Boya", "BOY-01", 70, false],
+        ["Ölçü Kontrol", "KLT-01", 22, true],
+        ["Paketleme ve Etiketleme", "PKT-01", 16, false]
       ]
     },
     {
@@ -308,8 +414,10 @@ async function seedRoutes({ products, machines }) {
       operations: [
         ["Presleme", "PRS-01", 32, false],
         ["Delik Delme", "DRL-01", 30, false],
-        ["Montaj", "MNT-02", 50, false],
-        ["Final Kontrol", "KLT-02", 20, true]
+        ["CNC Frezeleme", "CNC-02", 42, false],
+        ["Manuel Montaj", "MNT-02", 48, false],
+        ["Final Kalite Kontrol", "KLT-02", 20, true],
+        ["Paketleme ve Etiketleme", "PKT-01", 18, false]
       ]
     },
     {
@@ -317,10 +425,12 @@ async function seedRoutes({ products, machines }) {
       name: "Kontrol Panel Kutusu Rotası",
       operations: [
         ["Lazer Kesim", "LZR-01", 35, false],
-        ["Büküm", "BKM-01", 40, false],
+        ["Abkant Büküm", "BKM-01", 40, false],
+        ["Robot Kaynak", "KYN-01", 44, false],
         ["Toz Boya", "BOY-01", 80, false],
-        ["Paketleme", "PKT-01", 28, false],
-        ["Final Kontrol", "KLT-02", 25, true]
+        ["Manuel Montaj", "MNT-02", 58, false],
+        ["Final Kalite Kontrol", "KLT-02", 25, true],
+        ["Paketleme ve Etiketleme", "PKT-01", 28, false]
       ]
     }
   ];
@@ -331,7 +441,7 @@ async function seedRoutes({ products, machines }) {
       data: {
         productId: definition.product.id,
         name: definition.name,
-        description: "Sürekli üretimde kullanılan standart ürün rotası"
+        description: "Metal parça fabrikası için standart operasyon akışı"
       }
     });
 
@@ -708,6 +818,7 @@ async function main() {
   const { admin, manager, qualityStaff, operators } = await seedUsers();
   const masterData = await seedFactoryMasterData();
   const routes = await seedRoutes(masterData);
+  await seedBomAndInventory({ products: masterData.products, admin });
   await seedGroupsSkillsAndRoster({ operators, machines: masterData.machines, shifts: masterData.shifts });
   await seedWorkOrders({ routes, operators, shifts: masterData.shifts, manager, qualityStaff });
 

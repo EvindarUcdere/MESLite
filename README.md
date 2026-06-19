@@ -4,6 +4,12 @@ MES Lite is a realistic factory production tracking MVP built for portfolio, int
 
 The project is not only a CRUD dashboard. It models a real production flow where a work order moves through multiple operations, operators enter production data from mobile, managers monitor the process from web, quality decisions are tracked, and realtime notifications keep both sides synchronized.
 
+## Demo Factory Profile
+
+The demo data is standardized around a metal parts and machine equipment factory. MES Lite models products such as hydraulic valve bodies, motor cover sets, connection brackets and control panel boxes; their routes include cutting, pressing, CNC machining, drilling, welding, assembly, quality control and packaging.
+
+This factory profile also includes product BOMs, component materials and initial stock records, so the project can evolve naturally toward MRP, stock reservation and production planning.
+
 ## Live Demo
 
 | Target | URL |

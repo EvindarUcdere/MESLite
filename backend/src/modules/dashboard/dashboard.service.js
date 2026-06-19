@@ -118,6 +118,14 @@ function mapScrapTrackingItem(log, actionWorkOrderMap = new Map()) {
     scrapActionWorkOrderNo: log.scrapActionWorkOrderNo,
     scrapActionWorkOrder: calculateActionWorkOrderProgress(actionWorkOrder),
     scrapActionNote: log.scrapActionNote,
+    attachments: (log.attachments ?? []).map((attachment) => ({
+      id: attachment.id,
+      fileName: attachment.fileName,
+      fileUrl: attachment.fileUrl,
+      mimeType: attachment.mimeType,
+      size: attachment.size
+    })),
+    hasVisualEvidence: Boolean(log.attachments?.length),
     machineCode: log.machine?.code,
     machineName: log.machine?.name,
     operatorName: log.operator?.name,
@@ -418,7 +426,8 @@ export async function getLiveOverview() {
           }
         },
         machine: true,
-        shift: true
+        shift: true,
+        attachments: true
       },
       orderBy: { createdAt: "desc" },
       take: 20

@@ -1936,12 +1936,18 @@ export default function App() {
                     ]}
                   >
                     <View style={styles.operationHeader}>
-                      <Text style={styles.operationSequence}>{operation.sequenceNo}</Text>
+                      <Text style={[styles.operationSequence, styles[`operationSequence${operation.status}`]]}>{operation.sequenceNo}</Text>
                       <View style={styles.operationHeaderText}>
                         <Text style={styles.operationName}>{operation.operationName}</Text>
                         <Text style={styles.muted}>{operation.machine?.code ?? "Makine yok"}</Text>
                       </View>
-                      <Text style={[styles.operationStage, isShortCompletedOperation(operation, selectedWorkOrder) ? styles.shortClosedBadge : null]}>
+                      <Text
+                        style={[
+                          styles.operationStage,
+                          styles[`operationStage${operation.status}`],
+                          isShortCompletedOperation(operation, selectedWorkOrder) ? styles.shortClosedBadge : null
+                        ]}
+                      >
                         {getOperationStageLabel(operation, selectedWorkOrder)}
                       </Text>
                     </View>
@@ -3120,28 +3126,29 @@ const styles = StyleSheet.create({
     backgroundColor: "#eefaf7"
   },
   operationWAITING: {
-    opacity: 0.82,
+    opacity: 0.72,
     backgroundColor: "#f8fafc",
-    borderLeftColor: "#94a3b8"
+    borderColor: "#e2e8f0",
+    borderLeftColor: "#cbd5e1"
   },
   operationREADY: {
-    backgroundColor: "#ecfdf8",
-    borderColor: "#9bd8c8",
-    borderLeftColor: "#0f7f78"
+    backgroundColor: "#ecfeff",
+    borderColor: "#67e8f9",
+    borderLeftColor: "#0891b2"
   },
   operationIN_PROGRESS: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#bfdbfe",
+    backgroundColor: "#e8f3ff",
+    borderColor: "#60a5fa",
     borderLeftColor: "#2563eb"
   },
   operationPAUSED: {
-    backgroundColor: "#fffbeb",
-    borderColor: "#fde68a",
+    backgroundColor: "#fff7ed",
+    borderColor: "#fdba74",
     borderLeftColor: "#d97706"
   },
   operationCOMPLETED: {
-    backgroundColor: "#f0fdf4",
-    borderColor: "#bbf7d0",
+    backgroundColor: "#ecfdf3",
+    borderColor: "#4ade80",
     borderLeftColor: "#16a34a"
   },
   shortCompletedOperationCard: {
@@ -3167,6 +3174,22 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     overflow: "hidden"
   },
+  operationSequenceWAITING: {
+    color: "#64748b",
+    backgroundColor: "#e2e8f0"
+  },
+  operationSequenceREADY: {
+    backgroundColor: "#0891b2"
+  },
+  operationSequenceIN_PROGRESS: {
+    backgroundColor: "#2563eb"
+  },
+  operationSequencePAUSED: {
+    backgroundColor: "#d97706"
+  },
+  operationSequenceCOMPLETED: {
+    backgroundColor: "#16a34a"
+  },
   operationHeaderText: {
     flex: 1,
     gap: 2
@@ -3186,6 +3209,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     overflow: "hidden"
+  },
+  operationStageWAITING: {
+    color: "#64748b",
+    backgroundColor: "#e2e8f0"
+  },
+  operationStageREADY: {
+    color: "#155e75",
+    backgroundColor: "#cffafe"
+  },
+  operationStageIN_PROGRESS: {
+    color: "#1d4ed8",
+    backgroundColor: "#dbeafe"
+  },
+  operationStagePAUSED: {
+    color: "#92400e",
+    backgroundColor: "#ffedd5"
+  },
+  operationStageCOMPLETED: {
+    color: "#166534",
+    backgroundColor: "#dcfce7"
   },
   myOperationText: {
     color: "#0f7f78",

@@ -61,6 +61,70 @@ export async function listStockMovements(filters = {}) {
   });
 }
 
+export async function calculateMaterialCheck(productId, quantity) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: {
+      bomItems: {
+        include: {
+          componentProduct: {
+            include: { stockItem: true }
+          }
+        },
+        orderBy: { createdAt: "asc" }
+      }
+    }
+  });
+
+  if (!product) {
+    throw new ApiError(404, "Ürün bulunamadı");
+  }
+
+  const plannedQuantity = Number(quantity);
+  const items = product.bomItems.map((item) => {
+    const stockItem = item.componentProduct.stockItem;
+    const grossRequiredQuantity = Number(item.quantity) * plannedQuantity;
+    const requiredQuantity = grossRequiredQuantity * (1 + Number(item.wastePercent ?? 0) / 100);
+    const quantityOnHand = toNumber(stockItem?.quantityOnHand);
+    const reservedQuantity = toNumber(stockItem?.reservedQuantity);
+    const availableQuantity = Math.max(quantityOnHand - reservedQuantity, 0);
+    const shortageQuantity = Math.max(requiredQuantity - availableQuantity, 0);
+
+    return {
+      productId: item.componentProduct.id,
+      code: item.componentProduct.code,
+      name: item.componentProduct.name,
+      unit: item.unit || item.componentProduct.unit,
+      bomQuantity: Number(item.quantity),
+      wastePercent: Number(item.wastePercent ?? 0),
+      requiredQuantity,
+      quantityOnHand,
+      reservedQuantity,
+      availableQuantity,
+      shortageQuantity,
+      isEnough: shortageQuantity <= 0,
+      location: stockItem?.location ?? null
+    };
+  });
+
+  const totalShortageItems = items.filter((item) => !item.isEnough).length;
+
+  return {
+    product: {
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      unit: product.unit
+    },
+    plannedQuantity,
+    hasBom: items.length > 0,
+    isStockEnough: items.length > 0 && totalShortageItems === 0,
+    totalBomItems: items.length,
+    totalShortageItems,
+    items
+  };
+}
+
 export async function updateStockItemSettings(productId, data) {
   const product = await prisma.product.findUnique({ where: { id: productId } });
 

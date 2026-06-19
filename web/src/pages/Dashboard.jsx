@@ -476,6 +476,32 @@ export default function Dashboard() {
                 <span>{formatDateShort(item.createdAt)}</span>
                 {item.scrapActionWorkOrderNo ? <span>{item.scrapActionWorkOrderNo}</span> : null}
               </div>
+              <div className={`scrap-evidence-strip ${item.hasVisualEvidence ? "has-evidence" : "no-evidence"}`}>
+                <div>
+                  <small>Görsel Kanıt</small>
+                  <strong>{item.hasVisualEvidence ? `${item.attachments.length} fotoğraf eklendi` : "Fotoğraf eklenmemiş"}</strong>
+                  <span>{item.hasVisualEvidence ? "Kalite kararı için operatörün eklediği saha görseli incelenebilir." : "Karar yalnızca fire nedeni ve operatör notuna göre verilecek."}</span>
+                </div>
+                {item.hasVisualEvidence ? (
+                  <div className="scrap-evidence-thumbs">
+                    {item.attachments.slice(0, 3).map((attachment) => (
+                      <button
+                        key={attachment.id}
+                        type="button"
+                        className="scrap-evidence-thumb"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          window.open(getAttachmentUrl(attachment), "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        <img src={getAttachmentUrl(attachment)} alt={attachment.fileName || "Fire görsel kanıtı"} />
+                        <span>{attachment.fileName || "Görseli aç"}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <div className="scrap-action-flow">
                 <div className="scrap-action-source">
                   <small>Kaynak fire</small>

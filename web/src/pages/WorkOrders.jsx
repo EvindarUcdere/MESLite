@@ -1,6 +1,7 @@
 ﻿import { Play, Plus, Square, TimerReset } from "lucide-react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { getMaterialCheck } from "../api/inventory.api.js";
 import { getMachines, getProducts, getUsers } from "../api/masterData.api.js";
 import { createProductionLog, createScrapAction } from "../api/productionLogs.api.js";
 import { getProductRoutes } from "../api/productRoutes.api.js";
@@ -337,6 +338,12 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatQuantity(value) {
+  return new Intl.NumberFormat("tr-TR", {
+    maximumFractionDigits: 2
+  }).format(Number(value ?? 0));
+}
+
 function getDayKey(value) {
   if (!value) {
     return "";
@@ -413,6 +420,8 @@ export default function WorkOrders() {
   const [focusedWorkOrderId, setFocusedWorkOrderId] = useState("");
   const [focusedOperationId, setFocusedOperationId] = useState("");
   const [quickWorkOrderView, setQuickWorkOrderView] = useState("today");
+  const [materialCheck, setMaterialCheck] = useState(null);
+  const [isMaterialCheckLoading, setIsMaterialCheckLoading] = useState(false);
   const workOrderRowRefs = useRef(new Map());
   const [form, setForm] = useState({
     orderNo: "",
@@ -753,6 +762,43 @@ export default function WorkOrders() {
       isMounted = false;
     };
   }, [form.workDate, form.shiftId, operationAssignments.map((assignment) => `${assignment.routeOperationId}:${assignment.machineId}`).join("|")]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const plannedQuantity = Number(form.plannedQuantity);
+
+    if (!form.productId || !plannedQuantity || plannedQuantity <= 0) {
+      setMaterialCheck(null);
+      setIsMaterialCheckLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsMaterialCheckLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await getMaterialCheck({ productId: form.productId, quantity: plannedQuantity });
+
+        if (isMounted) {
+          setMaterialCheck(result);
+        }
+      } catch (_error) {
+        if (isMounted) {
+          setMaterialCheck(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsMaterialCheckLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timer);
+    };
+  }, [form.productId, form.plannedQuantity]);
 
   function updateProductionForm(field, value) {
     setProductionForm((current) => ({ ...current, [field]: value }));
@@ -1167,6 +1213,54 @@ export default function WorkOrders() {
               ) : null}
             </div>
           ) : null}
+          {form.productId ? (
+            <div className={`material-check-card ${materialCheck?.isStockEnough ? "is-ready" : materialCheck?.hasBom ? "is-warning" : "is-muted"}`}>
+              <div className="material-check-header">
+                <div>
+                  <strong>Malzeme Uygunluğu</strong>
+                  <span>
+                    {isMaterialCheckLoading
+                      ? "Reçete ve stok kontrol ediliyor..."
+                      : materialCheck?.hasBom
+                        ? `${formatQuantity(materialCheck.plannedQuantity)} adet üretim için ${materialCheck.totalBomItems} reçete kalemi kontrol edildi.`
+                        : "Bu ürün için reçete tanımlı değil. MRP kontrolü yapılamıyor."}
+                  </span>
+                </div>
+                {materialCheck?.hasBom ? (
+                  <span className={`material-status-pill ${materialCheck.isStockEnough ? "is-ready" : "is-warning"}`}>
+                    {materialCheck.isStockEnough ? "Stok yeterli" : `${materialCheck.totalShortageItems} eksik kalem`}
+                  </span>
+                ) : null}
+              </div>
+              {materialCheck?.items?.length ? (
+                <div className="material-check-list">
+                  {materialCheck.items.slice(0, 6).map((item) => (
+                    <div className="material-check-row" key={item.productId}>
+                      <div>
+                        <strong>{item.code}</strong>
+                        <span>{item.name}</span>
+                      </div>
+                      <div>
+                        <small>Gerekli</small>
+                        <strong>
+                          {formatQuantity(item.requiredQuantity)} {item.unit}
+                        </strong>
+                      </div>
+                      <div>
+                        <small>Kullanılabilir</small>
+                        <strong>
+                          {formatQuantity(item.availableQuantity)} {item.unit}
+                        </strong>
+                      </div>
+                      <span className={`material-row-pill ${item.isEnough ? "is-ready" : "is-warning"}`}>
+                        {item.isEnough ? "Yeterli" : `${formatQuantity(item.shortageQuantity)} ${item.unit} eksik`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {selectedRoute ? (
             <div className="operation-assignment-panel">
               <div>
@@ -1513,19 +1607,29 @@ export default function WorkOrders() {
                               <div className="work-order-scrap-list">
                                 {scrapLogs.map((log) => (
                                   <article key={log.id} className={`work-order-scrap-card scrap-state-${(log.scrapActionStatus ?? "PENDING").toLowerCase()}`}>
-                                    <div>
-                                      <span className="scrap-card-kicker">{log.workOrderOperation?.operationName ?? "Operasyon"}</span>
-                                      <strong>
-                                        {log.scrapQuantity} fire / {SCRAP_DISPOSITION_LABELS[log.scrapDisposition] ?? log.scrapDisposition ?? "Karar yok"}
-                                      </strong>
-                                      <p>
-                                        Neden: {SCRAP_REASON_LABELS[log.scrapReason] ?? log.scrapReason ?? "-"}
-                                        {log.scrapResolutionQuantity > 0 ? ` · Telafi miktarı: ${log.scrapResolutionQuantity}` : ""}
-                                      </p>
-                                      {log.scrapDispositionNote || log.scrapActionNote ? (
-                                        <small>{[log.scrapDispositionNote, log.scrapActionNote].filter(Boolean).join(" / ")}</small>
-                                      ) : null}
+                                    <div className="scrap-card-flow">
+                                      <div className="scrap-flow-node scrap-flow-source">
+                                        <small>Kaynak operasyon</small>
+                                        <span className="scrap-card-kicker">{log.workOrderOperation?.operationName ?? "Operasyon"}</span>
+                                        <strong>{workOrder.orderNo}</strong>
+                                        <p>
+                                          {log.scrapQuantity} fire · {SCRAP_REASON_LABELS[log.scrapReason] ?? log.scrapReason ?? "-"}
+                                        </p>
+                                      </div>
+                                      <div className="scrap-flow-connector">
+                                        <span />
+                                        <strong>→</strong>
+                                      </div>
+                                      <div className="scrap-flow-node scrap-flow-target">
+                                        <small>Fire kararı ve aksiyon</small>
+                                        <strong>{SCRAP_DISPOSITION_LABELS[log.scrapDisposition] ?? log.scrapDisposition ?? "Karar yok"}</strong>
+                                        <p>{log.scrapResolutionQuantity > 0 ? `${log.scrapResolutionQuantity} adet telafi` : "Ek üretim yok"}</p>
+                                        {log.scrapActionWorkOrderNo ? <em>{log.scrapActionWorkOrderNo}</em> : null}
+                                      </div>
                                     </div>
+                                    {log.scrapDispositionNote || log.scrapActionNote ? (
+                                      <small className="scrap-card-note">{[log.scrapDispositionNote, log.scrapActionNote].filter(Boolean).join(" / ")}</small>
+                                    ) : null}
                                     <div className="scrap-card-action">
                                       <span>{SCRAP_ACTION_STATUS_LABELS[log.scrapActionStatus] ?? log.scrapActionStatus}</span>
                                       {log.scrapActionWorkOrderId ? (

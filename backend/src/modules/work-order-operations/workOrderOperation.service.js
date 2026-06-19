@@ -230,13 +230,6 @@ async function closeSourceWorkOrdersIfScrapActionsCompleted(tx, actionWorkOrder,
       continue;
     }
 
-    const sourceOperationsCompleted =
-      sourceWorkOrder.operations.length === 0 || sourceWorkOrder.operations.every((operation) => operation.status === "COMPLETED");
-
-    if (!sourceOperationsCompleted) {
-      continue;
-    }
-
     const actionLogs = await tx.productionLog.findMany({
       where: {
         workOrderId: sourceWorkOrderId,
@@ -264,22 +257,53 @@ async function closeSourceWorkOrdersIfScrapActionsCompleted(tx, actionWorkOrder,
       continue;
     }
 
+    const sourceOperationProducedQuantity = sourceWorkOrder.operations.reduce(
+      (maxQuantity, operation) => Math.max(maxQuantity, operation.producedQuantity),
+      0
+    );
+    const sourceProducedQuantity = Math.max(sourceWorkOrder.producedQuantity, sourceOperationProducedQuantity);
     const completedActionProducedQuantity = actionWorkOrders
       .filter((linkedAction) => linkedAction.status === "COMPLETED")
       .reduce((total, linkedAction) => total + linkedAction.producedQuantity, 0);
-    const coveredQuantity = sourceWorkOrder.producedQuantity + completedActionProducedQuantity;
+    const coveredQuantity = sourceProducedQuantity + completedActionProducedQuantity;
 
     if (coveredQuantity < sourceWorkOrder.plannedQuantity) {
       continue;
     }
 
+    const nextProducedQuantity = Math.min(sourceWorkOrder.plannedQuantity, coveredQuantity);
+
+    await tx.workOrderOperation.updateMany({
+      where: {
+        workOrderId: sourceWorkOrder.id,
+        status: { not: "COMPLETED" }
+      },
+      data: {
+        status: "COMPLETED",
+        completedAt
+      }
+    });
+
     const closedWorkOrder = await tx.workOrder.update({
       where: { id: sourceWorkOrder.id },
       data: {
         status: "COMPLETED",
+        producedQuantity: nextProducedQuantity,
         actualEndDate: sourceWorkOrder.actualEndDate ?? completedAt
       }
     });
+
+    const firstSourceOperation = sourceWorkOrder.operations.sort((first, second) => first.sequenceNo - second.sequenceNo)[0];
+    if (firstSourceOperation) {
+      await tx.operationMessage.create({
+        data: {
+          workOrderOperationId: firstSourceOperation.id,
+          senderId: actor.id,
+          severity: "INFO",
+          message: `Eksik adetler bağlı telafi iş emri ile kapatıldı. Ana iş emri ${nextProducedQuantity}/${sourceWorkOrder.plannedQuantity} olarak tamamlandı.`
+        }
+      });
+    }
 
     await recordAuditLog(
       {
@@ -294,8 +318,10 @@ async function closeSourceWorkOrdersIfScrapActionsCompleted(tx, actionWorkOrder,
           actionWorkOrderIds,
           plannedQuantity: sourceWorkOrder.plannedQuantity,
           sourceProducedQuantity: sourceWorkOrder.producedQuantity,
+          sourceOperationProducedQuantity,
           completedActionProducedQuantity,
-          coveredQuantity
+          coveredQuantity,
+          appliedProducedQuantity: nextProducedQuantity
         }
       },
       tx
