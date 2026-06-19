@@ -280,6 +280,51 @@ function getPendingGroupedScrapLogs(workOrder) {
   return getScrapLogs(workOrder).filter((log) => !log.scrapActionWorkOrderId && log.scrapActionStatus !== "NOT_REQUIRED");
 }
 
+function getScrapActionSummary(workOrder) {
+  const scrapLogs = getScrapLogs(workOrder);
+
+  return {
+    totalScrapQuantity: scrapLogs.reduce((total, log) => total + Number(log.scrapQuantity ?? 0), 0),
+    createdCount: scrapLogs.filter((log) => Boolean(log.scrapActionWorkOrderId)).length,
+    pendingCount: scrapLogs.filter((log) => !log.scrapActionWorkOrderId && log.scrapActionStatus !== "NOT_REQUIRED").length,
+    noActionCount: scrapLogs.filter((log) => log.scrapActionStatus === "NOT_REQUIRED").length
+  };
+}
+
+function getWorkOrderOpenReason(workOrder) {
+  const displayQuantities = getWorkOrderDisplayQuantities(workOrder);
+  const operations = [...(workOrder.operations ?? [])].sort((first, second) => first.sequenceNo - second.sequenceNo);
+  const pendingScrapCount = getPendingGroupedScrapLogs(workOrder).length;
+  const activeOperation = operations.find((operation) => ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status));
+  const waitingOperation = operations.find((operation) => operation.status === "WAITING");
+
+  if (pendingScrapCount > 0) {
+    return `${pendingScrapCount} fire kaydı için telafi, yeniden işlem veya hurda kararı bekleniyor.`;
+  }
+
+  if (activeOperation?.status === "PAUSED") {
+    return `${activeOperation.operationName} duraklatıldı; üretimin devam etmesi için yeniden başlatılmalı.`;
+  }
+
+  if (activeOperation) {
+    return `${activeOperation.operationName} adımı ${getOperationStatusLabel(activeOperation, workOrder).toLocaleLowerCase("tr-TR")} durumda.`;
+  }
+
+  if (waitingOperation) {
+    return `${waitingOperation.operationName} sırada bekliyor; önceki operasyon tamamlanınca devreye alınacak.`;
+  }
+
+  if (displayQuantities.remainingQuantity > 0) {
+    return `Planlanan miktarın ${displayQuantities.remainingQuantity} adedi henüz kapanmadı.`;
+  }
+
+  if (workOrder.status === "COMPLETED") {
+    return "Tüm operasyonlar ve gerekiyorsa telafi akışı kapanmış görünüyor.";
+  }
+
+  return "Akışta açık bekleyen operasyon yok; durum son üretim kayıtlarına göre izleniyor.";
+}
+
 function getFlowRiskLevel(workOrder) {
   if (workOrder.operations?.some((operation) => isShortCompletedOperation(operation, workOrder))) {
     return "critical";
@@ -1385,6 +1430,8 @@ export default function WorkOrders() {
                 const operationProgress = getOperationProgress(workOrder.operations);
                 const scrapLogs = getScrapLogs(workOrder);
                 const pendingGroupedScrapLogs = getPendingGroupedScrapLogs(workOrder);
+                const scrapActionSummary = getScrapActionSummary(workOrder);
+                const openReason = getWorkOrderOpenReason(workOrder);
 
                 return (
                   <Fragment key={workOrder.id}>
@@ -1457,6 +1504,31 @@ export default function WorkOrders() {
                               <span>Kalan</span>
                               <strong>{operationProgress.remaining}</strong>
                             </div>
+                          </div>
+                          <div className="work-order-flow-explainer">
+                            <div>
+                              <span>Akış Yorumu</span>
+                              <strong>{openReason}</strong>
+                            </div>
+                            <dl>
+                              <div>
+                                <dt>Üretim</dt>
+                                <dd>
+                                  {displayQuantities.producedQuantity}/{workOrder.plannedQuantity}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt>Fire</dt>
+                                <dd>{scrapActionSummary.totalScrapQuantity}</dd>
+                              </div>
+                              <div>
+                                <dt>Telafi</dt>
+                                <dd>
+                                  {scrapActionSummary.createdCount} oluşturuldu
+                                  {scrapActionSummary.pendingCount ? `, ${scrapActionSummary.pendingCount} bekliyor` : ""}
+                                </dd>
+                              </div>
+                            </dl>
                           </div>
                           <div className="work-order-operation-timeline">
                             {workOrder.operations.map((operation, index) => {
@@ -1596,6 +1668,12 @@ export default function WorkOrders() {
                                   <span>Bu iş emrinden doğan fire kararları ve oluşan telafi/rework işleri</span>
                                 </div>
                                 <div className="work-order-scrap-actions">
+                                  <div className="scrap-summary-chips">
+                                    <span>Toplam fire: {scrapActionSummary.totalScrapQuantity}</span>
+                                    <span>Telafi: {scrapActionSummary.createdCount}</span>
+                                    <span>Bekleyen karar: {scrapActionSummary.pendingCount}</span>
+                                    {scrapActionSummary.noActionCount ? <span>Ek üretim yok: {scrapActionSummary.noActionCount}</span> : null}
+                                  </div>
                                   <em>{scrapLogs.length} kayıt</em>
                                   {pendingGroupedScrapLogs.length > 1 ? (
                                     <button type="button" onClick={() => handleCreateGroupedScrapAction(workOrder)}>
