@@ -322,6 +322,10 @@ export async function createProductionLog(actor, data) {
       throw new ApiError(400, "Üretim kaydı operasyonu seçilen iş emrine ait olmalıdır");
     }
 
+    if (operation && data.expectedOperationVersion !== undefined && operation.version !== data.expectedOperationVersion) {
+      throw new ApiError(409, "Bu operasyon başka bir kullanıcı tarafından güncellendi. Lütfen ekranı yenileyip tekrar deneyin.");
+    }
+
     const workOrder = await tx.workOrder.findUnique({
       where: { id: data.workOrderId },
       include: {
@@ -498,14 +502,26 @@ export async function createProductionLog(actor, data) {
     let updatedOperation = null;
 
     if (operation) {
-      updatedOperation = await tx.workOrderOperation.update({
-        where: { id: operation.id },
+      const operationUpdate = await tx.workOrderOperation.updateMany({
+        where: {
+          id: operation.id,
+          version: operation.version
+        },
         data: {
           status: operation.status === "READY" ? "IN_PROGRESS" : operation.status,
           startedAt: operation.startedAt ?? new Date(),
           producedQuantity: { increment: data.producedQuantity },
-          scrapQuantity: { increment: data.scrapQuantity }
-        },
+          scrapQuantity: { increment: data.scrapQuantity },
+          version: { increment: 1 }
+        }
+      });
+
+      if (operationUpdate.count !== 1) {
+        throw new ApiError(409, "Bu operasyon başka bir kullanıcı tarafından güncellendi. Lütfen ekranı yenileyip tekrar deneyin.");
+      }
+
+      updatedOperation = await tx.workOrderOperation.findUnique({
+        where: { id: operation.id },
         include: {
           workOrder: { include: { product: true, route: true } },
           routeOperation: true,

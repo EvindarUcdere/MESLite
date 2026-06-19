@@ -1458,6 +1458,7 @@ export default function App() {
       const productionLog = await createProductionLog({
         workOrderId: selectedProductionWorkOrder.id,
         workOrderOperationId: selectedProductionOperation.id,
+        expectedOperationVersion: selectedProductionOperation.version ?? 0,
         machineId: selectedProductionOperation.machineId,
         producedQuantity: produced,
         scrapQuantity: scrap,

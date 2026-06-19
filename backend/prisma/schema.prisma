@@ -448,6 +448,7 @@ model WorkOrderOperation {
   status             WorkOrderOperationStatus @default(WAITING)
   producedQuantity   Int                      @default(0)
   scrapQuantity      Int                      @default(0)
+  version            Int                      @default(0)
   startedAt          DateTime?
   completedAt        DateTime?
   createdAt          DateTime                 @default(now())
