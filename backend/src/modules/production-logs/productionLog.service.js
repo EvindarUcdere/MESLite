@@ -301,6 +301,10 @@ export function findProductionLogById(id) {
 
 export async function createProductionLog(actor, data) {
   const isZeroQuantityLog = data.producedQuantity === 0 && data.scrapQuantity === 0;
+  const hasScrap = data.scrapQuantity > 0;
+  const shouldDeferScrapDecision = hasScrap && actor.role === "OPERATOR";
+  const effectiveScrapDisposition = shouldDeferScrapDecision ? "PENDING_REVIEW" : data.scrapDisposition;
+  const effectiveScrapResolutionQuantity = shouldDeferScrapDecision ? 0 : data.scrapResolutionQuantity ?? 0;
 
   if (isZeroQuantityLog && !data.note?.trim()) {
     throw new ApiError(400, "Üretim ve fire adedi sıfırsa not girmek zorunludur");
@@ -412,8 +416,8 @@ export async function createProductionLog(actor, data) {
         producedQuantity: data.producedQuantity,
         scrapQuantity: data.scrapQuantity,
         scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
-        scrapDisposition: data.scrapQuantity > 0 ? data.scrapDisposition : null,
-        scrapResolutionQuantity: data.scrapQuantity > 0 ? data.scrapResolutionQuantity ?? 0 : 0,
+        scrapDisposition: data.scrapQuantity > 0 ? effectiveScrapDisposition : null,
+        scrapResolutionQuantity: data.scrapQuantity > 0 ? effectiveScrapResolutionQuantity : 0,
         scrapDispositionNote: data.scrapQuantity > 0 ? data.scrapDispositionNote : null,
         scrapActionStatus: data.scrapQuantity > 0 ? "PENDING" : "NOT_REQUIRED",
         startedAt: data.startedAt ? new Date(data.startedAt) : undefined,
@@ -432,8 +436,10 @@ export async function createProductionLog(actor, data) {
         ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
         {
           type: "SCRAP_RECORDED",
-          title: "Fire kararı girildi",
-          message: `${workOrder.orderNo}: ${data.scrapQuantity} fire - karar ${data.scrapDisposition}`,
+          title: shouldDeferScrapDecision ? "Fire kararı bekliyor" : "Fire kararı girildi",
+          message: shouldDeferScrapDecision
+            ? `${workOrder.orderNo}: ${data.scrapQuantity} fire kaydı için kalite/yönetici kararı bekleniyor.`
+            : `${workOrder.orderNo}: ${data.scrapQuantity} fire - karar ${effectiveScrapDisposition}`,
           entityType: "ProductionLog",
           entityId: log.id,
           metadata: {
@@ -445,14 +451,29 @@ export async function createProductionLog(actor, data) {
             operatorId,
             scrapQuantity: data.scrapQuantity,
             scrapReason: data.scrapReason,
-            scrapDisposition: data.scrapDisposition,
-            scrapResolutionQuantity: data.scrapResolutionQuantity ?? 0
+            scrapDisposition: effectiveScrapDisposition,
+            scrapResolutionQuantity: effectiveScrapResolutionQuantity
           }
         },
         tx
       );
 
-      scrapAction = await createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data });
+      scrapAction = shouldDeferScrapDecision
+        ? {
+            status: "PENDING",
+            note: "Fire kararı kalite/yönetici incelemesi bekliyor."
+          }
+        : await createScrapActionWorkOrder(tx, {
+            actor,
+            workOrder,
+            operation,
+            log,
+            data: {
+              ...data,
+              scrapDisposition: effectiveScrapDisposition,
+              scrapResolutionQuantity: effectiveScrapResolutionQuantity
+            }
+          });
 
       log = await tx.productionLog.update({
         where: { id: log.id },
@@ -583,8 +604,8 @@ export async function createProductionLog(actor, data) {
           producedQuantity: data.producedQuantity,
           scrapQuantity: data.scrapQuantity,
           scrapReason: data.scrapQuantity > 0 ? data.scrapReason : null,
-          scrapDisposition: data.scrapQuantity > 0 ? data.scrapDisposition : null,
-          scrapResolutionQuantity: data.scrapQuantity > 0 ? data.scrapResolutionQuantity ?? 0 : 0,
+          scrapDisposition: data.scrapQuantity > 0 ? effectiveScrapDisposition : null,
+          scrapResolutionQuantity: data.scrapQuantity > 0 ? effectiveScrapResolutionQuantity : 0,
           scrapDispositionNote: data.scrapQuantity > 0 ? data.scrapDispositionNote : null,
           hasNote: Boolean(data.note?.trim()),
           criticalAlert: Boolean(data.isCriticalAlert),

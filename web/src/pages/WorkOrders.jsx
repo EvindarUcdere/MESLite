@@ -621,11 +621,14 @@ export default function WorkOrders() {
 
     const isOpen = (workOrder) => workOrder.status !== "COMPLETED" && workOrder.status !== "CANCELLED";
     const hasShortOperation = (workOrder) => (workOrder.operations ?? []).some((operation) => isShortCompletedOperation(operation, workOrder));
+    const hasPendingScrapDecision = (workOrder) => getPendingGroupedScrapLogs(workOrder).length > 0;
 
     const delayed = filteredWorkOrders.filter((workOrder) => {
       const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
-      return isOpen(workOrder) && (planKey < todayKey || hasShortOperation(workOrder));
+      return isOpen(workOrder) && planKey < todayKey;
     });
+
+    const needsDecision = filteredWorkOrders.filter((workOrder) => isOpen(workOrder) && (hasShortOperation(workOrder) || hasPendingScrapDecision(workOrder)));
 
     const today = filteredWorkOrders.filter((workOrder) => {
       const planKey = getDayKey(getWorkOrderPlanDate(workOrder));
@@ -640,13 +643,15 @@ export default function WorkOrders() {
     return {
       today,
       delayed,
+      needsDecision,
       tomorrow: tomorrowItems,
       all: filteredWorkOrders
     };
   }, [filteredWorkOrders]);
   const quickWorkOrderTabs = [
     { key: "today", label: "Bugün", count: quickWorkOrderBuckets.today.length },
-    { key: "delayed", label: "Geciken / Eksik", count: quickWorkOrderBuckets.delayed.length },
+    { key: "delayed", label: "Geciken", count: quickWorkOrderBuckets.delayed.length },
+    { key: "needsDecision", label: "Eksik / Karar", count: quickWorkOrderBuckets.needsDecision.length },
     { key: "tomorrow", label: "Yarın", count: quickWorkOrderBuckets.tomorrow.length },
     { key: "all", label: "Tüm İşler", count: quickWorkOrderBuckets.all.length }
   ];
@@ -862,6 +867,11 @@ export default function WorkOrders() {
 
       if (hasMissingOperationAssignment) {
         setError("İş emri oluşturmadan önce her operasyon için makine ve operatör seçin.");
+        return;
+      }
+
+      if (materialCheck?.hasBom && !materialCheck.isStockEnough) {
+        setError("Stok yetersiz. Eksik malzemeler tamamlanmadan bu iş emri oluşturulamaz.");
         return;
       }
 
@@ -1140,7 +1150,7 @@ export default function WorkOrders() {
         <div className="section-title-row">
           <div>
             <h2>Operasyon Görünümü</h2>
-            <p className="muted-text">Günlük takip için önce bugünün, geciken/eksik kalan veya yarının iş emirlerini daraltılmış listede görün.</p>
+            <p className="muted-text">Günlük takip için bugünün işleri, geciken işler ve fire/eksik karar bekleyen işleri hızlıca ayırın.</p>
           </div>
         </div>
         <div className="work-order-view-tabs" role="tablist" aria-label="İş emri görünümü">
@@ -1369,7 +1379,11 @@ export default function WorkOrders() {
               })}
             </div>
           ) : null}
-          <button className="primary-button" type="submit" disabled={isSubmitting || !form.routeId || hasMissingOperationAssignment}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={isSubmitting || !form.routeId || hasMissingOperationAssignment || (materialCheck?.hasBom && !materialCheck.isStockEnough)}
+          >
             <Plus size={18} />
             {isSubmitting ? "Oluşturuluyor..." : "Oluştur"}
           </button>

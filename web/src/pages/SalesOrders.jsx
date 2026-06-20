@@ -1,4 +1,14 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, ShoppingCart, Trash2, Wand2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardList,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  ShoppingCart,
+  Trash2,
+  Wand2
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getProducts } from "../api/masterData.api.js";
 import { createSalesOrder, createWorkOrdersFromSalesOrder, getSalesOrderMrp, getSalesOrders } from "../api/salesOrders.api.js";
@@ -11,8 +21,8 @@ const emptyItem = {
 };
 
 const steps = [
-  { id: 1, title: "Sipariş", description: "Müşteri talebi girilir" },
-  { id: 2, title: "MRP Kontrolü", description: "Reçete ve stok kontrol edilir" },
+  { id: 1, title: "Sipariş", description: "Müşteri talebi alınır" },
+  { id: 2, title: "MRP Kontrolü", description: "Reçete ve stok doğrulanır" },
   { id: 3, title: "İş Emri", description: "Uygunsa üretime aktarılır" }
 ];
 
@@ -73,6 +83,11 @@ export default function SalesOrders() {
   const selectedOrder = useMemo(() => salesOrders.find((order) => order.id === selectedOrderId), [salesOrders, selectedOrderId]);
   const shortageItems = useMemo(() => mrpResult?.requirements?.filter((item) => !item.isEnough) ?? [], [mrpResult]);
   const createdWorkOrders = selectedOrder?.workOrders ?? [];
+
+  const formTotalQuantity = useMemo(
+    () => form.items.reduce((total, item) => total + Number(item.quantity || 0), 0),
+    [form.items]
+  );
 
   async function loadMrp(orderId = selectedOrderId) {
     if (!orderId) {
@@ -257,11 +272,11 @@ export default function SalesOrders() {
 
   return (
     <div className="page-stack sales-order-page">
-      <header className="page-header">
+      <header className="page-header sales-order-hero">
         <div>
           <span className="dashboard-eyebrow">Satıştan Üretime</span>
           <h1>Satış Siparişleri ve MRP</h1>
-          <p>Müşteri talebini önce stok ve reçete ile doğrulayın, sonra MES iş emrine dönüştürün.</p>
+          <p>Müşteri talebini önce stok ve reçete ile doğrulayın, sonra güvenli şekilde MES iş emrine dönüştürün.</p>
         </div>
         <button className="secondary-action" type="button" onClick={() => loadData()}>
           <RefreshCw size={16} />
@@ -282,8 +297,10 @@ export default function SalesOrders() {
               onClick={() => setActiveStep(step.id)}
             >
               <span>{step.id}</span>
-              <strong>{step.title}</strong>
-              <small>{step.description}</small>
+              <div>
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </div>
             </button>
           ))}
         </div>
@@ -292,16 +309,16 @@ export default function SalesOrders() {
           <article className="panel sales-flow-main">
             {activeStep === 1 ? (
               <>
-                <div className="panel-heading-row">
+                <div className="panel-heading-row sales-section-heading">
                   <div>
-                    <h2>1. Sipariş Bilgisi</h2>
-                    <p>Bu adım müşteri talebini sisteme alır. Henüz üretim başlatılmaz.</p>
+                    <h2>Sipariş Bilgisi</h2>
+                    <p>Müşteri talebi burada kayıt altına alınır; üretim henüz başlatılmaz.</p>
                   </div>
                   <ShoppingCart size={22} />
                 </div>
 
                 <form className="sales-order-form" onSubmit={handleCreateSalesOrder}>
-                  <div className="form-grid-two">
+                  <div className="form-grid-two sales-form-grid">
                     <label>
                       Sipariş No
                       <input value={form.orderNo} onChange={(event) => updateForm("orderNo", event.target.value)} placeholder="SO-2026-001" required />
@@ -326,8 +343,11 @@ export default function SalesOrders() {
                   </label>
 
                   <div className="sales-order-items">
-                    <div className="panel-heading-row">
-                      <h3>Kalemler</h3>
+                    <div className="panel-heading-row sales-items-heading">
+                      <div>
+                        <h3>Ürün Kalemleri</h3>
+                        <p>{form.items.length} kalem, toplam {formatNumber(formTotalQuantity)} adet</p>
+                      </div>
                       <button className="secondary-action" type="button" onClick={addItem}>
                         <Plus size={16} />
                         Kalem Ekle
@@ -336,7 +356,7 @@ export default function SalesOrders() {
 
                     {form.items.map((item, index) => (
                       <div className="sales-order-item-row" key={`${index}-${item.productId}`}>
-                        <label>
+                        <label className="sales-item-product">
                           Ürün
                           <select value={item.productId} onChange={(event) => updateItem(index, "productId", event.target.value)} required>
                             <option value="">Ürün seç</option>
@@ -347,15 +367,15 @@ export default function SalesOrders() {
                             ))}
                           </select>
                         </label>
-                        <label>
+                        <label className="sales-item-quantity">
                           Adet
                           <input min="1" type="number" value={item.quantity} onChange={(event) => updateItem(index, "quantity", event.target.value)} required />
                         </label>
-                        <label>
+                        <label className="sales-item-note">
                           Not
                           <input value={item.note} onChange={(event) => updateItem(index, "note", event.target.value)} placeholder="Opsiyonel" />
                         </label>
-                        <button className="icon-text-action" type="button" onClick={() => removeItem(index)} disabled={form.items.length === 1}>
+                        <button className="icon-text-action sales-item-remove" type="button" onClick={() => removeItem(index)} disabled={form.items.length === 1}>
                           <Trash2 size={16} />
                           Kaldır
                         </button>
@@ -363,7 +383,7 @@ export default function SalesOrders() {
                     ))}
                   </div>
 
-                  <button className="primary-action" type="submit" disabled={isSubmitting}>
+                  <button className="primary-action sales-submit-action" type="submit" disabled={isSubmitting}>
                     <PackageCheck size={18} />
                     Siparişi Kaydet ve MRP Kontrolüne Geç
                   </button>
@@ -373,10 +393,10 @@ export default function SalesOrders() {
 
             {activeStep === 2 ? (
               <>
-                <div className="panel-heading-row">
+                <div className="panel-heading-row sales-section-heading">
                   <div>
-                    <h2>2. MRP ve Stok Kontrolü</h2>
-                    <p>Ürün reçetesine göre hangi malzemeden ne kadar gerektiği hesaplanır.</p>
+                    <h2>MRP ve Stok Kontrolü</h2>
+                    <p>Ürün reçetesine göre gereken malzemeler hesaplanır ve kullanılabilir stokla karşılaştırılır.</p>
                   </div>
                   {mrpResult?.isMaterialReady ? <CheckCircle2 className="success-icon" /> : <AlertTriangle className="warning-icon" />}
                 </div>
@@ -447,9 +467,9 @@ export default function SalesOrders() {
 
             {activeStep === 3 ? (
               <>
-                <div className="panel-heading-row">
+                <div className="panel-heading-row sales-section-heading">
                   <div>
-                    <h2>3. İş Emrine Dönüştür</h2>
+                    <h2>İş Emrine Dönüştür</h2>
                     <p>Stok uygunsa sipariş kalemleri MES iş emrine çevrilir.</p>
                   </div>
                   <ClipboardList size={22} />
@@ -490,7 +510,7 @@ export default function SalesOrders() {
 
                 <div className="sales-flow-actions">
                   <button className="secondary-action" type="button" onClick={() => setActiveStep(2)}>
-                    MRP’ye Dön
+                    MRP'ye Dön
                   </button>
                   <button className="primary-action" type="button" onClick={handleCreateWorkOrders} disabled={!mrpResult?.isMaterialReady || isSubmitting}>
                     <Wand2 size={18} />

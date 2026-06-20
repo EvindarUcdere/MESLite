@@ -212,6 +212,168 @@ function dateOnlyFromDate(value) {
   return date;
 }
 
+function toNumber(value) {
+  return Number(value ?? 0);
+}
+
+async function getMaterialRequirements(tx, productId, plannedQuantity) {
+  const product = await tx.product.findUnique({
+    where: { id: productId },
+    include: {
+      bomItems: {
+        include: {
+          componentProduct: {
+            include: { stockItem: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!product) {
+    throw new ApiError(404, "Ürün bulunamadı");
+  }
+
+  return product.bomItems.map((item) => {
+    const stockItem = item.componentProduct.stockItem;
+    const requiredQuantity = toNumber(item.quantity) * plannedQuantity * (1 + toNumber(item.wastePercent) / 100);
+    const quantityOnHand = toNumber(stockItem?.quantityOnHand);
+    const reservedQuantity = toNumber(stockItem?.reservedQuantity);
+    const availableQuantity = Math.max(quantityOnHand - reservedQuantity, 0);
+    const shortageQuantity = Math.max(requiredQuantity - availableQuantity, 0);
+
+    return {
+      stockItemId: stockItem?.id ?? null,
+      productId: item.componentProduct.id,
+      code: item.componentProduct.code,
+      name: item.componentProduct.name,
+      unit: item.unit || item.componentProduct.unit,
+      requiredQuantity,
+      quantityOnHand,
+      reservedQuantity,
+      availableQuantity,
+      shortageQuantity
+    };
+  });
+}
+
+function assertMaterialRequirements(requirements) {
+  const shortageItems = requirements.filter((item) => item.shortageQuantity > 0);
+
+  if (shortageItems.length) {
+    const summary = shortageItems
+      .slice(0, 3)
+      .map((item) => `${item.code}: ${item.shortageQuantity.toFixed(2)} ${item.unit} eksik`)
+      .join(", ");
+
+    throw new ApiError(400, `Stok yetersiz. MRP kontrolünden geçmeden iş emri oluşturulamaz. ${summary}`);
+  }
+
+  return {
+    hasBom: requirements.length > 0,
+    isStockEnough: true,
+    shortageItems
+  };
+}
+
+async function reserveMaterialStock(tx, productId, plannedQuantity) {
+  const requirements = await getMaterialRequirements(tx, productId, plannedQuantity);
+  const materialCheck = assertMaterialRequirements(requirements);
+
+  for (const item of requirements) {
+    const stockItem = await tx.stockItem.upsert({
+      where: { productId: item.productId },
+      create: {
+        productId: item.productId,
+        reservedQuantity: item.requiredQuantity
+      },
+      update: {
+        reservedQuantity: {
+          increment: item.requiredQuantity
+        }
+      }
+    });
+
+    const nextReservedQuantity = toNumber(stockItem.reservedQuantity);
+    const quantityOnHand = toNumber(stockItem.quantityOnHand);
+
+    if (nextReservedQuantity > quantityOnHand) {
+      throw new ApiError(400, `${item.code} için stok rezervasyonu yapılamadı. Kullanılabilir stok yetersiz.`);
+    }
+  }
+
+  return materialCheck;
+}
+
+async function consumeReservedMaterialStock(tx, workOrder, actorId) {
+  const requirements = await getMaterialRequirements(tx, workOrder.productId, toNumber(workOrder.plannedQuantity));
+
+  for (const item of requirements) {
+    const stockItem = await tx.stockItem.findUnique({
+      where: { productId: item.productId }
+    });
+
+    if (!stockItem) {
+      throw new ApiError(400, `${item.code} için stok kartı bulunamadı`);
+    }
+
+    const currentQuantity = toNumber(stockItem.quantityOnHand);
+    const currentReservedQuantity = toNumber(stockItem.reservedQuantity);
+    const nextQuantity = currentQuantity - item.requiredQuantity;
+
+    if (nextQuantity < 0) {
+      throw new ApiError(400, `${item.code} stok eksiye düşemez. Mevcut stok: ${currentQuantity}`);
+    }
+
+    const updatedStockItem = await tx.stockItem.update({
+      where: { id: stockItem.id },
+      data: {
+        quantityOnHand: nextQuantity,
+        reservedQuantity: Math.max(currentReservedQuantity - item.requiredQuantity, 0)
+      }
+    });
+
+    await tx.stockMovement.create({
+      data: {
+        stockItemId: stockItem.id,
+        productId: item.productId,
+        type: "CONSUMPTION_OUT",
+        quantity: item.requiredQuantity,
+        balanceAfter: updatedStockItem.quantityOnHand,
+        referenceType: "WorkOrder",
+        referenceId: workOrder.id,
+        note: `${workOrder.orderNo} iş emri malzeme tüketimi`,
+        createdById: actorId
+      }
+    });
+  }
+
+  return requirements;
+}
+
+async function releaseReservedMaterialStock(tx, workOrder) {
+  const requirements = await getMaterialRequirements(tx, workOrder.productId, toNumber(workOrder.plannedQuantity));
+
+  for (const item of requirements) {
+    const stockItem = await tx.stockItem.findUnique({
+      where: { productId: item.productId }
+    });
+
+    if (!stockItem) {
+      continue;
+    }
+
+    await tx.stockItem.update({
+      where: { id: stockItem.id },
+      data: {
+        reservedQuantity: Math.max(toNumber(stockItem.reservedQuantity) - item.requiredQuantity, 0)
+      }
+    });
+  }
+
+  return requirements;
+}
+
 function normalizeText(value) {
   return value?.toLocaleLowerCase("tr-TR") ?? "";
 }
@@ -574,6 +736,8 @@ export async function createWorkOrder(userId, data) {
       }
     });
 
+    const materialCheck = await reserveMaterialStock(tx, data.productId, Number(data.plannedQuantity));
+
     if (route) {
       await tx.workOrderOperation.createMany({
         data: route.operations.map((operation, index) => {
@@ -604,7 +768,11 @@ export async function createWorkOrder(userId, data) {
           plannedQuantity: workOrder.plannedQuantity,
           productId: workOrder.productId,
           routeId: workOrder.routeId,
-          operationCount: route?.operations.length ?? 0
+          operationCount: route?.operations.length ?? 0,
+          materialCheck: {
+            hasBom: materialCheck.hasBom,
+            isStockEnough: materialCheck.isStockEnough
+          }
         }
       },
       tx
@@ -661,6 +829,24 @@ export async function updateWorkOrderStatus(actor, id, status) {
   };
 
   const workOrder = await prisma.$transaction(async (tx) => {
+    const current = await tx.workOrder.findUnique({ where: { id } });
+
+    if (!current) {
+      throw new ApiError(404, "İş emri bulunamadı");
+    }
+
+    if (status === "CANCELLED" && !["COMPLETED", "CANCELLED"].includes(current.status)) {
+      await releaseReservedMaterialStock(tx, current);
+    }
+
+    if (status === "COMPLETED" && current.status !== "COMPLETED") {
+      if (toNumber(current.producedQuantity) <= 0) {
+        throw new ApiError(400, "İş emri tamamlanmadan önce üretim adedi kaydedilmelidir");
+      }
+
+      await consumeReservedMaterialStock(tx, current, actor?.id ?? current.createdById);
+    }
+
     const updated = await tx.workOrder.update({
       where: { id },
       data: { status, ...statusDates },
@@ -1055,6 +1241,8 @@ export async function completeWorkOrder(actor, id) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const consumedMaterials = await consumeReservedMaterialStock(tx, current, actor?.id ?? current.createdById);
+
     const updated = await tx.workOrder.update({
       where: { id },
       data: {
@@ -1085,6 +1273,7 @@ export async function completeWorkOrder(actor, id) {
           plannedQuantity: current.plannedQuantity,
           producedQuantity: current.producedQuantity,
           scrapQuantity: current.scrapQuantity,
+          consumedMaterialCount: consumedMaterials.length,
           managerOverride: actor?.role !== "OPERATOR" && current.producedQuantity < current.plannedQuantity
         }
       },

@@ -64,7 +64,11 @@ function getApiErrorMessage(error, fallback) {
 
 function isQualityOperation(operation) {
   const name = operation.operationName?.toLocaleLowerCase("tr-TR") ?? "";
-  return QUALITY_OPERATION_KEYWORDS.some((keyword) => name.includes(keyword));
+  return operation.routeOperation?.requiresQualityCheck || QUALITY_OPERATION_KEYWORDS.some((keyword) => name.includes(keyword));
+}
+
+function isPastDue(value) {
+  return value ? new Date(value).getTime() < Date.now() : false;
 }
 
 function getQualityPendingItems(workOrders, qualityChecks) {
@@ -76,10 +80,11 @@ function getQualityPendingItems(workOrders, qualityChecks) {
         .filter((operation) => operation.status === "COMPLETED" && operation.producedQuantity > 0 && isQualityOperation(operation) && !checkedOperationIds.has(operation.id))
         .map((operation) => ({
           workOrder,
-          operation
+          operation,
+          isDeliveryOverdue: isPastDue(workOrder.plannedEndDate)
         }))
     )
-    .sort((a, b) => new Date(b.operation.completedAt ?? b.workOrder.updatedAt).getTime() - new Date(a.operation.completedAt ?? a.workOrder.updatedAt).getTime());
+    .sort((a, b) => Number(b.isDeliveryOverdue) - Number(a.isDeliveryOverdue) || new Date(b.operation.completedAt ?? b.workOrder.updatedAt).getTime() - new Date(a.operation.completedAt ?? a.workOrder.updatedAt).getTime());
 }
 
 function getSelectedWorkOrderTrace(workOrder) {
@@ -383,8 +388,8 @@ export default function Quality() {
       <section className="panel">
         <div className="section-title-row">
           <div>
-            <h2>Kalite Sonucu Bekleyen Isler</h2>
-            <p className="muted-text">Mobil kalite operasyonu tamamlanmis ama resmi kalite sonucu henuz girilmemis isler.</p>
+            <h2>Kalite Sonucu Bekleyen İşler</h2>
+            <p className="muted-text">Kalite kontrol gerektiren operasyonu tamamlanmış ama resmi kalite sonucu henüz girilmemiş işler.</p>
           </div>
           <span className="status-pill status-planned">{pendingQualityItems.length} bekliyor</span>
         </div>
@@ -394,6 +399,7 @@ export default function Quality() {
               <div>
                 <strong>{item.workOrder.orderNo}</strong>
                 <span>{item.workOrder.product.name}</span>
+                {item.isDeliveryOverdue ? <em className="quality-overdue-label">Teslim tarihi geçmiş</em> : null}
               </div>
               <div>
                 <span>Operasyon</span>
@@ -413,7 +419,7 @@ export default function Quality() {
               </div>
             </button>
           ))}
-          {!isLoading && pendingQualityItems.length === 0 ? <p className="empty-state">Kalite sonucu bekleyen is yok.</p> : null}
+          {!isLoading && pendingQualityItems.length === 0 ? <p className="empty-state">Kalite sonucu bekleyen iş yok.</p> : null}
         </div>
       </section>
 
