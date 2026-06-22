@@ -168,7 +168,7 @@ async function notifyDuePlannedWorkOrders() {
       continue;
     }
 
-    await createNotificationsForRoles(["ADMIN", "PRODUCTION_MANAGER"], {
+    await createNotificationsForRoles(["PLANNER", "PRODUCTION_MANAGER"], {
       type: "WORK_ORDER_START_DUE",
       title: "Planlı iş emri başlama zamanı geldi",
       message: `${workOrder.orderNo} iş emri planlanan başlangıç tarihine ulaştı. Üretim yöneticisi iş emrini başlatabilir.`,
@@ -1044,7 +1044,7 @@ export async function startWorkOrder(id, actor) {
       tx
     );
 
-    if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && operation?.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+    if (actor?.role === "PRODUCTION_MANAGER" && operation?.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
       const isRestart = targetOperation?.status === "PAUSED";
       await createNotification(
         {
@@ -1065,7 +1065,7 @@ export async function startWorkOrder(id, actor) {
         },
         tx
       );
-    } else if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor?.role) && !operation && updated.assignedOperatorId && updated.assignedOperatorId !== actor.id) {
+    } else if (actor?.role === "PRODUCTION_MANAGER" && !operation && updated.assignedOperatorId && updated.assignedOperatorId !== actor.id) {
       const isRestart = current.status === "PAUSED";
       await createNotification(
         {

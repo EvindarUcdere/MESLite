@@ -11,5 +11,5 @@ export const shiftRoutes = Router();
 shiftRoutes.use(requireAuth);
 shiftRoutes.get("/", asyncHandler(shiftController.list));
 shiftRoutes.get("/:id", asyncHandler(shiftController.detail));
-shiftRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(createShiftSchema), asyncHandler(shiftController.create));
-shiftRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateShiftSchema), asyncHandler(shiftController.update));
+shiftRoutes.post("/", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(createShiftSchema), asyncHandler(shiftController.create));
+shiftRoutes.put("/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(updateShiftSchema), asyncHandler(shiftController.update));

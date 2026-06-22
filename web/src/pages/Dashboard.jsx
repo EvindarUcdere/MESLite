@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowRight, Award, Bell, CheckCircle2, Factory, Flame, Gauge, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Award, Bell, CheckCircle2, ClipboardList, Factory, Flame, Gauge, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
+import { ROLES } from "../utils/roles.js";
 
 const STATUS_COLORS = {
   PLANNED: "#64748b",
@@ -148,6 +149,472 @@ function EmptyDashboardVisual({ icon: Icon = Award, text }) {
         <Icon size={54} strokeWidth={1.5} />
       </span>
       <p>{text}</p>
+    </div>
+  );
+}
+
+function RoleMetricCard({ label, value, hint, icon: Icon, to, tone = "teal" }) {
+  const content = (
+    <>
+      <span className={`role-metric-icon role-metric-${tone}`}>
+        <Icon size={19} />
+      </span>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{hint}</small>
+    </>
+  );
+
+  if (to) {
+    return (
+      <Link className="role-metric-card" to={to}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <article className="role-metric-card">{content}</article>;
+}
+
+function AdminDashboard({ summary, live, isLoading, error, lastUpdatedAt, onRefresh }) {
+  const machineCount = Object.values(summary?.machineStatusCounts ?? {}).reduce((total, value) => total + value, 0);
+  const activeWorkOrderCount = summary?.activeWorkOrders ?? 0;
+  const openAlertCount = summary?.openAlerts ?? 0;
+  const qualityWaitingCount = live?.pendingQualityOperations?.length ?? 0;
+
+  const adminMetrics = [
+    { label: "Aktif İş", value: activeWorkOrderCount, hint: "Sistem genelindeki açık üretim", icon: ClipboardList, to: "/reports#work-order-status", tone: "teal" },
+    { label: "Makine Parkı", value: machineCount, hint: `${summary?.runningMachines ?? 0} çalışıyor`, icon: Factory, to: "/machines", tone: "blue" },
+    { label: "Açık Uyarı", value: openAlertCount, hint: "Operasyonel takip yöneticide", icon: AlertTriangle, to: "/reports#delayed-operations", tone: "amber" },
+    { label: "Kalite Bekleyen", value: qualityWaitingCount, hint: "Kalite ekibi aksiyon alır", icon: ShieldCheck, to: "/reports#quality-results", tone: "green" }
+  ];
+
+  return (
+    <div className="page-stack dashboard-page">
+      <header className="page-header dashboard-header">
+        <div>
+          <span className="dashboard-eyebrow">Sistem Yönetimi</span>
+          <h1>MES Lite Admin</h1>
+          <p>Tanımlar, kullanıcılar, makineler ve sistem sağlığı burada yönetilir. Günlük üretim müdahalesi üretim yöneticisi ekranındadır.</p>
+        </div>
+        <div className="dashboard-header-actions">
+          <div className="live-indicator">
+            <span />
+            {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
+          </div>
+          <button className="secondary-action" type="button" onClick={onRefresh} disabled={isLoading}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+      </header>
+
+      {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="role-metric-grid">
+        {adminMetrics.map((metric) => (
+          <RoleMetricCard key={metric.label} {...metric} value={isLoading ? "..." : metric.value} />
+        ))}
+      </section>
+
+      <section className="role-dashboard-grid">
+        <article className="panel role-dashboard-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Admin Sorumlulukları</h2>
+              <p className="muted-text">Admin günlük üretim kararını değil, sistemin doğru çalışacağı zemini yönetir.</p>
+            </div>
+          </div>
+          <div className="role-action-list">
+            <Link to="/users">Kullanıcı, rol ve mobil giriş bilgileri</Link>
+            <Link to="/products">Ürün, rota ve reçete tanımları</Link>
+            <Link to="/machines">Makine parkı ve yetkinlik temeli</Link>
+            <Link to="/inventory">Stok ve MRP ana verileri</Link>
+            <Link to="/audit-logs">İşlem geçmişi ve izlenebilirlik</Link>
+            <Link to="/event-logs">Sistem olayları ve entegrasyon kayıtları</Link>
+          </div>
+        </article>
+
+        <article className="panel role-dashboard-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Operasyonel Ayrım</h2>
+              <p className="muted-text">Detaylı üretim, fire ve kalite aksiyonları ilgili ekiplerin ekranlarında tutulur.</p>
+            </div>
+          </div>
+          <div className="responsibility-map">
+            <div>
+              <strong>Üretim Yöneticisi</strong>
+              <span>Geciken işler, fire takip kuyruğu, vardiya ve iş emri müdahalesi.</span>
+            </div>
+            <div>
+              <strong>Kalite Personeli</strong>
+              <span>Kalite sonucu, şartlı kabul, red, yeniden işlem ve kalite notları.</span>
+            </div>
+            <div>
+              <strong>Admin</strong>
+              <span>Kullanıcılar, tanımlar, stok altyapısı, rapor erişimi ve sistem izleri.</span>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRefresh }) {
+  const machineCount = Object.values(summary?.machineStatusCounts ?? {}).reduce((total, value) => total + value, 0);
+  const activeWorkOrderCount = summary?.activeWorkOrders ?? 0;
+  const openAlertCount = summary?.openAlerts ?? 0;
+  const qualityWaitingCount = live?.pendingQualityOperations?.length ?? 0;
+  const recentNotes = live?.operatorNotes?.slice(0, 4) ?? [];
+  const scrapPendingCount = live?.scrapTrackingQueue?.filter((item) => item.scrapActionStatus === "PENDING").length ?? 0;
+  const stoppedMachineCount = Object.entries(summary?.machineStatusCounts ?? {})
+    .filter(([status]) => ["STOPPED", "MAINTENANCE"].includes(status))
+    .reduce((total, [, value]) => total + value, 0);
+  const systemHealthScore = Math.max(0, 100 - openAlertCount * 8 - scrapPendingCount * 6 - stoppedMachineCount * 5 - qualityWaitingCount * 3);
+  const healthStatus = systemHealthScore >= 85 ? "Sağlıklı" : systemHealthScore >= 65 ? "Takip gerekli" : "Riskli";
+
+  const adminMetrics = [
+    { label: "Sistem Sağlığı", value: `${systemHealthScore}%`, hint: healthStatus, icon: Gauge, to: "/reports", tone: systemHealthScore >= 85 ? "green" : "amber" },
+    { label: "Aktif İş", value: activeWorkOrderCount, hint: "Sistem genelindeki açık üretim", icon: ClipboardList, to: "/reports#work-order-status", tone: "teal" },
+    { label: "Makine Parkı", value: machineCount, hint: `${summary?.runningMachines ?? 0} çalışıyor, ${stoppedMachineCount} takipte`, icon: Factory, to: "/machines", tone: "blue" },
+    { label: "Açık Uyarı", value: openAlertCount, hint: "Operasyonel aksiyon üretim yöneticisinde", icon: AlertTriangle, to: "/reports#delayed-operations", tone: "amber" },
+    { label: "Fire Kararı", value: scrapPendingCount, hint: "Kalite/üretim kararı bekleyen kayıt", icon: Flame, to: "/notifications", tone: "red" },
+    { label: "Kalite Bekleyen", value: qualityWaitingCount, hint: "Kalite ekibi aksiyon alir", icon: ShieldCheck, to: "/reports#quality-results", tone: "green" }
+  ];
+
+  const controlItems = [
+    { title: "Kullanıcı ve rol yönetimi", description: "Yeni çalışanların web/mobil erişimi, pasife alma ve rol ayrımı.", to: "/users", status: "Admin aksiyonu" },
+    { title: "Ana veri bütünlüğü", description: "Ürün, rota, reçete, makine ve stok tanımlarının üretimden önce hazır olması.", to: "/products", status: "Tanım kontrolü" },
+    { title: "İzlenebilirlik", description: "Kim hangi üretim, kalite, fire veya yetki aksiyonunu yaptı takip edilir.", to: "/audit-logs", status: "Audit" },
+    { title: "Sistem olayları", description: "Domain event kayıtları, bildirim ve entegrasyon davranışlarını doğrular.", to: "/event-logs", status: "Teknik iz" }
+  ];
+
+  const roleBoundaries = [
+    { role: "Planlama", responsibility: "Satış siparişi, MRP, iş emri ve vardiya hazırlığı", to: "/sales-orders" },
+    { role: "Üretim Yöneticisi", responsibility: "Canlı üretim, duruş, gecikme ve operasyon müdahalesi", to: "/reports#delayed-operations" },
+    { role: "Kalite", responsibility: "Kalite sonucu, red, şartlı kabul, yeniden işlem ve kalite notları", to: "/reports#quality-results" },
+    { role: "Admin", responsibility: "Kullanıcı, rol, sistem tanımları, audit ve erişim güvenliği", to: "/users" }
+  ];
+
+  return (
+    <div className="page-stack dashboard-page">
+      <header className="page-header dashboard-header">
+        <div>
+          <span className="dashboard-eyebrow">Sistem Yönetimi</span>
+          <h1>MES Lite Admin</h1>
+          <p>Kullanıcı, yetki, ana veri ve sistem izlenebilirliğini yönetin. Günlük üretim müdahalesi ilgili operasyon rollerinde kalır.</p>
+        </div>
+        <div className="dashboard-header-actions">
+          <div className="live-indicator">
+            <span />
+            {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
+          </div>
+          <button className="secondary-action" type="button" onClick={onRefresh} disabled={isLoading}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+      </header>
+
+      {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="role-metric-grid admin-metric-grid">
+        {adminMetrics.map((metric) => (
+          <RoleMetricCard key={metric.label} {...metric} value={isLoading ? "..." : metric.value} />
+        ))}
+      </section>
+
+      <section className="admin-analysis-grid">
+        <article className="panel admin-system-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Sistem Kontrol Merkezi</h2>
+              <p className="muted-text">Admin üretim kararı vermez; üretimin doğru çalışacağı veriyi, yetkiyi ve izleri yönetir.</p>
+            </div>
+          </div>
+          <div className="admin-control-list">
+            {controlItems.map((item) => (
+              <Link key={item.title} to={item.to} className="admin-control-item">
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.description}</small>
+                </span>
+                <em>{item.status}</em>
+                <ArrowRight size={16} />
+              </Link>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel admin-system-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Rol Ayrımı Analizi</h2>
+              <p className="muted-text">Üretim süreci tek kişide toplanmaz; her rol kendi karar alanında çalışır.</p>
+            </div>
+          </div>
+          <div className="admin-role-boundary-list">
+            {roleBoundaries.map((item) => (
+              <Link key={item.role} to={item.to}>
+                <span>{item.role}</span>
+                <strong>{item.responsibility}</strong>
+              </Link>
+            ))}
+          </div>
+        </article>
+      </section>
+
+      <section className="admin-analysis-grid">
+        <article className="panel admin-system-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Operasyonel Risk Özeti</h2>
+              <p className="muted-text">Admin müdahale etmez; riskin doğru role düştüğünü kontrol eder.</p>
+            </div>
+          </div>
+          <div className="admin-risk-list">
+            <div className={openAlertCount > 0 ? "is-warning" : "is-ok"}>
+              <AlertTriangle size={18} />
+              <span>Açık uyarı</span>
+              <strong>{isLoading ? "..." : openAlertCount}</strong>
+            </div>
+            <div className={scrapPendingCount > 0 ? "is-warning" : "is-ok"}>
+              <Flame size={18} />
+              <span>Fire kararı bekleyen</span>
+              <strong>{isLoading ? "..." : scrapPendingCount}</strong>
+            </div>
+            <div className={qualityWaitingCount > 0 ? "is-warning" : "is-ok"}>
+              <ShieldCheck size={18} />
+              <span>Kalite sonucu bekleyen</span>
+              <strong>{isLoading ? "..." : qualityWaitingCount}</strong>
+            </div>
+            <div className={stoppedMachineCount > 0 ? "is-warning" : "is-ok"}>
+              <Factory size={18} />
+              <span>Duruş/bakım makinesi</span>
+              <strong>{isLoading ? "..." : stoppedMachineCount}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="panel admin-system-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Son Saha Sinyalleri</h2>
+              <p className="muted-text">Operatör notları ve saha mesajları sistemin canlılığını gösterir.</p>
+            </div>
+            <Link to="/field-notes" className="section-link">Tüm notlar</Link>
+          </div>
+          <div className="admin-signal-list">
+            {recentNotes.map((log) => (
+              <Link key={log.id} to="/field-notes">
+                <span>{log.workOrder?.orderNo ?? "-"}</span>
+                <strong>{log.note}</strong>
+                <small>{log.operator?.name ?? "-"} - {formatDateShort(log.createdAt)}</small>
+              </Link>
+            ))}
+            {!isLoading && recentNotes.length === 0 ? (
+              <div className="admin-empty-state">
+                <Bell size={22} />
+                Henüz saha notu yok.
+              </div>
+            ) : null}
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function PlannerDashboard({ summary, live, isLoading, error, lastUpdatedAt, onRefresh }) {
+  const activeWorkOrderCount = summary?.activeWorkOrders ?? 0;
+  const overdueWorkOrders = live?.interventionQueue?.filter((workOrder) => isWorkOrderOverdue(workOrder)) ?? [];
+  const scrapDecisionQueue = live?.scrapTrackingQueue?.filter((item) => item.scrapActionStatus === "PENDING") ?? [];
+  const plannedWorkOrders = Object.entries(summary?.workOrderStatusCounts ?? {}).find(([status]) => status === "PLANNED")?.[1] ?? 0;
+
+  const plannerMetrics = [
+    { label: "Planlı İş", value: plannedWorkOrders, hint: "Başlatılmayı bekleyen iş emirleri", icon: ClipboardList, to: "/work-orders", tone: "blue" },
+    { label: "Aktif İş", value: activeWorkOrderCount, hint: "Üretim akışındaki işler", icon: Factory, to: "/work-orders", tone: "teal" },
+    { label: "Geciken İş", value: overdueWorkOrders.length, hint: "Termin riski olan işler", icon: AlertTriangle, to: "/work-orders", tone: "amber" },
+    { label: "Fire Kararı", value: scrapDecisionQueue.length, hint: "Planı etkileyebilecek eksikler", icon: Flame, to: "/alerts", tone: "red" }
+  ];
+
+  return (
+    <div className="page-stack dashboard-page">
+      <header className="page-header dashboard-header">
+        <div>
+          <span className="dashboard-eyebrow">Planlama Kokpiti</span>
+          <h1>Üretim Planlama</h1>
+          <p>Satış talebinden MRP kontrolüne, vardiya planından iş emrine kadar üretime hazırlık akışını yönetin.</p>
+        </div>
+        <div className="dashboard-header-actions">
+          <div className="live-indicator">
+            <span />
+            {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
+          </div>
+          <button className="secondary-action" type="button" onClick={onRefresh} disabled={isLoading}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+      </header>
+
+      {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="role-metric-grid">
+        {plannerMetrics.map((metric) => (
+          <RoleMetricCard key={metric.label} {...metric} value={isLoading ? "..." : metric.value} />
+        ))}
+      </section>
+
+      <section className="role-dashboard-grid">
+        <article className="panel action-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Planlama Akışı</h2>
+              <p className="muted-text">Planner rolü üretim yapmaz; üretime girecek işi hazırlar ve kaynak uygunluğunu kontrol eder.</p>
+            </div>
+          </div>
+          <div className="role-responsibility-list">
+            <Link to="/sales-orders">
+              <strong>1. Satış & MRP</strong>
+              <span>Müşteri talebini gir, reçete ve stok yeterliliğini kontrol et.</span>
+            </Link>
+            <Link to="/work-orders">
+              <strong>2. İş Emirleri</strong>
+              <span>Uygun siparişi iş emrine çevir, rota ve operasyon atamalarını planla.</span>
+            </Link>
+            <Link to="/shift-planning">
+              <strong>3. Vardiya Planı</strong>
+              <span>Operatör, makine yetkinliği ve vardiya uygunluğunu aylık planda düzenle.</span>
+            </Link>
+            <Link to="/inventory">
+              <strong>4. Stok</strong>
+              <span>Malzeme rezervasyonlarını ve üretimi bloke edebilecek eksikleri izle.</span>
+            </Link>
+          </div>
+        </article>
+
+        <article className="panel action-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Planlama Riski</h2>
+              <p className="muted-text">Termin, fire telafisi ve stok etkisi yaratan kayıtlar burada öne çıkar.</p>
+            </div>
+          </div>
+          <div className="priority-list">
+            {overdueWorkOrders.slice(0, 6).map((workOrder) => (
+              <Link className="priority-row" key={workOrder.id} to={`/work-orders?workOrderId=${workOrder.id}`}>
+                <div>
+                  <strong>{workOrder.orderNo}</strong>
+                  <span>{workOrder.product?.name ?? "Ürün belirtilmemiş"}</span>
+                </div>
+                <div>
+                  <span>{formatDateShort(workOrder.plannedEndDate)}</span>
+                  <small>Termin geçti</small>
+                </div>
+              </Link>
+            ))}
+            {!isLoading && overdueWorkOrders.length === 0 ? <EmptyDashboardVisual icon={PackageCheck} text="Planlama riski görünmüyor." /> : null}
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function QualityDashboard({ live, isLoading, error, lastUpdatedAt, onRefresh }) {
+  const pendingQualityOperations = live?.pendingQualityOperations ?? [];
+  const scrapTrackingQueue = live?.scrapTrackingQueue ?? [];
+  const qualityRelevantScrap = scrapTrackingQueue.filter((item) => ["PENDING_REVIEW", "REWORK", "CONDITIONAL_ACCEPT"].includes(item.scrapDisposition));
+  const latestQualityNotes = (live?.operatorNotes ?? []).filter((log) => String(log.note ?? "").toLocaleLowerCase("tr-TR").includes("kalite")).slice(0, 4);
+
+  return (
+    <div className="page-stack dashboard-page">
+      <header className="page-header dashboard-header">
+        <div>
+          <span className="dashboard-eyebrow">Kalite Kokpiti</span>
+          <h1>Kalite Takip Paneli</h1>
+          <p>Kalite sonucu bekleyen üretimleri, fire kararlarını ve saha notlarını tek ekrandan takip edin.</p>
+        </div>
+        <div className="dashboard-header-actions">
+          <div className="live-indicator">
+            <span />
+            {lastUpdatedAt ? `Canlı - ${lastUpdatedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Canlı bağlantı"}
+          </div>
+          <button className="secondary-action" type="button" onClick={onRefresh} disabled={isLoading}>
+            <RefreshCw size={16} />
+            Yenile
+          </button>
+        </div>
+      </header>
+
+      {error ? <p className="form-error">{error}</p> : null}
+
+      <section className="role-metric-grid">
+        <RoleMetricCard label="Kalite Bekleyen" value={isLoading ? "..." : pendingQualityOperations.length} hint="Sonuç girilecek operasyon" icon={ShieldCheck} to="/quality" tone="green" />
+        <RoleMetricCard label="Fire İncelemesi" value={isLoading ? "..." : qualityRelevantScrap.length} hint="Kalite kararı gerektiren kayıt" icon={AlertTriangle} to="/alerts" tone="amber" />
+        <RoleMetricCard label="Saha Notu" value={isLoading ? "..." : latestQualityNotes.length} hint="Kalite içeren son notlar" icon={Bell} to="/field-notes" tone="blue" />
+      </section>
+
+      <section className="dashboard-action-grid">
+        <article className="panel action-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Kalite Sonucu Bekleyenler</h2>
+              <p className="muted-text">Üretim tamamlanmış ama resmi kalite kararı girilmemiş operasyonlar.</p>
+            </div>
+            <Link className="text-link" to="/quality">
+              Kalite ekranı <ArrowRight size={15} />
+            </Link>
+          </div>
+          <div className="priority-list">
+            {pendingQualityOperations.slice(0, 8).map((operation) => (
+              <Link className="priority-row" key={operation.id} to="/quality">
+                <div>
+                  <strong>{operation.workOrder.orderNo}</strong>
+                  <span>
+                    {operation.sequenceNo}. {operation.operationName}
+                  </span>
+                </div>
+                <div>
+                  <span>{operation.producedQuantity} adet</span>
+                  <small>{getMachineLabel(operation.machine)}</small>
+                </div>
+              </Link>
+            ))}
+            {!isLoading && pendingQualityOperations.length === 0 ? <EmptyDashboardVisual icon={Award} text="Kalite bekleyen operasyon yok." /> : null}
+          </div>
+        </article>
+
+        <article className="panel action-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Fire Kararı Bekleyenler</h2>
+              <p className="muted-text">Hurda, yeniden işlem, şartlı kabul veya yönetici incelemesi gerektiren kayıtlar.</p>
+            </div>
+            <Link className="text-link" to="/alerts">
+              Uyarılar <ArrowRight size={15} />
+            </Link>
+          </div>
+          <div className="priority-list">
+            {qualityRelevantScrap.slice(0, 8).map((item) => (
+              <Link className="priority-row" key={item.id} to={item.scrapActionWorkOrderId ? `/work-orders?workOrderId=${item.scrapActionWorkOrderId}` : "/work-orders"}>
+                <div>
+                  <strong>{item.orderNo}</strong>
+                  <span>{item.operationName ?? "Operasyon belirtilmemiş"}</span>
+                </div>
+                <div>
+                  <span>{item.logScrapQuantity} fire</span>
+                  <small>{SCRAP_DISPOSITION_LABELS[item.scrapDisposition] ?? item.scrapDisposition}</small>
+                </div>
+              </Link>
+            ))}
+            {!isLoading && qualityRelevantScrap.length === 0 ? <p className="empty-state">Kalite kararı bekleyen fire kaydı yok.</p> : null}
+          </div>
+        </article>
+      </section>
     </div>
   );
 }
@@ -330,6 +797,18 @@ export default function Dashboard() {
   const machineStatusTotal = machineStatusData.reduce((total, item) => total + item.value, 0);
   const workOrderStatusTotal = workOrderStatusData.reduce((total, item) => total + item.value, 0);
   const qualityStatusTotal = qualityStatusData.reduce((total, item) => total + item.value, 0);
+
+  if (user?.role === ROLES.ADMIN) {
+    return <AdminDashboardV2 summary={summary} live={live} isLoading={isLoading} error={error} lastUpdatedAt={lastUpdatedAt} onRefresh={() => loadDashboard({ showLoading: true })} />;
+  }
+
+  if (user?.role === ROLES.PLANNER) {
+    return <PlannerDashboard summary={summary} live={live} isLoading={isLoading} error={error} lastUpdatedAt={lastUpdatedAt} onRefresh={() => loadDashboard({ showLoading: true })} />;
+  }
+
+  if (user?.role === ROLES.QUALITY_STAFF) {
+    return <QualityDashboard live={live} isLoading={isLoading} error={error} lastUpdatedAt={lastUpdatedAt} onRefresh={() => loadDashboard({ showLoading: true })} />;
+  }
 
   return (
     <div className="page-stack dashboard-page">

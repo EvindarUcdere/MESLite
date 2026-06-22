@@ -17,13 +17,13 @@ export const shiftPlanningRoutes = Router();
 shiftPlanningRoutes.use(requireAuth);
 
 shiftPlanningRoutes.get("/groups", asyncHandler(shiftPlanningController.listGroups));
-shiftPlanningRoutes.post("/groups", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(upsertGroupSchema), asyncHandler(shiftPlanningController.createGroup));
-shiftPlanningRoutes.put("/groups/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateGroupSchema), asyncHandler(shiftPlanningController.updateGroup));
-shiftPlanningRoutes.delete("/groups/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), asyncHandler(shiftPlanningController.removeGroup));
+shiftPlanningRoutes.post("/groups", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(upsertGroupSchema), asyncHandler(shiftPlanningController.createGroup));
+shiftPlanningRoutes.put("/groups/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(updateGroupSchema), asyncHandler(shiftPlanningController.updateGroup));
+shiftPlanningRoutes.delete("/groups/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), asyncHandler(shiftPlanningController.removeGroup));
 
 shiftPlanningRoutes.get("/templates", asyncHandler(shiftPlanningController.listTemplates));
-shiftPlanningRoutes.post("/templates", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(upsertTemplateSchema), asyncHandler(shiftPlanningController.createTemplate));
-shiftPlanningRoutes.put("/templates/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateTemplateSchema), asyncHandler(shiftPlanningController.updateTemplate));
-shiftPlanningRoutes.delete("/templates/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), asyncHandler(shiftPlanningController.removeTemplate));
+shiftPlanningRoutes.post("/templates", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(upsertTemplateSchema), asyncHandler(shiftPlanningController.createTemplate));
+shiftPlanningRoutes.put("/templates/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(updateTemplateSchema), asyncHandler(shiftPlanningController.updateTemplate));
+shiftPlanningRoutes.delete("/templates/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), asyncHandler(shiftPlanningController.removeTemplate));
 
-shiftPlanningRoutes.post("/generate-monthly", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(generateMonthlyPlanSchema), asyncHandler(shiftPlanningController.generateMonthlyPlan));
+shiftPlanningRoutes.post("/generate-monthly", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(generateMonthlyPlanSchema), asyncHandler(shiftPlanningController.generateMonthlyPlan));

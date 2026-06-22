@@ -11,19 +11,19 @@ export const productionAlertRoutes = Router();
 productionAlertRoutes.use(requireAuth);
 productionAlertRoutes.get(
   "/",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"),
+  allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"),
   validate(listProductionAlertsSchema),
   asyncHandler(productionAlertController.list)
 );
 productionAlertRoutes.patch(
   "/:id",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"),
+  allowRoles("PRODUCTION_MANAGER", "QUALITY_STAFF"),
   validate(updateProductionAlertSchema),
   asyncHandler(productionAlertController.update)
 );
 productionAlertRoutes.post(
   "/:id/quality-action",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER"),
+  allowRoles("QUALITY_STAFF"),
   validate(decideQualityActionSchema),
   asyncHandler(productionAlertController.decideQualityAction)
 );

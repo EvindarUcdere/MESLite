@@ -270,6 +270,7 @@ export default function Users() {
           Rol
           <select value={state.role} onChange={(event) => updater("role", event.target.value)} required>
             <option value="OPERATOR">Operatör</option>
+            <option value="PLANNER">Planlama</option>
             <option value="PRODUCTION_MANAGER">Üretim Yöneticisi</option>
             <option value="QUALITY_STAFF">Kalite Personeli</option>
             <option value="VIEWER">İzleyici</option>

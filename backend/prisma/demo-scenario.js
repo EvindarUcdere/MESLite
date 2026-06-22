@@ -416,6 +416,7 @@ async function main() {
 
   const [admin, manager, cuttingOperator, assemblyOperator, qualityOperator, qualityStaff] = await Promise.all([
     upsertUser({ email: "admin@meslite.local", name: "MES Lite Admin", role: "ADMIN" }),
+    upsertUser({ email: "planner@meslite.local", name: "Planlama Uzmanı", role: "PLANNER" }),
     upsertUser({ email: "manager@meslite.local", name: "Üretim Yöneticisi", role: "PRODUCTION_MANAGER" }),
     upsertUser({ email: "operator@meslite.local", name: "Line Operator", role: "OPERATOR" }),
     upsertUser({ email: "assembly.operator@meslite.local", name: "Ali Kaya", role: "OPERATOR" }),

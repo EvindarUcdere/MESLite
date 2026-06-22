@@ -9,7 +9,7 @@ import { createProductRouteSchema, updateProductRouteSchema } from "./productRou
 export const productRouteRoutes = Router();
 
 productRouteRoutes.use(requireAuth);
-productRouteRoutes.get("/", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productRouteController.list));
-productRouteRoutes.get("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productRouteController.detail));
-productRouteRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(createProductRouteSchema), asyncHandler(productRouteController.create));
-productRouteRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateProductRouteSchema), asyncHandler(productRouteController.update));
+productRouteRoutes.get("/", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productRouteController.list));
+productRouteRoutes.get("/:id", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(productRouteController.detail));
+productRouteRoutes.post("/", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER"), validate(createProductRouteSchema), asyncHandler(productRouteController.create));
+productRouteRoutes.put("/:id", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER"), validate(updateProductRouteSchema), asyncHandler(productRouteController.update));

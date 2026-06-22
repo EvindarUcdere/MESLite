@@ -237,7 +237,7 @@ async function findQualityActionOwner(tx) {
   }
 
   return tx.user.findFirst({
-    where: { role: "ADMIN", isActive: true },
+    where: { role: "QUALITY_STAFF", isActive: true },
     orderBy: { createdAt: "asc" },
     select: { id: true }
   });
@@ -282,7 +282,7 @@ async function createQualityActionIfNeeded(tx, { actor, workOrder, selectedOpera
   });
 
   await createNotificationsForRoles(
-    ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+    ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
     {
       type: "QUALITY_NONCONFORMITY",
       title: "Kalite uygunsuzlugu aksiyonu",

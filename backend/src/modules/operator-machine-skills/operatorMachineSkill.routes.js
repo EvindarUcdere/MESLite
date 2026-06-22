@@ -14,6 +14,6 @@ export const operatorMachineSkillRoutes = Router();
 
 operatorMachineSkillRoutes.use(requireAuth);
 operatorMachineSkillRoutes.get("/", validate(listOperatorMachineSkillsSchema), asyncHandler(operatorMachineSkillController.list));
-operatorMachineSkillRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(upsertOperatorMachineSkillSchema), asyncHandler(operatorMachineSkillController.upsert));
-operatorMachineSkillRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateOperatorMachineSkillSchema), asyncHandler(operatorMachineSkillController.update));
-operatorMachineSkillRoutes.delete("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), asyncHandler(operatorMachineSkillController.remove));
+operatorMachineSkillRoutes.post("/", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(upsertOperatorMachineSkillSchema), asyncHandler(operatorMachineSkillController.upsert));
+operatorMachineSkillRoutes.put("/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(updateOperatorMachineSkillSchema), asyncHandler(operatorMachineSkillController.update));
+operatorMachineSkillRoutes.delete("/:id", allowRoles("PLANNER", "PRODUCTION_MANAGER"), asyncHandler(operatorMachineSkillController.remove));

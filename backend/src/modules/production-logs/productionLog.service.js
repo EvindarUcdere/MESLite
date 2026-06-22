@@ -214,7 +214,7 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
   }
 
   await createNotificationsForRoles(
-    ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+    ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
     {
       type: isRework ? "SCRAP_REWORK_ORDER_CREATED" : "SCRAP_REPRODUCTION_ORDER_CREATED",
       title: isRework ? "Yeniden işlem emri oluşturuldu" : "Telafi üretim emri oluşturuldu",
@@ -433,7 +433,7 @@ export async function createProductionLog(actor, data) {
 
     if (data.scrapQuantity > 0) {
       await createNotificationsForRoles(
-        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
         {
           type: "SCRAP_RECORDED",
           title: shouldDeferScrapDecision ? "Fire kararı bekliyor" : "Fire kararı girildi",
@@ -501,7 +501,7 @@ export async function createProductionLog(actor, data) {
       });
 
       await createNotificationsForRoles(
-        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        ["PRODUCTION_MANAGER", "QUALITY_STAFF"],
         {
           type: "CRITICAL_PRODUCTION_ALERT",
           title: "Kritik üretim uyarısı",
@@ -920,7 +920,7 @@ export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, d
     }
 
     await createNotificationsForRoles(
-      ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+      ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
       {
         type: "GROUPED_SCRAP_REPRODUCTION_ORDER_CREATED",
         title: "Toplu telafi üretim emri oluşturuldu",

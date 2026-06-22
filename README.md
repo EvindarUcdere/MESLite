@@ -370,9 +370,10 @@ Report areas:
 
 | Role | Main Responsibility |
 | --- | --- |
-| `ADMIN` | Full system access, master data and user management |
-| `PRODUCTION_MANAGER` | Work order planning, monitoring, overrides, reports |
-| `QUALITY_STAFF` | Quality checks and quality-related follow-up |
+| `ADMIN` | User management, authorization, audit visibility and system-level administration |
+| `PLANNER` | Sales order intake, MRP checks, work order creation, shift planning and operation assignment |
+| `PRODUCTION_MANAGER` | Live production monitoring, operation interventions, downtime follow-up and reports |
+| `QUALITY_STAFF` | Quality checks, nonconformity follow-up and scrap/rework decisions |
 | `OPERATOR` | Mobile production entry, operation status, notes, downtime |
 
 ## Demo Users
@@ -386,6 +387,7 @@ Admin123!
 | User | Email | Role |
 | --- | --- | --- |
 | MES Lite Admin | `admin@meslite.local` | `ADMIN` |
+| Planning Specialist | `planner@meslite.local` | `PLANNER` |
 | Production Manager | `manager@meslite.local` | `PRODUCTION_MANAGER` |
 | Line Operator | `operator@meslite.local` | `OPERATOR` |
 | Ali Kaya | `assembly.operator@meslite.local` | `OPERATOR` |

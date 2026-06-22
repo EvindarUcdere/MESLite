@@ -12,16 +12,16 @@ workOrderRoutes.use(requireAuth);
 workOrderRoutes.get("/", asyncHandler(workOrderController.list));
 workOrderRoutes.get("/available-operators", validate(availableOperatorsSchema), asyncHandler(workOrderController.availableOperators));
 workOrderRoutes.get("/:id", asyncHandler(workOrderController.detail));
-workOrderRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(createWorkOrderSchema), asyncHandler(workOrderController.create));
-workOrderRoutes.patch("/:id/status", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(updateStatusSchema), asyncHandler(workOrderController.updateStatus));
-workOrderRoutes.patch("/:id/assign-operator", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(assignOperatorSchema), asyncHandler(workOrderController.assignOperator));
-workOrderRoutes.patch("/:id/assign-machine", allowRoles("ADMIN", "PRODUCTION_MANAGER"), validate(assignMachineSchema), asyncHandler(workOrderController.assignMachine));
-workOrderRoutes.post("/:id/start", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.start));
-workOrderRoutes.post("/:id/pause", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.pause));
-workOrderRoutes.post("/:id/complete", allowRoles("ADMIN", "PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.complete));
+workOrderRoutes.post("/", allowRoles("PLANNER"), validate(createWorkOrderSchema), asyncHandler(workOrderController.create));
+workOrderRoutes.patch("/:id/status", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(updateStatusSchema), asyncHandler(workOrderController.updateStatus));
+workOrderRoutes.patch("/:id/assign-operator", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(assignOperatorSchema), asyncHandler(workOrderController.assignOperator));
+workOrderRoutes.patch("/:id/assign-machine", allowRoles("PLANNER", "PRODUCTION_MANAGER"), validate(assignMachineSchema), asyncHandler(workOrderController.assignMachine));
+workOrderRoutes.post("/:id/start", allowRoles("PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.start));
+workOrderRoutes.post("/:id/pause", allowRoles("PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.pause));
+workOrderRoutes.post("/:id/complete", allowRoles("PRODUCTION_MANAGER", "OPERATOR"), asyncHandler(workOrderController.complete));
 workOrderRoutes.post(
   "/:id/grouped-scrap-action",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"),
+  allowRoles("PRODUCTION_MANAGER", "QUALITY_STAFF"),
   validate(groupedScrapActionSchema),
   asyncHandler(workOrderController.createGroupedScrapAction)
 );

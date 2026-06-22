@@ -29,25 +29,27 @@ export function AppRoutes() {
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/notifications" element={<Notifications />} />
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.managementPlusQuality} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.operationsAndQuality} />}>
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/field-notes" element={<FieldNotes />} />
           </Route>
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planningWork} />}>
             <Route path="/work-orders" element={<WorkOrders />} />
             <Route path="/sales-orders" element={<SalesOrders />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/routes" element={<RouteManagement />} />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.shiftPlanningWork} />}>
             <Route path="/shift-planning" element={<ShiftPlanning />} />
           </Route>
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.planning} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.masterData} />}>
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/routes" element={<RouteManagement />} />
             <Route path="/products" element={<Products />} />
             <Route path="/machines" element={<Machines />} />
           </Route>
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.quality} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.qualityWork} />}>
             <Route path="/quality" element={<Quality />} />
           </Route>
-          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.management} />}>
+          <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.reports} />}>
             <Route path="/reports" element={<Reports />} />
             <Route path="/audit-logs" element={<AuditLogs />} />
             <Route path="/event-logs" element={<EventLogs />} />

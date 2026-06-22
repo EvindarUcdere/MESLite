@@ -169,6 +169,7 @@ async function seedUsers() {
   });
 
   const admin = await upsertUser({ name: "MES Lite Admin", email: "admin@meslite.local", role: "ADMIN", profile: { employeeCode: "ADM-0001", department: "Bilgi Sistemleri", position: "Sistem Yöneticisi", phone: "+90 555 100 00 01" } });
+  await upsertUser({ name: "Planlama Uzmanı Deniz Aksoy", email: "planner@meslite.local", role: "PLANNER", profile: { employeeCode: "PLN-0001", department: "Üretim Planlama", position: "Planlama Uzmanı", phone: "+90 555 100 00 05" } });
   const manager = await upsertUser({ name: "Üretim Müdürü Selim Arda", email: "manager@meslite.local", role: "PRODUCTION_MANAGER" });
   const qualityStaff = await upsertUser({ name: "Kalite Sorumlusu Ebru Kaya", email: "quality@meslite.local", role: "QUALITY_STAFF" });
   await upsertUser({ name: "Yönetim Gözlemcisi", email: "viewer@meslite.local", role: "VIEWER" });

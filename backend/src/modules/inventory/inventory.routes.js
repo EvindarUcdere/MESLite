@@ -14,13 +14,13 @@ inventoryRoutes.get("/movements", asyncHandler(inventoryController.listStockMove
 inventoryRoutes.get("/material-check", validate(materialCheckSchema), asyncHandler(inventoryController.materialCheck));
 inventoryRoutes.patch(
   "/stock-items/:productId",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER"),
+  allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER"),
   validate(updateStockItemSchema),
   asyncHandler(inventoryController.updateStockItem)
 );
 inventoryRoutes.post(
   "/movements",
-  allowRoles("ADMIN", "PRODUCTION_MANAGER"),
+  allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER"),
   validate(createStockMovementSchema),
   asyncHandler(inventoryController.createMovement)
 );

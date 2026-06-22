@@ -12,7 +12,7 @@ const userBody = z.object({
   terminationDate: z.string().date().optional().or(z.literal("")),
   emergencyContactName: z.string().trim().min(1).optional().or(z.literal("")),
   emergencyContactPhone: z.string().trim().min(1).optional().or(z.literal("")),
-  role: z.enum(["ADMIN", "PRODUCTION_MANAGER", "OPERATOR", "QUALITY_STAFF", "VIEWER"]).default("OPERATOR"),
+  role: z.enum(["ADMIN", "PLANNER", "PRODUCTION_MANAGER", "OPERATOR", "QUALITY_STAFF", "VIEWER"]).default("OPERATOR"),
   isActive: z.boolean().default(true)
 });
 

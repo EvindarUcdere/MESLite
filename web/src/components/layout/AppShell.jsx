@@ -4,99 +4,115 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getNotifications } from "../../api/notifications.api.js";
 import { useSocket } from "../../hooks/useSocket.js";
 import { useAuthStore } from "../../store/authStore.js";
-import { hasRole, ROLES, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
+import { hasRole, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
+
+function getDashboardLabel(role) {
+  if (role === "ADMIN") {
+    return "Yönetim Paneli";
+  }
+
+  if (role === "PLANNER") {
+    return "Planlama Paneli";
+  }
+
+  if (role === "QUALITY_STAFF") {
+    return "Kalite Paneli";
+  }
+
+  return "Üretim Paneli";
+}
 
 const navigationItems = [
   {
     to: "/",
     end: true,
-    label: "Üretim Paneli",
+    label: (user) => getDashboardLabel(user?.role),
     icon: BarChart3,
-    roles: [...ROLE_GROUPS.management, ...ROLE_GROUPS.production, ...ROLE_GROUPS.quality]
+    roles: ROLE_GROUPS.dashboard
   },
   {
     to: "/work-orders",
     label: "İş Emirleri",
     icon: ClipboardList,
-    roles: ROLE_GROUPS.planning
+    roles: ROLE_GROUPS.planningWork
   },
   {
     to: "/sales-orders",
     label: "Satış & MRP",
     icon: ShoppingCart,
-    roles: ROLE_GROUPS.planning
-  },
-  {
-    to: "/inventory",
-    label: "Stok",
-    icon: PackageSearch,
-    roles: ROLE_GROUPS.planning
-  },
-  {
-    to: "/notifications",
-    label: "Bildirimler",
-    icon: Bell,
-    roles: [ROLES.ADMIN, ROLES.PRODUCTION_MANAGER, ROLES.OPERATOR, ROLES.QUALITY_STAFF, ROLES.VIEWER]
-  },
-  {
-    to: "/routes",
-    label: "Rotalar",
-    icon: GitBranch,
-    roles: ROLE_GROUPS.planning
+    roles: ROLE_GROUPS.planningWork
   },
   {
     to: "/shift-planning",
     label: "Vardiya Planı",
     icon: CalendarDays,
-    roles: ROLE_GROUPS.planning
+    roles: ROLE_GROUPS.shiftPlanningWork
   },
   {
     to: "/alerts",
     label: "Uyarılar",
     icon: AlertTriangle,
-    roles: ROLE_GROUPS.managementPlusQuality
+    roles: ROLE_GROUPS.operationsAndQuality
   },
   {
     to: "/field-notes",
     label: "Saha Notları",
     icon: MessageSquareText,
-    roles: ROLE_GROUPS.managementPlusQuality
-  },
-  {
-    to: "/products",
-    label: "Ürünler",
-    icon: Boxes,
-    roles: ROLE_GROUPS.planning
-  },
-  {
-    to: "/machines",
-    label: "Makineler",
-    icon: Cpu,
-    roles: ROLE_GROUPS.planning
+    roles: ROLE_GROUPS.operationsAndQuality
   },
   {
     to: "/quality",
     label: "Kalite",
     icon: ClipboardCheck,
-    roles: ROLE_GROUPS.quality
+    roles: ROLE_GROUPS.qualityWork
+  },
+  {
+    to: "/inventory",
+    label: "Stok",
+    icon: PackageSearch,
+    roles: ROLE_GROUPS.masterData
+  },
+  {
+    to: "/routes",
+    label: "Rotalar",
+    icon: GitBranch,
+    roles: ROLE_GROUPS.masterData
+  },
+  {
+    to: "/products",
+    label: "Ürünler",
+    icon: Boxes,
+    roles: ROLE_GROUPS.masterData
+  },
+  {
+    to: "/machines",
+    label: "Makineler",
+    icon: Cpu,
+    roles: ROLE_GROUPS.masterData
+  },
+  {
+    to: "/notifications",
+    label: "Bildirimler",
+    icon: Bell,
+    roles: ROLE_GROUPS.allAuthenticated
   },
   {
     to: "/reports",
     label: "Raporlar",
     icon: FileBarChart,
-    roles: ROLE_GROUPS.management
+    roles: ROLE_GROUPS.reports
   },
   {
     to: "/audit-logs",
     label: "İşlem Geçmişi",
     icon: History,
-    roles: ROLE_GROUPS.management
+    roles: ROLE_GROUPS.reports
   },
   {
     to: "/event-logs",
     label: "Sistem Olayları",
     icon: Activity,
-    roles: ROLE_GROUPS.management
+    roles: ROLE_GROUPS.reports
   },
   {
     to: "/users",
@@ -171,11 +187,12 @@ export function AppShell() {
             .filter((item) => hasRole(user, item.roles))
             .map((item) => {
               const Icon = item.icon;
+              const label = typeof item.label === "function" ? item.label(user) : item.label;
 
               return (
                 <NavLink key={item.to} to={item.to} end={item.end}>
                   <Icon size={18} />
-                  <span className="sidebar-link-label">{item.label}</span>
+                  <span className="sidebar-link-label">{label}</span>
                   {item.to === "/notifications" && unreadNotificationCount > 0 ? (
                     <span className="sidebar-notification-badge">{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}</span>
                   ) : null}

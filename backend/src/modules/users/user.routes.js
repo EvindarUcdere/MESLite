@@ -9,8 +9,8 @@ import { createUserSchema, updateUserSchema, updateUserStatusSchema } from "./us
 export const userRoutes = Router();
 
 userRoutes.use(requireAuth);
-userRoutes.get("/", allowRoles("ADMIN", "PRODUCTION_MANAGER"), asyncHandler(userController.list));
-userRoutes.get("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER"), asyncHandler(userController.detail));
+userRoutes.get("/", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"), asyncHandler(userController.list));
+userRoutes.get("/:id", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"), asyncHandler(userController.detail));
 userRoutes.post("/", allowRoles("ADMIN"), validate(createUserSchema), asyncHandler(userController.create));
 userRoutes.put("/:id", allowRoles("ADMIN"), validate(updateUserSchema), asyncHandler(userController.update));
 userRoutes.patch("/:id/status", allowRoles("ADMIN"), validate(updateUserStatusSchema), asyncHandler(userController.updateStatus));

@@ -28,6 +28,17 @@ async function main() {
     }
   });
 
+  await prisma.user.upsert({
+    where: { email: "planner@meslite.local" },
+    update: {},
+    create: {
+      name: "Production Planner",
+      email: "planner@meslite.local",
+      passwordHash,
+      role: "PLANNER"
+    }
+  });
+
   const operator = await prisma.user.upsert({
     where: { email: "operator@meslite.local" },
     update: {},

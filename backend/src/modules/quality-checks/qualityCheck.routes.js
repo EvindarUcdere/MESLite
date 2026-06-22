@@ -9,7 +9,7 @@ import { createQualityCheckSchema, updateQualityCheckSchema } from "./qualityChe
 export const qualityCheckRoutes = Router();
 
 qualityCheckRoutes.use(requireAuth);
-qualityCheckRoutes.get("/", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(qualityCheckController.list));
-qualityCheckRoutes.get("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(qualityCheckController.detail));
-qualityCheckRoutes.post("/", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"), validate(createQualityCheckSchema), asyncHandler(qualityCheckController.create));
-qualityCheckRoutes.put("/:id", allowRoles("ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"), validate(updateQualityCheckSchema), asyncHandler(qualityCheckController.update));
+qualityCheckRoutes.get("/", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(qualityCheckController.list));
+qualityCheckRoutes.get("/:id", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(qualityCheckController.detail));
+qualityCheckRoutes.post("/", allowRoles("QUALITY_STAFF"), validate(createQualityCheckSchema), asyncHandler(qualityCheckController.create));
+qualityCheckRoutes.put("/:id", allowRoles("QUALITY_STAFF"), validate(updateQualityCheckSchema), asyncHandler(qualityCheckController.update));

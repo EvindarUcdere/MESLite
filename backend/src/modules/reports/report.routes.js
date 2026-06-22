@@ -7,4 +7,4 @@ import * as reportController from "./report.controller.js";
 export const reportRoutes = Router();
 
 reportRoutes.use(requireAuth);
-reportRoutes.get("/overview", allowRoles("ADMIN", "PRODUCTION_MANAGER", "VIEWER"), asyncHandler(reportController.overview));
+reportRoutes.get("/overview", allowRoles("ADMIN", "PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF", "VIEWER"), asyncHandler(reportController.overview));

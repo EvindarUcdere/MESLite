@@ -101,7 +101,7 @@ function isBeforePlannedStart(workOrder, date = new Date()) {
 
 function canReopenShortCompletedOperation(actor, operation) {
   return (
-    ["ADMIN", "PRODUCTION_MANAGER"].includes(actor.role) &&
+    actor.role === "PRODUCTION_MANAGER" &&
     operation.status === "COMPLETED" &&
     operation.workOrder.plannedQuantity > 0 &&
     operation.producedQuantity < operation.workOrder.plannedQuantity
@@ -467,7 +467,7 @@ export async function startOperation(actor, id) {
       tx
     );
 
-    if (["ADMIN", "PRODUCTION_MANAGER"].includes(actor.role) && operation.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
+    if (actor.role === "PRODUCTION_MANAGER" && operation.assignedOperatorId && operation.assignedOperatorId !== actor.id) {
       await createNotification(
         {
           recipientId: operation.assignedOperatorId,
@@ -713,7 +713,7 @@ export async function completeOperation(actor, id) {
 
     if (!nextOperation && remainingOperationCount === 0 && !hasEnoughFinalProduction) {
       await createNotificationsForRoles(
-        ["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
+        ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
         {
           type: "WORK_ORDER_SHORT_PRODUCTION",
           title: "İş emri eksik üretimle açık kaldı",
@@ -845,7 +845,7 @@ export async function createOperationMessage(actor, id, data) {
   }
 
   if (actor.role === "OPERATOR") {
-    await createNotificationsForRoles(["ADMIN", "PRODUCTION_MANAGER", "QUALITY_STAFF"], {
+    await createNotificationsForRoles(["PRODUCTION_MANAGER", "QUALITY_STAFF"], {
       type: "OPERATOR_FIELD_MESSAGE",
       title: "Operatörden saha mesajı",
       message: `${operation.workOrder.orderNo} / ${operation.operationName}: ${message.message}`,
