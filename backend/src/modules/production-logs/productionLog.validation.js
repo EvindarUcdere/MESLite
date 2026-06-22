@@ -87,10 +87,10 @@ export const createScrapActionSchema = z.object({
     scrapResolutionQuantity: z.number().int().min(1).optional(),
     scrapDispositionNote: z.string().max(1000).optional()
   }).superRefine((body, ctx) => {
-    if (["PENDING_REVIEW", "CONDITIONAL_ACCEPT"].includes(body.scrapDisposition)) {
+    if (body.scrapDisposition === "PENDING_REVIEW") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Telafi is emri icin yeniden uretim, yeniden islem veya hurda karari secilmelidir",
+        message: "Fire aksiyonu icin nihai karar secilmelidir",
         path: ["scrapDisposition"]
       });
     }

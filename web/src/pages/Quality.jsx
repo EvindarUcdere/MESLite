@@ -1,5 +1,6 @@
 ﻿import { AlertTriangle, ClipboardCheck, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { createScrapAction } from "../api/productionLogs.api.js";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
 
@@ -18,6 +19,49 @@ const SCRAP_REASON_LABELS = {
   OTHER: "Diğer",
   UNKNOWN: "Belirtilmemiş"
 };
+
+const SCRAP_DISPOSITIONS = [
+  { value: "REPRODUCE", label: "Fire kadar yeniden üretilecek" },
+  { value: "REWORK", label: "Yeniden işlenecek / onarılacak" },
+  { value: "SCRAP", label: "Hurda ayrılacak ve telafi üretilecek" },
+  { value: "CONDITIONAL_ACCEPT", label: "Şartlı kabul" }
+];
+
+const SCRAP_DISPOSITION_LABELS = Object.fromEntries(SCRAP_DISPOSITIONS.map((disposition) => [disposition.value, disposition.label]));
+
+const QUALITY_DECISION_OPTIONS = [
+  {
+    value: "PASSED",
+    status: "PASSED",
+    label: "Geçti",
+    description: "Ürün kalite standartlarına uygundur.",
+    tone: "pass"
+  },
+  {
+    value: "CONDITIONAL",
+    status: "PARTIAL",
+    label: "Şartlı Geçti",
+    description: "Belirli şartlarla kabul edilmiştir.",
+    tone: "partial",
+    scrapDisposition: "CONDITIONAL_ACCEPT"
+  },
+  {
+    value: "REWORK",
+    status: "PARTIAL",
+    label: "Yeniden İşlem",
+    description: "Düzeltme / yeniden işlem gereklidir.",
+    tone: "rework",
+    scrapDisposition: "REWORK"
+  },
+  {
+    value: "FAILED",
+    status: "FAILED",
+    label: "Kalite Reddi",
+    description: "Ürün kalite standartlarına uygun değildir.",
+    tone: "fail",
+    scrapDisposition: "SCRAP"
+  }
+];
 
 const IMPACT_LABELS = {
   HIGH: "Yüksek risk",
@@ -71,6 +115,31 @@ function isPastDue(value) {
   return value ? new Date(value).getTime() < Date.now() : false;
 }
 
+function getOperationLogs(workOrder, operation) {
+  return (workOrder.productionLogs ?? []).filter((log) => log.workOrderOperationId === operation.id || log.workOrderOperation?.id === operation.id);
+}
+
+function getLatestOperatorNote(logs) {
+  return logs.find((log) => log.note?.trim())?.note?.trim() ?? "";
+}
+
+function getLatestScrapReason(logs) {
+  const scrapLog = logs.find((log) => Number(log.scrapQuantity ?? 0) > 0);
+  if (!scrapLog) {
+    return "";
+  }
+
+  return SCRAP_REASON_LABELS[scrapLog.scrapReason ?? "UNKNOWN"] ?? scrapLog.scrapReason ?? "";
+}
+
+function getFirstAttachment(logs) {
+  return logs.flatMap((log) => log.attachments ?? [])[0] ?? null;
+}
+
+function getOpenScrapLog(logs) {
+  return logs.find((log) => Number(log.scrapQuantity ?? 0) > 0 && !log.scrapActionWorkOrderId && log.scrapActionStatus !== "NOT_REQUIRED") ?? null;
+}
+
 function getQualityPendingItems(workOrders, qualityChecks) {
   const checkedOperationIds = new Set(qualityChecks.map((check) => check.workOrderOperationId).filter(Boolean));
 
@@ -78,11 +147,19 @@ function getQualityPendingItems(workOrders, qualityChecks) {
     .flatMap((workOrder) =>
       (workOrder.operations ?? [])
         .filter((operation) => operation.status === "COMPLETED" && operation.producedQuantity > 0 && isQualityOperation(operation) && !checkedOperationIds.has(operation.id))
-        .map((operation) => ({
-          workOrder,
-          operation,
-          isDeliveryOverdue: isPastDue(workOrder.plannedEndDate)
-        }))
+        .map((operation) => {
+          const operationLogs = getOperationLogs(workOrder, operation);
+
+          return {
+            workOrder,
+            operation,
+            operationLogs,
+            latestNote: getLatestOperatorNote(operationLogs),
+            latestScrapReason: getLatestScrapReason(operationLogs),
+            firstAttachment: getFirstAttachment(operationLogs),
+            isDeliveryOverdue: isPastDue(workOrder.plannedEndDate)
+          };
+        })
     )
     .sort((a, b) => Number(b.isDeliveryOverdue) - Number(a.isDeliveryOverdue) || new Date(b.operation.completedAt ?? b.workOrder.updatedAt).getTime() - new Date(a.operation.completedAt ?? a.workOrder.updatedAt).getTime());
 }
@@ -244,10 +321,14 @@ export default function Quality() {
   const [form, setForm] = useState({
     workOrderId: "",
     workOrderOperationId: "",
+    decisionType: "PASSED",
     status: "PASSED",
     defectQuantity: 0,
     defectReason: "",
-    note: ""
+    note: "",
+    scrapDisposition: "REPRODUCE",
+    scrapResolutionQuantity: 0,
+    scrapDispositionNote: ""
   });
 
   const checkCandidates = useMemo(
@@ -261,8 +342,14 @@ export default function Quality() {
     [selectedWorkOrder]
   );
   const selectedOperation = operationCandidates.find((operation) => operation.id === form.workOrderOperationId);
-  const selectedProductionLogs = selectedWorkOrder?.productionLogs ?? [];
+  const selectedPendingItem = pendingQualityItems.find((item) => item.operation.id === form.workOrderOperationId);
+  const selectedProductionLogs = selectedWorkOrder && selectedOperation ? getOperationLogs(selectedWorkOrder, selectedOperation) : selectedWorkOrder?.productionLogs ?? [];
+  const selectedOpenScrapLog = getOpenScrapLog(selectedProductionLogs);
   const selectedTraceability = getSelectedWorkOrderTrace(selectedWorkOrder);
+  const selectedProducedQuantity = Number(selectedOperation?.producedQuantity ?? selectedWorkOrder?.producedQuantity ?? 0);
+  const selectedScrapQuantity = Number(selectedOperation?.scrapQuantity ?? selectedWorkOrder?.scrapQuantity ?? 0);
+  const selectedTotalQuantity = selectedProducedQuantity + selectedScrapQuantity;
+  const selectedGoodPercent = selectedTotalQuantity > 0 ? Math.round((selectedProducedQuantity / selectedTotalQuantity) * 100) : 100;
 
   async function loadData() {
     setError("");
@@ -304,19 +391,45 @@ export default function Quality() {
     setForm((current) => ({
       ...current,
       [field]: value,
-      ...(field === "workOrderId" ? { workOrderOperationId: "" } : {})
+      ...(field === "workOrderId" ? { workOrderOperationId: "" } : {}),
+      ...(field === "scrapDisposition" && value === "CONDITIONAL_ACCEPT" ? { scrapResolutionQuantity: 0 } : {}),
+      ...(field === "scrapDisposition" && value !== "CONDITIONAL_ACCEPT" && selectedOpenScrapLog ? { scrapResolutionQuantity: selectedOpenScrapLog.scrapQuantity } : {})
     }));
   }
 
   function selectPendingQualityItem(item) {
+    const openScrapLog = getOpenScrapLog(item.operationLogs);
+
     setForm((current) => ({
       ...current,
       workOrderId: item.workOrder.id,
       workOrderOperationId: item.operation.id,
+      decisionType: "PASSED",
       status: "PASSED",
       defectQuantity: 0,
       defectReason: "",
-      note: ""
+      note: "",
+      scrapDisposition: "REPRODUCE",
+      scrapResolutionQuantity: openScrapLog?.scrapQuantity ?? 0,
+      scrapDispositionNote: openScrapLog ? "Kalite kontrol sonrası fire kararı verildi." : ""
+    }));
+
+    window.setTimeout(() => {
+      document.getElementById("quality-entry-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
+  function selectQualityDecision(option) {
+    setForm((current) => ({
+      ...current,
+      decisionType: option.value,
+      status: option.status,
+      ...(selectedOpenScrapLog && option.scrapDisposition
+        ? {
+            scrapDisposition: option.scrapDisposition,
+            scrapResolutionQuantity: option.scrapDisposition === "CONDITIONAL_ACCEPT" ? 0 : selectedOpenScrapLog.scrapQuantity
+          }
+        : {})
     }));
   }
 
@@ -350,6 +463,20 @@ export default function Quality() {
         return;
       }
 
+      if (selectedOpenScrapLog) {
+        const scrapResolutionQuantity = Number(form.scrapResolutionQuantity);
+
+        if (form.scrapDisposition !== "CONDITIONAL_ACCEPT" && scrapResolutionQuantity <= 0) {
+          setError("Fire telafisi için aksiyon adedi girin.");
+          return;
+        }
+
+        if (scrapResolutionQuantity > selectedOpenScrapLog.scrapQuantity) {
+          setError(`Fire aksiyon adedi fire miktarını aşamaz. Fire: ${selectedOpenScrapLog.scrapQuantity} adet.`);
+          return;
+        }
+      }
+
       await createQualityCheck({
         workOrderId: form.workOrderId,
         ...(form.workOrderOperationId ? { workOrderOperationId: form.workOrderOperationId } : {}),
@@ -359,12 +486,26 @@ export default function Quality() {
         ...(form.note ? { note: form.note } : {})
       });
 
+      if (selectedOpenScrapLog) {
+        await createScrapAction(selectedOpenScrapLog.id, {
+          scrapDisposition: form.scrapDisposition,
+          ...(form.scrapDisposition !== "CONDITIONAL_ACCEPT" ? { scrapResolutionQuantity: Number(form.scrapResolutionQuantity) || selectedOpenScrapLog.scrapQuantity } : {}),
+          scrapDispositionNote: form.scrapDispositionNote || `${SCRAP_DISPOSITION_LABELS[form.scrapDisposition]} kararı kalite ekranından verildi.`
+        });
+      }
+
       setForm((current) => ({
         ...current,
+        workOrderId: "",
         workOrderOperationId: "",
+        decisionType: "PASSED",
+        status: "PASSED",
         defectQuantity: 0,
         defectReason: "",
-        note: ""
+        note: "",
+        scrapDisposition: "REPRODUCE",
+        scrapResolutionQuantity: 0,
+        scrapDispositionNote: ""
       }));
       await loadData();
     } catch (error) {
@@ -417,90 +558,222 @@ export default function Quality() {
                 <span>Tamamlanma</span>
                 <strong>{formatDate(item.operation.completedAt)}</strong>
               </div>
+              <div className="pending-quality-evidence">
+                <div>
+                  <span>Operatör Notu</span>
+                  <strong>{item.latestNote || "Not yok"}</strong>
+                  {item.latestScrapReason ? <em>{item.latestScrapReason}</em> : null}
+                </div>
+                {item.firstAttachment ? (
+                  <img className="pending-quality-thumb" src={getAttachmentUrl(item.firstAttachment)} alt={item.firstAttachment.fileName || "Kalite görsel kanıtı"} />
+                ) : (
+                  <span className="pending-quality-no-image">Görsel yok</span>
+                )}
+              </div>
             </button>
           ))}
           {!isLoading && pendingQualityItems.length === 0 ? <p className="empty-state">Kalite sonucu bekleyen iş yok.</p> : null}
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel" id="quality-entry-panel">
         <div className="section-title-row">
           <div>
             <h2>Kalite Girişi</h2>
-            <p className="muted-text">Üretimi yapılmış iş emirleri için kalite sonucunu, operasyon adımını ve hata nedenini kaydedin.</p>
+            <p className="muted-text">Üstteki listeden bir işi seçin, operatör notunu ve görsel kanıtı kontrol edip kalite sonucunu kaydedin.</p>
           </div>
         </div>
-        <form className="work-order-form quality-check-form" onSubmit={handleSubmit}>
-          <label>
-            İş Emri
-            <select value={form.workOrderId} onChange={(event) => updateForm("workOrderId", event.target.value)} required>
-              <option value="">Üretimi yapılmış iş emri seçin</option>
-              {checkCandidates.map((workOrder) => (
-                <option key={workOrder.id} value={workOrder.id}>
-                  {workOrder.orderNo} - {workOrder.product.name} ({workOrder.producedQuantity} adet)
-                </option>
-              ))}
-            </select>
-          </label>
-          {selectedWorkOrder?.operations?.length ? (
-            <label>
-              Operasyon
-              <select value={form.workOrderOperationId} onChange={(event) => updateForm("workOrderOperationId", event.target.value)} required>
-                <option value="">Kalite kontrol adımı seçin</option>
-                {operationCandidates.map((operation) => (
-                  <option key={operation.id} value={operation.id}>
-                    {operation.sequenceNo}. {operation.operationName} - {operation.producedQuantity} adet
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <div className="field-span-all">
-            <span className="form-field-title">Hızlı İş Emri Seçimi</span>
-            <div className="choice-list">
-              {checkCandidates.map((workOrder) => (
-                <button
-                  key={workOrder.id}
-                  className={`choice-button ${form.workOrderId === workOrder.id ? "choice-button-active" : ""}`}
-                  type="button"
-                  onClick={() => updateForm("workOrderId", workOrder.id)}
-                >
-                  <strong>{workOrder.orderNo}</strong>
-                  <span>{workOrder.product.name}</span>
-                  <small>
-                    Üretim {workOrder.producedQuantity} / Fire {workOrder.scrapQuantity}
-                  </small>
-                </button>
-              ))}
-            </div>
+        {!selectedWorkOrder || !selectedOperation ? (
+          <div className="quality-empty-selection">
+            <ClipboardCheck size={34} />
+            <strong>Kalite sonucu girmek için listeden bir iş seçin.</strong>
+            <span>Seçtiğiniz işin operatör notu, görsel kanıtı ve karar formu burada açılacak.</span>
           </div>
-          <label>
-            Sonuç
-            <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} required>
-              <option value="PASSED">Geçti</option>
-              <option value="PARTIAL">Kısmi</option>
-              <option value="FAILED">Kaldı</option>
-            </select>
-          </label>
-          <label>
-            Hatalı Adet
-            <input value={form.defectQuantity} onChange={(event) => updateForm("defectQuantity", event.target.value)} type="number" min="0" required />
-          </label>
-          <label>
-            Hata Nedeni
-            <input value={form.defectReason} onChange={(event) => updateForm("defectReason", event.target.value)} placeholder="Çizik, ölçü hatası, malzeme..." />
-          </label>
-          <label>
-            Not
-            <input value={form.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="İsteğe bağlı not" />
-          </label>
-          <button className="primary-button" type="submit" disabled={isSubmitting || checkCandidates.length === 0}>
-            <Plus size={18} />
-            Kaydet
-          </button>
-        </form>
-        {selectedWorkOrder ? (
+        ) : (
           <>
+            <form className="quality-result-form" onSubmit={handleSubmit}>
+              <div className="quality-command-card">
+                <div className="quality-command-main">
+                  <span>İş Emri</span>
+                  <strong>{selectedWorkOrder.orderNo}</strong>
+                  <small>{selectedWorkOrder.product.name}</small>
+                  {isPastDue(selectedWorkOrder.dueDate) ? <em>Teslim tarihi geçmiş</em> : null}
+                </div>
+                <div className="quality-command-meta">
+                  <div>
+                    <span>Operasyon</span>
+                    <strong>
+                      {selectedOperation.sequenceNo}. {selectedOperation.operationName}
+                    </strong>
+                    <small>{selectedOperation.machine?.code ?? "Makine yok"}</small>
+                  </div>
+                  <div>
+                    <span>Operatör</span>
+                    <strong>{selectedOperation.assignedOperator?.name ?? "Operatör yok"}</strong>
+                  </div>
+                  <div>
+                    <span>Tarih / Saat</span>
+                    <strong>{formatDate(selectedOperation.completedAt)}</strong>
+                  </div>
+                </div>
+                <div className="quality-command-metrics">
+                  <div className="quality-command-metric metric-production">
+                    <span>Üretim</span>
+                    <strong>{selectedOperation.producedQuantity}</strong>
+                    <small>adet</small>
+                  </div>
+                  <div className="quality-command-metric metric-scrap">
+                    <span>Fire</span>
+                    <strong>{selectedOperation.scrapQuantity}</strong>
+                    <small>adet</small>
+                  </div>
+                </div>
+              </div>
+
+              <div className="quality-result-grid">
+                <section className="quality-form-card quality-review-card">
+                  <div className="quality-card-title">
+                    <span>1</span>
+                    <h3>İnceleme Bilgileri</h3>
+                  </div>
+                  <div className="quality-review-columns">
+                    <div className="operator-note-box">
+                      <span>Operatör Notu</span>
+                      <p>{selectedPendingItem?.latestNote || "Operatör notu yok."}</p>
+                      {selectedPendingItem?.latestScrapReason ? <em>{selectedPendingItem.latestScrapReason}</em> : null}
+                    </div>
+                    <div className="quality-production-summary">
+                      <span>Üretim Özeti</span>
+                      <div className="quality-ring" style={{ "--quality-good": `${selectedGoodPercent}%` }}>
+                        <strong>{selectedTotalQuantity}</strong>
+                        <small>Toplam</small>
+                      </div>
+                      <div className="quality-ring-legend">
+                        <span><i className="legend-good" /> Sağlam <strong>{selectedProducedQuantity}</strong></span>
+                        <span><i className="legend-scrap" /> Fire <strong>{selectedScrapQuantity}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="quality-photo-strip">
+                    <span>Fotoğraf Kanıtları</span>
+                    {selectedPendingItem?.firstAttachment ? (
+                      <a className="quality-photo-tile" href={getAttachmentUrl(selectedPendingItem.firstAttachment)} target="_blank" rel="noreferrer">
+                        <img src={getAttachmentUrl(selectedPendingItem.firstAttachment)} alt={selectedPendingItem.firstAttachment.fileName || "Kalite görsel kanıtı"} />
+                      </a>
+                    ) : null}
+                    <div className="quality-photo-empty">Görsel kanıt yok</div>
+                  </div>
+                </section>
+
+                <section className="quality-form-card quality-decision-card">
+                  <div className="quality-card-title">
+                    <span>2</span>
+                    <h3>Kalite Kararı</h3>
+                  </div>
+                  <p className="muted-text">Kararınızı seçin; fire varsa alttaki fire aksiyonu bu karara göre güncellenir.</p>
+                  <div className="quality-choice-list">
+                    {QUALITY_DECISION_OPTIONS.map((option) => (
+                      <button
+                        className={`quality-choice-card quality-choice-${option.tone} ${form.decisionType === option.value ? "quality-choice-card-active" : ""}`}
+                        key={option.value}
+                        onClick={() => selectQualityDecision(option)}
+                        type="button"
+                      >
+                        <span className="quality-radio-dot" />
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="quality-form-card quality-defect-card">
+                  <div className="quality-card-title">
+                    <span>3</span>
+                    <h3>Hata Bilgileri</h3>
+                  </div>
+                  <div className="quality-form-row">
+                    <label>
+                      Hatalı Adet
+                      <input value={form.defectQuantity} onChange={(event) => updateForm("defectQuantity", event.target.value)} type="number" min="0" required />
+                    </label>
+                    <label>
+                      Hata Türü
+                      <input value={form.defectReason} onChange={(event) => updateForm("defectReason", event.target.value)} placeholder="Çizik, ölçü hatası..." />
+                    </label>
+                  </div>
+                  <label>
+                    Hata Açıklaması / Not
+                    <textarea value={form.note} onChange={(event) => updateForm("note", event.target.value)} placeholder="Karar açıklaması veya aksiyon notu" rows="5" />
+                  </label>
+                </section>
+
+                <section className="quality-form-card quality-scrap-card">
+                  <div className="quality-card-title quality-card-title-spread">
+                    <div>
+                      <span>4</span>
+                      <h3>Fire Dağıtımı ve Kararları</h3>
+                    </div>
+                    {selectedOpenScrapLog ? <b>Toplam fire {selectedOpenScrapLog.scrapQuantity} adet</b> : <b>Fire yok</b>}
+                  </div>
+                  {selectedOpenScrapLog ? (
+                    <>
+                      <div className="quality-scrap-alert">
+                        <strong>{SCRAP_REASON_LABELS[selectedOpenScrapLog.scrapReason ?? "UNKNOWN"] ?? selectedOpenScrapLog.scrapReason}</strong>
+                        <span>Bu fire kaydı için kalite/üretim aksiyonu seçilecek.</span>
+                      </div>
+                      <label>
+                        Aksiyon
+                        <select value={form.scrapDisposition} onChange={(event) => updateForm("scrapDisposition", event.target.value)} required>
+                          {SCRAP_DISPOSITIONS.map((disposition) => (
+                            <option key={disposition.value} value={disposition.value}>
+                              {disposition.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {form.scrapDisposition !== "CONDITIONAL_ACCEPT" ? (
+                        <label>
+                          Aksiyon Adedi
+                          <input
+                            value={form.scrapResolutionQuantity}
+                            onChange={(event) => updateForm("scrapResolutionQuantity", event.target.value)}
+                            type="number"
+                            min="1"
+                            max={selectedOpenScrapLog.scrapQuantity}
+                            required
+                          />
+                        </label>
+                      ) : null}
+                      <label>
+                        Fire Karar Notu
+                        <input
+                          value={form.scrapDispositionNote}
+                          onChange={(event) => updateForm("scrapDispositionNote", event.target.value)}
+                          placeholder="Örn: görsele göre yeniden üretim açıldı"
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <div className="quality-info-box">Bu operasyon için açık fire kararı bulunmuyor. Sadece kalite sonucu kaydedilecek.</div>
+                  )}
+                </section>
+
+                <section className="quality-form-card quality-note-card">
+                  <div className="quality-card-title">
+                    <span>5</span>
+                    <h3>Kaydı Tamamla</h3>
+                  </div>
+                  <div className="quality-info-box">
+                    Kaydettiğiniz kalite sonucu ilgili üretim kaydına işlenecek ve raporlarda kullanılacaktır.
+                  </div>
+                  <button className="primary-button quality-save-button" type="submit" disabled={isSubmitting}>
+                    <Plus size={18} />
+                    Kalite Sonucunu Kaydet
+                  </button>
+                </section>
+              </div>
+            </form>
             <div className="quality-context">
               <div>
                 <span>İş Emri</span>
@@ -578,7 +851,7 @@ export default function Quality() {
               </div>
             </div>
           </>
-        ) : null}
+        )}
         {!isLoading && checkCandidates.length === 0 ? <p className="empty-state">Kalite girişi için önce üretim kaydı girin.</p> : null}
       </section>
 
