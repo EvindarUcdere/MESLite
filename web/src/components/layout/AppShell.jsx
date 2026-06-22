@@ -8,7 +8,7 @@ import { hasRole, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
 
 function getDashboardLabel(role) {
   if (role === "ADMIN") {
-    return "Yönetim Paneli";
+    return "Sistem Paneli";
   }
 
   if (role === "PLANNER") {

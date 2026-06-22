@@ -302,9 +302,9 @@ function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRe
     <div className="page-stack dashboard-page">
       <header className="page-header dashboard-header">
         <div>
-          <span className="dashboard-eyebrow">Sistem Yönetimi</span>
-          <h1>MES Lite Admin</h1>
-          <p>Kullanıcı, yetki, ana veri ve sistem izlenebilirliğini yönetin. Günlük üretim müdahalesi ilgili operasyon rollerinde kalır.</p>
+          <span className="dashboard-eyebrow">Admin Kontrol Alanı</span>
+          <h1>Sistem Kontrol Paneli</h1>
+          <p>Kullanıcı, yetki, ana veri ve izlenebilirliği buradan yönetin. Üretim, kalite ve planlama kararları ilgili rol ekranlarında kalır.</p>
         </div>
         <div className="dashboard-header-actions">
           <div className="live-indicator">
@@ -330,8 +330,8 @@ function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRe
         <article className="panel admin-system-panel">
           <div className="section-title-row">
             <div>
-              <h2>Sistem Kontrol Merkezi</h2>
-              <p className="muted-text">Admin üretim kararı vermez; üretimin doğru çalışacağı veriyi, yetkiyi ve izleri yönetir.</p>
+              <h2>Yönetilebilir Sistem Temeli</h2>
+              <p className="muted-text">Admin üretim kararı vermez; üretimin doğru çalışacağı veriyi, yetkiyi, erişimi ve işlem izlerini yönetir.</p>
             </div>
           </div>
           <div className="admin-control-list">
