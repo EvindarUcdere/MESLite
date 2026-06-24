@@ -216,6 +216,41 @@ function toNumber(value) {
   return Number(value ?? 0);
 }
 
+function assertRoutedWorkOrderCanBeCompleted(workOrder) {
+  const operations = workOrder.operations ?? [];
+
+  if (!operations.length) {
+    return;
+  }
+
+  const incompleteOperation = operations.find((operation) => operation.status !== "COMPLETED");
+
+  if (incompleteOperation) {
+    throw new ApiError(
+      400,
+      `Rotalı iş emri tamamlanmadan önce tüm operasyonlar tamamlanmalıdır (${incompleteOperation.sequenceNo}. ${incompleteOperation.operationName}: ${incompleteOperation.status})`
+    );
+  }
+
+  const finalOperation = operations.at(-1);
+  const operationScrapTotal = operations.reduce((sum, operation) => sum + toNumber(operation.scrapQuantity), 0);
+
+  if (toNumber(finalOperation?.producedQuantity) <= 0) {
+    throw new ApiError(400, "Rotalı iş emri tamamlanmadan önce final operasyon üretim adedi kaydedilmelidir");
+  }
+
+  if (toNumber(workOrder.producedQuantity) !== toNumber(finalOperation.producedQuantity)) {
+    throw new ApiError(
+      400,
+      `İş emri sağlam üretimi final operasyonla uyuşmuyor (${workOrder.producedQuantity}/${finalOperation.producedQuantity})`
+    );
+  }
+
+  if (toNumber(workOrder.scrapQuantity) !== operationScrapTotal) {
+    throw new ApiError(400, `İş emri fire toplamı operasyon toplamlarıyla uyuşmuyor (${workOrder.scrapQuantity}/${operationScrapTotal})`);
+  }
+}
+
 async function getMaterialRequirements(tx, productId, plannedQuantity) {
   const product = await tx.product.findUnique({
     where: { id: productId },
@@ -829,7 +864,14 @@ export async function updateWorkOrderStatus(actor, id, status) {
   };
 
   const workOrder = await prisma.$transaction(async (tx) => {
-    const current = await tx.workOrder.findUnique({ where: { id } });
+    const current = await tx.workOrder.findUnique({
+      where: { id },
+      include: {
+        operations: {
+          orderBy: { sequenceNo: "asc" }
+        }
+      }
+    });
 
     if (!current) {
       throw new ApiError(404, "İş emri bulunamadı");
@@ -843,6 +885,8 @@ export async function updateWorkOrderStatus(actor, id, status) {
       if (toNumber(current.producedQuantity) <= 0) {
         throw new ApiError(400, "İş emri tamamlanmadan önce üretim adedi kaydedilmelidir");
       }
+
+      assertRoutedWorkOrderCanBeCompleted(current);
 
       await consumeReservedMaterialStock(tx, current, actor?.id ?? current.createdById);
     }
@@ -1222,7 +1266,14 @@ export async function pauseWorkOrder(id, actor) {
 }
 
 export async function completeWorkOrder(actor, id) {
-  const current = await prisma.workOrder.findUnique({ where: { id } });
+  const current = await prisma.workOrder.findUnique({
+    where: { id },
+    include: {
+      operations: {
+        orderBy: { sequenceNo: "asc" }
+      }
+    }
+  });
 
   if (!current) {
     throw new ApiError(404, "İş emri bulunamadı");
@@ -1239,6 +1290,8 @@ export async function completeWorkOrder(actor, id) {
   if (actor.role === "OPERATOR" && current.producedQuantity < current.plannedQuantity) {
     throw new ApiError(400, `Planlanan adet üretilmeden iş emri tamamlanamaz (${current.producedQuantity}/${current.plannedQuantity})`);
   }
+
+  assertRoutedWorkOrderCanBeCompleted(current);
 
   const result = await prisma.$transaction(async (tx) => {
     const consumedMaterials = await consumeReservedMaterialStock(tx, current, actor?.id ?? current.createdById);

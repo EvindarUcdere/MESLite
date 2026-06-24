@@ -8,6 +8,22 @@ function inspectWorkOrder(workOrder) {
     const finalOperation = operations.at(-1);
     const operationScrapTotal = operations.reduce((sum, operation) => sum + operation.scrapQuantity, 0);
 
+    if (workOrder.status === "COMPLETED") {
+      const incompleteOperation = operations.find((operation) => operation.status !== "COMPLETED");
+
+      if (incompleteOperation) {
+        issues.push({
+          type: "COMPLETED_WORK_ORDER_HAS_INCOMPLETE_OPERATION",
+          message: "Completed routed work orders must have all operations completed",
+          operation: {
+            sequenceNo: incompleteOperation.sequenceNo,
+            operationName: incompleteOperation.operationName,
+            status: incompleteOperation.status
+          }
+        });
+      }
+    }
+
     if (workOrder.producedQuantity !== finalOperation.producedQuantity) {
       issues.push({
         type: "WORK_ORDER_FINAL_PRODUCTION_MISMATCH",
@@ -47,23 +63,6 @@ function inspectWorkOrder(workOrder) {
         });
       }
 
-      if (previous.status === "COMPLETED" && previous.producedQuantity < workOrder.plannedQuantity && current.producedQuantity > 0) {
-        issues.push({
-          type: "DOWNSTREAM_STARTED_AFTER_SHORT_COMPLETED_OPERATION",
-          message: "A downstream operation has production after an upstream operation was completed below planned quantity",
-          previousOperation: {
-            sequenceNo: previous.sequenceNo,
-            operationName: previous.operationName,
-            producedQuantity: previous.producedQuantity,
-            plannedQuantity: workOrder.plannedQuantity
-          },
-          currentOperation: {
-            sequenceNo: current.sequenceNo,
-            operationName: current.operationName,
-            producedQuantity: current.producedQuantity
-          }
-        });
-      }
     }
   }
 
