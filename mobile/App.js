@@ -452,6 +452,22 @@ function hasCompletedOperationForUser(workOrder, userId) {
   return Boolean(userId && workOrder.operations?.some((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED"));
 }
 
+function getLastCompletedOperationForUser(workOrder, userId) {
+  return [...(workOrder?.operations ?? [])]
+    .reverse()
+    .find((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED");
+}
+
+function getNextPendingOperationAfter(workOrder, operation) {
+  if (!operation) {
+    return null;
+  }
+
+  return (workOrder.operations ?? [])
+    .filter((item) => item.sequenceNo > operation.sequenceNo && item.status !== "COMPLETED")
+    .sort((first, second) => first.sequenceNo - second.sequenceNo)[0];
+}
+
 function getProductionUnavailableReason(workOrder, userId) {
   if (!workOrder) {
     return "Üretim girişi için bir iş emri seçin.";
@@ -479,6 +495,13 @@ function getProductionUnavailableReason(workOrder, userId) {
   const activeMyOperation = myOperations.find((operation) => ["READY", "IN_PROGRESS", "PAUSED"].includes(operation.status));
 
   if (!activeMyOperation) {
+    const completedOperation = getLastCompletedOperationForUser(workOrder, userId);
+    const nextOperation = getNextPendingOperationAfter(workOrder, completedOperation);
+
+    if (completedOperation && nextOperation) {
+      return `${completedOperation.operationName} adımınız tamamlandı. Sıradaki adım ${nextOperation.operationName}; operatör: ${nextOperation.assignedOperator?.name ?? "atanmamış"}.`;
+    }
+
     return "Bu iş emrindeki size atanmış adımlar tamamlanmış veya henüz sırada değil.";
   }
 
@@ -509,9 +532,7 @@ function getMyCurrentOperationText(workOrder, userId) {
     return `${actionableOperation.operationName} sizde`;
   }
 
-  const completedOperation = [...(workOrder.operations ?? [])]
-    .reverse()
-    .find((operation) => operation.assignedOperatorId === userId && operation.status === "COMPLETED");
+  const completedOperation = getLastCompletedOperationForUser(workOrder, userId);
 
   if (completedOperation && !isClosedWorkOrder(workOrder)) {
     return `${completedOperation.operationName} bitti, akış devam ediyor`;

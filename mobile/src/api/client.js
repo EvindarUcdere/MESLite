@@ -82,7 +82,7 @@ export async function resolveApiBaseUrl({ force = false } = {}) {
 
   const candidates = getApiBaseCandidates();
   const storedApiUrl = await AsyncStorage.getItem(ACTIVE_API_URL_KEY);
-  const orderedCandidates = [storedApiUrl, ...candidates].filter(Boolean);
+  const orderedCandidates = [...candidates, storedApiUrl].filter(Boolean);
 
   for (const candidate of [...new Set(orderedCandidates)]) {
     if (await isApiReachable(candidate)) {

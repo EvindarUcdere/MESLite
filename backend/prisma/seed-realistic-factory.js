@@ -157,7 +157,7 @@ async function upsertUser({ name, email, role, isActive = true, profile = {} }) 
 
   return prisma.user.upsert({
     where: { email },
-    update: { name, role, isActive, ...profile },
+    update: { name, role, isActive, passwordHash, ...profile },
     create: { name, email, role, isActive, passwordHash, ...profile }
   });
 }
