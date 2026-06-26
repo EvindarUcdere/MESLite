@@ -6,6 +6,7 @@ build/
 .cache/
 coverage/
 uploads/
+logs/
 
 .env
 .env.local
