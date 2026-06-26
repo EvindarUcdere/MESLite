@@ -1,4 +1,5 @@
 import * as qualityCheckService from "./qualityCheck.service.js";
+import { runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
 
 export async function list(_req, res) {
   const checks = await qualityCheckService.findQualityChecks();
@@ -11,8 +12,17 @@ export async function detail(req, res) {
 }
 
 export async function create(req, res) {
-  const check = await qualityCheckService.createQualityCheck(req.user, req.validated.body);
-  res.status(201).json({ data: check });
+  const { operationId, ...payload } = req.validated.body;
+  const result = await runIdempotentOperation({
+    operationId,
+    type: "QUALITY_CHECK",
+    user: req.user,
+    workOrderId: payload.workOrderId,
+    payload,
+    handler: () => qualityCheckService.createQualityCheck(req.user, payload)
+  });
+
+  res.status(result.idempotent ? 200 : 201).json({ data: result.data, idempotent: result.idempotent });
 }
 
 export async function update(req, res) {

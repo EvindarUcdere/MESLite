@@ -24,6 +24,7 @@ export const updateProductionAlertSchema = z.object({
 
 export const decideQualityActionSchema = z.object({
   body: z.object({
+    operationId: z.string().uuid().optional(),
     decision: z.enum(["REWORK_OPERATION", "SCRAP", "CONDITIONAL_ACCEPT"]),
     reworkOperationId: z.string().uuid().nullable().optional(),
     note: z.string().trim().min(3, "Kalite aksiyon notu zorunludur")

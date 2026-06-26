@@ -1,5 +1,6 @@
 ﻿import { AlertTriangle, ClipboardCheck, Plus } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { createScrapAction } from "../api/productionLogs.api.js";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
@@ -313,6 +314,7 @@ function TraceabilityPanel({ traceability, compact = false }) {
 }
 
 export default function Quality() {
+  const [searchParams] = useSearchParams();
   const [workOrders, setWorkOrders] = useState([]);
   const [qualityChecks, setQualityChecks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -350,6 +352,8 @@ export default function Quality() {
   const selectedScrapQuantity = Number(selectedOperation?.scrapQuantity ?? selectedWorkOrder?.scrapQuantity ?? 0);
   const selectedTotalQuantity = selectedProducedQuantity + selectedScrapQuantity;
   const selectedGoodPercent = selectedTotalQuantity > 0 ? Math.round((selectedProducedQuantity / selectedTotalQuantity) * 100) : 100;
+  const targetWorkOrderId = searchParams.get("workOrderId");
+  const targetOperationId = searchParams.get("operationId");
 
   async function loadData() {
     setError("");
@@ -397,13 +401,13 @@ export default function Quality() {
     }));
   }
 
-  function selectPendingQualityItem(item) {
-    const openScrapLog = getOpenScrapLog(item.operationLogs);
+  function selectQualityTarget(workOrder, operation, operationLogs) {
+    const openScrapLog = getOpenScrapLog(operationLogs);
 
     setForm((current) => ({
       ...current,
-      workOrderId: item.workOrder.id,
-      workOrderOperationId: item.operation.id,
+      workOrderId: workOrder.id,
+      workOrderOperationId: operation.id,
       decisionType: "PASSED",
       status: "PASSED",
       defectQuantity: 0,
@@ -418,6 +422,33 @@ export default function Quality() {
       document.getElementById("quality-entry-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 0);
   }
+
+  function selectPendingQualityItem(item) {
+    selectQualityTarget(item.workOrder, item.operation, item.operationLogs);
+  }
+
+  useEffect(() => {
+    if (!targetWorkOrderId || isLoading || workOrders.length === 0) {
+      return;
+    }
+
+    const targetWorkOrder = checkCandidates.find((workOrder) => workOrder.id === targetWorkOrderId);
+
+    if (!targetWorkOrder) {
+      return;
+    }
+
+    const targetOperation =
+      (targetWorkOrder.operations ?? []).find((operation) => operation.id === targetOperationId && operation.producedQuantity > 0) ??
+      (targetWorkOrder.operations ?? []).find((operation) => operation.producedQuantity > 0 && isQualityOperation(operation)) ??
+      (targetWorkOrder.operations ?? []).find((operation) => operation.producedQuantity > 0);
+
+    if (!targetOperation || form.workOrderOperationId === targetOperation.id) {
+      return;
+    }
+
+    selectQualityTarget(targetWorkOrder, targetOperation, getOperationLogs(targetWorkOrder, targetOperation));
+  }, [targetWorkOrderId, targetOperationId, isLoading, workOrders, checkCandidates, form.workOrderOperationId]);
 
   function selectQualityDecision(option) {
     setForm((current) => ({

@@ -1,4 +1,5 @@
 import * as productionLogService from "./productionLog.service.js";
+import { runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
 
 export async function list(_req, res) {
   const logs = await productionLogService.findProductionLogs();
@@ -11,13 +12,30 @@ export async function detail(req, res) {
 }
 
 export async function create(req, res) {
-  const log = await productionLogService.createProductionLog(req.user, req.validated.body);
-  res.status(201).json({ data: log });
+  const { operationId, ...payload } = req.validated.body;
+  const result = await runIdempotentOperation({
+    operationId,
+    type: "PRODUCTION_LOG",
+    user: req.user,
+    workOrderId: payload.workOrderId,
+    payload,
+    handler: () => productionLogService.createProductionLog(req.user, payload)
+  });
+
+  res.status(result.idempotent ? 200 : 201).json({ data: result.data, idempotent: result.idempotent });
 }
 
 export async function createScrapAction(req, res) {
-  const log = await productionLogService.createScrapActionForProductionLog(req.user, req.params.id, req.validated.body);
-  res.status(201).json({ data: log });
+  const { operationId, ...payload } = req.validated.body;
+  const result = await runIdempotentOperation({
+    operationId,
+    type: "SCRAP_ACTION",
+    user: req.user,
+    payload: { productionLogId: req.params.id, ...payload },
+    handler: () => productionLogService.createScrapActionForProductionLog(req.user, req.params.id, payload)
+  });
+
+  res.status(result.idempotent ? 200 : 201).json({ data: result.data, idempotent: result.idempotent });
 }
 
 export async function addAttachment(req, res) {

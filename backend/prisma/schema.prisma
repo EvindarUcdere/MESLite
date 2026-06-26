@@ -187,6 +187,7 @@ model User {
   operatorGroups     OperatorGroupMember[]
   stockMovements     StockMovement[]
   createdSalesOrders SalesOrder[]          @relation("CreatedSalesOrders")
+  offlineOperationLogs OfflineOperationLog[]
 }
 
 model Product {
@@ -748,4 +749,24 @@ model MobileDebugLog {
   @@index([userId, createdAt])
   @@index([category, step, createdAt])
   @@map("mobile_debug_logs")
+}
+
+model OfflineOperationLog {
+  id          String   @id @default(uuid())
+  operationId String   @unique
+  type        String
+  userId      String
+  workOrderId String?
+  payload     Json?
+  response    Json?
+  status      String
+  errorMessage String?
+  createdAt   DateTime @default(now())
+  syncedAt    DateTime?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, status])
+  @@index([workOrderId])
+  @@map("offline_operation_logs")
 }

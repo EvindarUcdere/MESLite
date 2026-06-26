@@ -12,6 +12,9 @@ import { getShiftAssignments } from "./src/api/shiftPlanning.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
+import { isOfflineQueuedResult } from "./src/offline/offlineApi";
+import { getOfflineQueueSummary, initOfflineQueue } from "./src/offline/offlineQueue";
+import { syncOfflineQueue } from "./src/offline/syncService";
 
 const STATUS_LABELS = {
   PLANNED: "Planlandı",
@@ -764,6 +767,9 @@ export default function App() {
   const [shiftAssignments, setShiftAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [offlineSummary, setOfflineSummary] = useState({ pending: 0, synced: 0, failed: 0 });
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [isSyncingOfflineQueue, setIsSyncingOfflineQueue] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const selectedWorkOrderIdRef = useRef("");
@@ -909,6 +915,7 @@ export default function App() {
       appStateRef.current = nextState;
 
       if (nextState === "active" && user) {
+        syncPendingOfflineOperations();
         loadNotifications();
         loadWorkOrders({ preserveMessage: true });
         loadShiftCalendar();
@@ -920,11 +927,80 @@ export default function App() {
     };
   }, [user?.id]);
 
+  async function refreshOfflineSummary() {
+    try {
+      setOfflineSummary(await getOfflineQueueSummary());
+    } catch (_error) {
+      setOfflineSummary({ pending: 0, synced: 0, failed: 0 });
+    }
+  }
+
+  async function syncPendingOfflineOperations({ silent = true } = {}) {
+    if (!user || isSyncingOfflineQueue) {
+      return null;
+    }
+
+    setIsSyncingOfflineQueue(true);
+
+    try {
+      const summary = await syncOfflineQueue();
+      setOfflineSummary({
+        pending: summary.pending,
+        synced: summary.synced,
+        failed: summary.failed
+      });
+      setIsOfflineMode(!summary.isOnline);
+
+      if (!silent && summary.isOnline && summary.pending === 0) {
+        setSuccessMessage("Senkronizasyon tamamlandı.");
+      }
+
+      if (summary.isOnline) {
+        await loadWorkOrders({ preserveMessage: true });
+        await loadNotifications();
+      }
+
+      return summary;
+    } catch (_error) {
+      setIsOfflineMode(true);
+      await refreshOfflineSummary();
+      return null;
+    } finally {
+      setIsSyncingOfflineQueue(false);
+    }
+  }
+
   useEffect(() => {
     if (user?.id) {
       loadShiftCalendar(shiftMonth);
     }
   }, [user?.id, shiftMonth]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function prepareOfflineQueue() {
+      await initOfflineQueue();
+      if (!isMounted) {
+        return;
+      }
+
+      await refreshOfflineSummary();
+      if (isMounted) {
+        await syncPendingOfflineOperations({ silent: true });
+      }
+    }
+
+    prepareOfflineQueue();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {
@@ -1117,6 +1193,8 @@ export default function App() {
 
         if (session.token && session.user && isMounted) {
           setUser(session.user);
+          await initOfflineQueue();
+          await refreshOfflineSummary();
           await loadWorkOrders();
           await loadNotifications();
           await registerDevicePushToken();
@@ -1241,6 +1319,7 @@ export default function App() {
 
     const syncInterval = setInterval(() => {
       if (appStateRef.current === "active") {
+        syncPendingOfflineOperations();
         loadNotifications();
         refreshWorkOrders({ preserveMessage: true });
         loadShiftCalendar();
@@ -1266,8 +1345,11 @@ export default function App() {
       setEmail(cleanEmail);
       setPassword(cleanPassword);
       setUser(session.user);
+      await initOfflineQueue();
+      await refreshOfflineSummary();
       await loadWorkOrders();
       await loadNotifications();
+      await syncPendingOfflineOperations({ silent: true });
       await loadShiftCalendar(shiftMonth, session.user.id);
       await registerDevicePushToken();
       await loadPushStatus();
@@ -1286,6 +1368,8 @@ export default function App() {
     setUnreadNotificationCount(0);
     setSelectedWorkOrderId("");
     setSelectedOperationId("");
+    setOfflineSummary({ pending: 0, synced: 0, failed: 0 });
+    setIsOfflineMode(false);
   }
 
   async function runAction(action, fallbackMessage) {
@@ -1294,9 +1378,14 @@ export default function App() {
     setIsSubmitting(true);
 
     try {
-      await action();
-      await loadWorkOrders();
-      return true;
+      const result = await action();
+      await refreshOfflineSummary();
+
+      if (!isOfflineQueuedResult(result)) {
+        await loadWorkOrders();
+      }
+
+      return result ?? true;
     } catch (actionError) {
       if (isUnauthorizedError(actionError)) {
         await clearExpiredSession();
@@ -1335,9 +1424,9 @@ export default function App() {
   }
 
   async function handleOperationAction(action, successText, fallbackMessage) {
-    const isSuccess = await runAction(action, fallbackMessage);
-    if (isSuccess) {
-      setSuccessMessage(successText);
+    const result = await runAction(action, fallbackMessage);
+    if (result) {
+      setSuccessMessage(isOfflineQueuedResult(result) ? "Kaydedildi, senkronizasyon bekliyor." : successText);
     }
   }
 
@@ -1394,7 +1483,7 @@ export default function App() {
           message: ""
         }
       }));
-      setSuccessMessage("Operasyon mesajı gönderildi.");
+      setSuccessMessage(isOfflineQueuedResult(isSuccess) ? "Kaydedildi, senkronizasyon bekliyor." : "Operasyon mesajı gönderildi.");
     }
   }
 
@@ -1473,6 +1562,24 @@ export default function App() {
         ...(isCriticalAlert ? { isCriticalAlert, alertSeverity } : {}),
         ...(note ? { note } : {})
       });
+
+      const isQueued = isOfflineQueuedResult(productionLog);
+
+      if (isQueued) {
+        await refreshOfflineSummary();
+        setSuccessMessage(`Kaydedildi, senkronizasyon bekliyor${selectedImage ? ". Görsel bağlantı geldiğinde tekrar eklenmeli." : "."}`);
+        setProducedQuantity("10");
+        setScrapQuantity("0");
+        setScrapReason("");
+        setScrapDisposition("REPRODUCE");
+        setScrapResolutionQuantity("0");
+        setScrapDispositionNote("");
+        setNote("");
+        setIsCriticalAlert(false);
+        setAlertSeverity("WARNING");
+        setSelectedImage(null);
+        return;
+      }
 
       if (selectedImage) {
         await uploadProductionLogImage(productionLog.id, selectedImage);
@@ -1648,6 +1755,17 @@ export default function App() {
     );
   }
 
+  const offlineStatusTitle = isSyncingOfflineQueue
+    ? "Senkronizasyon yapılıyor"
+    : isOfflineMode
+      ? "İnternet yok"
+      : offlineSummary.failed > 0
+        ? "Senkronize edilemeyen kayıt var"
+        : offlineSummary.pending > 0
+          ? "Senkronizasyon bekliyor"
+          : "Senkronizasyon tamamlandı";
+  const offlineStatusText = `${offlineSummary.pending} bekleyen, ${offlineSummary.failed} başarısız kayıt`;
+
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
       <View style={styles.hero}>
@@ -1658,6 +1776,16 @@ export default function App() {
         </View>
         <Pressable style={styles.secondaryButton} onPress={handleLogout}>
           <Text style={styles.secondaryButtonText}>Çıkış</Text>
+        </Pressable>
+      </View>
+
+      <View style={[styles.syncStatus, isOfflineMode || offlineSummary.failed > 0 ? styles.syncStatusWarning : null]}>
+        <View>
+          <Text style={styles.syncStatusTitle}>{offlineStatusTitle}</Text>
+          <Text style={styles.syncStatusText}>{offlineStatusText}</Text>
+        </View>
+        <Pressable style={styles.inlineButton} onPress={() => syncPendingOfflineOperations({ silent: false })} disabled={isSyncingOfflineQueue}>
+          <Text style={styles.inlineButtonText}>{isSyncingOfflineQueue ? "Kontrol ediliyor" : "Şimdi Senkronize Et"}</Text>
         </Pressable>
       </View>
 
@@ -2487,6 +2615,35 @@ const styles = StyleSheet.create({
   mobileSummary: {
     flexDirection: "row",
     gap: 10
+  },
+  syncStatus: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    padding: 12,
+    backgroundColor: "#edfdfa",
+    borderColor: "#99f6e4",
+    borderLeftColor: "#0f7f78",
+    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1
+  },
+  syncStatusWarning: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderLeftColor: "#f97316"
+  },
+  syncStatusTitle: {
+    color: "#0f2c34",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  syncStatusText: {
+    color: "#607580",
+    fontSize: 12,
+    fontWeight: "700"
   },
   summaryItem: {
     flex: 1,

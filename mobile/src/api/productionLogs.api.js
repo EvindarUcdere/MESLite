@@ -1,8 +1,15 @@
 import { apiClient } from "./client";
+import { executeOrQueue } from "../offline/offlineApi";
 
 export async function createProductionLog(payload) {
-  const response = await apiClient.post("/production-logs", payload);
-  return response.data.data;
+  return executeOrQueue({
+    type: "PRODUCTION_LOG",
+    payload,
+    request: async (body) => {
+      const response = await apiClient.post("/production-logs", body);
+      return response.data.data;
+    }
+  });
 }
 
 export async function uploadProductionLogImage(productionLogId, image) {

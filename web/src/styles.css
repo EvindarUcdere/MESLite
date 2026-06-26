@@ -3774,6 +3774,50 @@ body {
   justify-content: flex-start;
 }
 
+.alert-intervention-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(13, 126, 118, 0.24);
+  border-radius: 8px;
+  background: rgba(231, 247, 242, 0.75);
+}
+
+.alert-intervention-row div {
+  display: grid;
+  gap: 3px;
+}
+
+.alert-intervention-row strong {
+  color: #0f766e;
+  font-size: 14px;
+}
+
+.alert-intervention-row span {
+  color: #526575;
+  font-size: 13px;
+}
+
+.alert-intervention-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.16);
+}
+
+.alert-intervention-link:hover {
+  background: #0b5f59;
+}
+
 .table-thumb {
   width: 56px;
   height: 40px;

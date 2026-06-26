@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { decideProductionAlertQualityAction, getProductionAlerts, updateProductionAlert } from "../api/productionAlerts.api.js";
 import { useSocket } from "../hooks/useSocket.js";
@@ -51,6 +52,26 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function getQualityInterventionPath(alert) {
+  const params = new URLSearchParams();
+
+  if (alert.workOrder?.id) {
+    params.set("workOrderId", alert.workOrder.id);
+  }
+
+  const operationId = alert.productionLog?.workOrderOperationId ?? alert.productionLog?.workOrderOperation?.id;
+
+  if (operationId) {
+    params.set("operationId", operationId);
+  }
+
+  if (alert.id) {
+    params.set("alertId", alert.id);
+  }
+
+  return `/quality?${params.toString()}`;
 }
 
 export default function Alerts() {
@@ -261,6 +282,15 @@ export default function Alerts() {
               <span>{ALERT_STATUS_LABELS[alert.status] ?? alert.status}</span>
               <span>{alert.createdBy.name}</span>
               {alert.qualityDecision ? <span>{QUALITY_ACTION_LABELS[alert.qualityDecision] ?? alert.qualityDecision}</span> : null}
+            </div>
+            <div className="alert-intervention-row">
+              <div>
+                <strong>Fire / kalite müdahalesi</strong>
+                <span>İlgili iş emrini kalite karar ekranında açıp not, görsel ve fire kararını birlikte inceleyin.</span>
+              </div>
+              <Link className="alert-intervention-link" to={getQualityInterventionPath(alert)}>
+                Fire/Kaliteye Git
+              </Link>
             </div>
             {alert.qualityDecision ? (
               <div className="quality-action-summary">

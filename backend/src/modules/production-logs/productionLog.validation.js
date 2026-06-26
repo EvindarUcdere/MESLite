@@ -47,6 +47,7 @@ function validateScrapDecision(body, ctx) {
 
 export const createProductionLogSchema = z.object({
   body: z.object({
+    operationId: z.string().uuid().optional(),
     workOrderId: z.string().uuid(),
     workOrderOperationId: z.string().uuid().optional(),
     expectedOperationVersion: z.number().int().min(0).optional(),
@@ -83,6 +84,7 @@ export const updateProductionLogSchema = z.object({
 
 export const createScrapActionSchema = z.object({
   body: z.object({
+    operationId: z.string().uuid().optional(),
     scrapDisposition: scrapDispositionSchema.default("REPRODUCE"),
     scrapResolutionQuantity: z.number().int().min(1).optional(),
     scrapDispositionNote: z.string().max(1000).optional()
