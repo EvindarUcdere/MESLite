@@ -29,7 +29,7 @@ export function createApp() {
   });
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", service: "mes-lite-api" });
+    res.json({ status: "ok", service: "mes-lite-api", mode: env.edgeMode ? "edge" : "cloud" });
   });
 
   mountSwagger(app);

@@ -1,13 +1,14 @@
-import { getApiBaseUrl } from "../api/client";
+import { resolveApiBaseUrl } from "../api/client";
 
 const HEALTH_TIMEOUT_MS = 4000;
 
 export async function checkBackendReachable() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
-  const baseUrl = getApiBaseUrl().replace(/\/api\/?$/, "");
 
   try {
+    const apiUrl = await resolveApiBaseUrl({ force: true });
+    const baseUrl = apiUrl.replace(/\/api\/?$/, "");
     const response = await fetch(`${baseUrl}/health`, {
       method: "GET",
       signal: controller.signal

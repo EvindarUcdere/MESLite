@@ -761,12 +761,17 @@ model OfflineOperationLog {
   response    Json?
   status      String
   errorMessage String?
+  cloudSyncStatus String   @default("NOT_REQUIRED")
+  cloudRetryCount Int      @default(0)
+  cloudErrorMessage String?
+  cloudSyncedAt DateTime?
   createdAt   DateTime @default(now())
   syncedAt    DateTime?
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([type, status])
+  @@index([cloudSyncStatus, createdAt])
   @@index([workOrderId])
   @@map("offline_operation_logs")
 }

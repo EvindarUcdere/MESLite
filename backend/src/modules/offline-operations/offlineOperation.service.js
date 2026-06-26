@@ -1,4 +1,5 @@
 import { prisma } from "../../config/db.js";
+import { env } from "../../config/env.js";
 
 function sanitizePayload(payload) {
   if (!payload || typeof payload !== "object") {
@@ -45,7 +46,8 @@ export async function runIdempotentOperation({ operationId, type, user, workOrde
         userId: user.id,
         workOrderId,
         payload: sanitizePayload(payload),
-        status: "PENDING"
+        status: "PENDING",
+        cloudSyncStatus: env.edgeMode ? "PENDING" : "NOT_REQUIRED"
       }
     });
   } catch (error) {
