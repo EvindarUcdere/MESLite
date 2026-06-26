@@ -30,7 +30,7 @@ function getCloudApiBaseUrl() {
 
   const host = getDevelopmentHost();
 
-  if (Platform.OS === "web" && host) {
+  if (host) {
     if (host === "localhost" || host === "127.0.0.1") {
       return "http://localhost:4000/api";
     }
