@@ -12,7 +12,7 @@ import { getShiftAssignments } from "./src/api/shiftPlanning.api";
 import { createMobileSocket } from "./src/api/socket";
 import { completeWorkOrderOperation, createOperationMessage, pauseWorkOrderOperation, startWorkOrderOperation } from "./src/api/workOrderOperations.api";
 import { getWorkOrders } from "./src/api/workOrders.api";
-import { isOfflineQueuedResult } from "./src/offline/offlineApi";
+import { createOperationId, isOfflineQueuedResult } from "./src/offline/offlineApi";
 import { getOfflineQueueSummary, initOfflineQueue } from "./src/offline/offlineQueue";
 import { syncOfflineQueue } from "./src/offline/syncService";
 
@@ -770,6 +770,7 @@ export default function App() {
   const [offlineSummary, setOfflineSummary] = useState({ pending: 0, synced: 0, failed: 0 });
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isSyncingOfflineQueue, setIsSyncingOfflineQueue] = useState(false);
+  const [lastProductionSubmission, setLastProductionSubmission] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const selectedWorkOrderIdRef = useRef("");
@@ -1370,6 +1371,7 @@ export default function App() {
     setSelectedOperationId("");
     setOfflineSummary({ pending: 0, synced: 0, failed: 0 });
     setIsOfflineMode(false);
+    setLastProductionSubmission(null);
   }
 
   async function runAction(action, fallbackMessage) {
@@ -1542,9 +1544,25 @@ export default function App() {
     }
 
     setIsSubmitting(true);
+    const submitOperationId = createOperationId();
+    const submittedAt = new Date().toISOString();
+    const submissionBase = {
+      operationId: submitOperationId,
+      orderNo: selectedProductionWorkOrder.orderNo,
+      operationName: selectedProductionOperation.operationName,
+      producedQuantity: produced,
+      scrapQuantity: scrap,
+      submittedAt
+    };
+    setLastProductionSubmission({
+      ...submissionBase,
+      status: "SENDING",
+      message: "Backend'e gönderiliyor."
+    });
 
     try {
       const productionLog = await createProductionLog({
+        operationId: submitOperationId,
         workOrderId: selectedProductionWorkOrder.id,
         workOrderOperationId: selectedProductionOperation.id,
         machineId: selectedProductionOperation.machineId,
@@ -1566,6 +1584,11 @@ export default function App() {
 
       if (isQueued) {
         await refreshOfflineSummary();
+        setLastProductionSubmission({
+          ...submissionBase,
+          status: "PENDING",
+          message: "Local kuyruğa alındı, senkronizasyon bekliyor."
+        });
         setSuccessMessage(`Kaydedildi, senkronizasyon bekliyor${selectedImage ? ". Görsel bağlantı geldiğinde tekrar eklenmeli." : "."}`);
         setProducedQuantity("10");
         setScrapQuantity("0");
@@ -1585,6 +1608,12 @@ export default function App() {
       }
 
       await loadWorkOrders();
+      setLastProductionSubmission({
+        ...submissionBase,
+        status: "SYNCED",
+        productionLogId: productionLog.id,
+        message: "Backend'e kaydedildi."
+      });
       setSuccessMessage(`${produced} üretim ve ${scrap} fire kaydı alındı${selectedImage ? ", görsel eklendi." : "."}`);
       setProducedQuantity("10");
       setScrapQuantity("0");
@@ -1602,7 +1631,13 @@ export default function App() {
         return;
       }
 
-      setError(getErrorMessage(productionError, "Üretim girişi kaydedilemedi."));
+      const errorMessage = getErrorMessage(productionError, "Üretim girişi kaydedilemedi.");
+      setLastProductionSubmission({
+        ...submissionBase,
+        status: "FAILED",
+        message: errorMessage
+      });
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -2528,6 +2563,48 @@ export default function App() {
         >
           <Text style={styles.primaryButtonText}>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</Text>
         </Pressable>
+        {lastProductionSubmission ? (
+          <View
+            style={[
+              styles.lastSubmissionPanel,
+              lastProductionSubmission.status === "FAILED" ? styles.lastSubmissionFailed : null,
+              lastProductionSubmission.status === "PENDING" ? styles.lastSubmissionPending : null,
+              lastProductionSubmission.status === "SYNCED" ? styles.lastSubmissionSynced : null
+            ]}
+          >
+            <View style={styles.lastSubmissionHeader}>
+              <Text style={styles.lastSubmissionTitle}>Son üretim işlemi</Text>
+              <Text style={styles.lastSubmissionStatus}>
+                {lastProductionSubmission.status === "SENDING"
+                  ? "Gönderiliyor"
+                  : lastProductionSubmission.status === "PENDING"
+                    ? "Kuyrukta"
+                    : lastProductionSubmission.status === "SYNCED"
+                      ? "Kaydedildi"
+                      : "Hata"}
+              </Text>
+            </View>
+            <Text style={styles.detailValue}>
+              {lastProductionSubmission.orderNo} - {lastProductionSubmission.operationName}
+            </Text>
+            <View style={styles.lastSubmissionGrid}>
+              <View style={styles.lastSubmissionMetric}>
+                <Text style={styles.detailLabel}>Üretim</Text>
+                <Text style={styles.detailValue}>{lastProductionSubmission.producedQuantity}</Text>
+              </View>
+              <View style={styles.lastSubmissionMetric}>
+                <Text style={styles.detailLabel}>Fire</Text>
+                <Text style={styles.detailValue}>{lastProductionSubmission.scrapQuantity}</Text>
+              </View>
+              <View style={styles.lastSubmissionMetric}>
+                <Text style={styles.detailLabel}>Saat</Text>
+                <Text style={styles.detailValue}>{formatDateTime(lastProductionSubmission.submittedAt)}</Text>
+              </View>
+            </View>
+            <Text style={styles.muted}>{lastProductionSubmission.message}</Text>
+            <Text style={styles.lastSubmissionOperationId}>OperationId: {lastProductionSubmission.operationId}</Text>
+          </View>
+        ) : null}
       </View>
       ) : null}
 
@@ -2893,6 +2970,75 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderRadius: 14,
     borderWidth: 1
+  },
+  lastSubmissionPanel: {
+    gap: 8,
+    padding: 12,
+    backgroundColor: "#f7fafb",
+    borderColor: "#dbe3ea",
+    borderLeftColor: "#64748b",
+    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1
+  },
+  lastSubmissionSynced: {
+    backgroundColor: "#edfdfa",
+    borderColor: "#99f6e4",
+    borderLeftColor: "#0f7f78"
+  },
+  lastSubmissionPending: {
+    backgroundColor: "#fff7ed",
+    borderColor: "#fed7aa",
+    borderLeftColor: "#f97316"
+  },
+  lastSubmissionFailed: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca",
+    borderLeftColor: "#dc2626"
+  },
+  lastSubmissionHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  lastSubmissionTitle: {
+    color: "#0f2c34",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  lastSubmissionStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    color: "#0f2c34",
+    backgroundColor: "#ffffff",
+    borderColor: "#dbe3ea",
+    borderRadius: 999,
+    borderWidth: 1,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden"
+  },
+  lastSubmissionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  lastSubmissionMetric: {
+    flex: 1,
+    minWidth: 96,
+    gap: 3,
+    padding: 10,
+    backgroundColor: "#ffffff",
+    borderColor: "#e1eaf0",
+    borderRadius: 10,
+    borderWidth: 1
+  },
+  lastSubmissionOperationId: {
+    color: "#607580",
+    fontSize: 11,
+    lineHeight: 16
   },
   quickRow: {
     flexDirection: "row",

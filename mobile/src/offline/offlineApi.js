@@ -3,7 +3,7 @@ import { checkBackendReachable } from "./connectivity";
 
 export const OFFLINE_QUEUE_RESULT = "__MES_LITE_OFFLINE_QUEUED__";
 
-function createOperationId() {
+export function createOperationId() {
   if (globalThis.crypto?.randomUUID) {
     return globalThis.crypto.randomUUID();
   }
