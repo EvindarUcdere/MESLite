@@ -1446,10 +1446,26 @@ export default function App() {
     }));
   }
 
-  async function handleOperationAction(action, successText, fallbackMessage) {
+  function updateLocalOperationStatus(operationId, status) {
+    setWorkOrders((current) =>
+      current.map((workOrder) => ({
+        ...workOrder,
+        status: status === "IN_PROGRESS" && workOrder.status === "PLANNED" ? "IN_PROGRESS" : workOrder.status,
+        operations: (workOrder.operations ?? []).map((operation) =>
+          operation.id === operationId ? { ...operation, status, offlineStatusPending: true } : operation
+        )
+      }))
+    );
+  }
+
+  async function handleOperationAction(action, successText, fallbackMessage, onQueued) {
     const result = await runAction(action, fallbackMessage);
     if (result) {
-      setSuccessMessage(isOfflineQueuedResult(result) ? "Kaydedildi, senkronizasyon bekliyor." : successText);
+      const isQueued = isOfflineQueuedResult(result);
+      if (isQueued) {
+        onQueued?.();
+      }
+      setSuccessMessage(isQueued ? "Kaydedildi, senkronizasyon bekliyor." : successText);
     }
   }
 
@@ -1461,9 +1477,10 @@ export default function App() {
         pauseWorkOrderOperation(operationId, {
           reason: draft.reason,
           note: draft.note?.trim() || undefined
-        }),
+      }),
       "Operasyon duraklatıldı. Duruş nedeni kaydedildi.",
-      "Operasyon duraklatılamadı."
+      "Operasyon duraklatılamadı.",
+      () => updateLocalOperationStatus(operationId, "PAUSED")
     );
   }
 
@@ -2136,6 +2153,9 @@ export default function App() {
                       </Text>
                     </View>
                     <Text style={styles.detailValue}>{getOperationStatusLabel(operation, selectedWorkOrder)}</Text>
+                    {operation.offlineStatusPending ? (
+                      <Text style={styles.myOperationText}>Yerel olarak güncellendi. Senkronizasyon bekleniyor.</Text>
+                    ) : null}
                     <Text style={styles.muted}>
                       Bu adım üretimi: {operation.producedQuantity}/{operationTransferQuantity} adet
                     </Text>
@@ -2197,7 +2217,8 @@ export default function App() {
                             handleOperationAction(
                               () => startWorkOrderOperation(operation.id),
                               "Operasyon başlatıldı.",
-                              "Operasyon başlatılamadı."
+                              "Operasyon başlatılamadı.",
+                              () => updateLocalOperationStatus(operation.id, "IN_PROGRESS")
                             )
                           }
                           disabled={!canStartOperation(operation, selectedWorkOrder) || isSubmitting}

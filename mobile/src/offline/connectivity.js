@@ -1,23 +1,9 @@
 import { resolveApiBaseUrl } from "../api/client";
 
-const HEALTH_TIMEOUT_MS = 4000;
-
 export async function checkBackendReachable() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
-
   try {
-    const apiUrl = await resolveApiBaseUrl({ force: true });
-    const baseUrl = apiUrl.replace(/\/api\/?$/, "");
-    const response = await fetch(`${baseUrl}/health`, {
-      method: "GET",
-      signal: controller.signal
-    });
-
-    return response.ok;
+    return Boolean(await resolveApiBaseUrl({ force: true, requireReachable: true }));
   } catch (_error) {
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }

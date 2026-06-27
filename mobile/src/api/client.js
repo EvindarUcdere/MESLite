@@ -73,7 +73,7 @@ export function getApiBaseUrl() {
   return activeApiUrlCache ?? getApiBaseCandidates()[0] ?? getCloudApiBaseUrl();
 }
 
-export async function resolveApiBaseUrl({ force = false } = {}) {
+export async function resolveApiBaseUrl({ force = false, requireReachable = false } = {}) {
   const now = Date.now();
 
   if (!force && activeApiUrlCache && now - activeApiUrlCheckedAt < API_RESOLVE_TTL_MS) {
@@ -95,7 +95,7 @@ export async function resolveApiBaseUrl({ force = false } = {}) {
 
   activeApiUrlCache = candidates[0] ?? getCloudApiBaseUrl();
   activeApiUrlCheckedAt = now;
-  return activeApiUrlCache;
+  return requireReachable ? null : activeApiUrlCache;
 }
 
 export const apiClient = axios.create({
