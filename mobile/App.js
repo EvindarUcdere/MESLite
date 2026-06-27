@@ -171,7 +171,7 @@ function isUnauthorizedError(error) {
 
 function getConnectionMessage(error) {
   if (error?.message === "Network Error" || error?.code === "ERR_NETWORK") {
-    return "Backend bağlantısı kurulamadı. API server açık mı kontrol edin.";
+    return "Çevrimdışısınız. Kayıtlarınız bağlantı yeniden kurulduğunda otomatik olarak aktarılacak.";
   }
 
   return getErrorMessage(error, "İş emirleri yüklenemedi.");
