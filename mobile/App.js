@@ -1458,6 +1458,53 @@ export default function App() {
     );
   }
 
+  function updateLocalOperationProduction(operationId, producedQuantity, scrapQuantity) {
+    setWorkOrders((current) =>
+      current.map((workOrder) => ({
+        ...workOrder,
+        operations: (workOrder.operations ?? []).map((operation) =>
+          operation.id === operationId
+            ? {
+                ...operation,
+                producedQuantity: (operation.producedQuantity ?? 0) + producedQuantity,
+                scrapQuantity: (operation.scrapQuantity ?? 0) + scrapQuantity,
+                offlineStatusPending: true
+              }
+            : operation
+        )
+      }))
+    );
+  }
+
+  function completeLocalOperation(operationId) {
+    setWorkOrders((current) =>
+      current.map((workOrder) => {
+        const operationIndex = (workOrder.operations ?? []).findIndex((operation) => operation.id === operationId);
+        if (operationIndex < 0) {
+          return workOrder;
+        }
+
+        const operations = workOrder.operations.map((operation, index) => {
+          if (index === operationIndex) {
+            return { ...operation, status: "COMPLETED", offlineStatusPending: true };
+          }
+
+          if (index === operationIndex + 1 && operation.status === "WAITING") {
+            return { ...operation, status: "READY", offlineStatusPending: true };
+          }
+
+          return operation;
+        });
+
+        return {
+          ...workOrder,
+          status: operationIndex === operations.length - 1 ? "COMPLETED" : workOrder.status,
+          operations
+        };
+      })
+    );
+  }
+
   async function handleOperationAction(action, successText, fallbackMessage, onQueued) {
     const result = await runAction(action, fallbackMessage);
     if (result) {
@@ -1493,7 +1540,8 @@ export default function App() {
     await handleOperationAction(
       () => completeWorkOrderOperation(rawSelectedProductionOperation.id),
       "Operasyon tamamlandı. Ürün sıradaki adıma devredildi.",
-      "Operasyon tamamlanamadı."
+      "Operasyon tamamlanamadı.",
+      () => completeLocalOperation(rawSelectedProductionOperation.id)
     );
   }
 
@@ -1621,6 +1669,7 @@ export default function App() {
       const isQueued = isOfflineQueuedResult(productionLog);
 
       if (isQueued) {
+        updateLocalOperationProduction(selectedProductionOperation.id, produced, scrap);
         await refreshOfflineSummary();
         setLastProductionSubmission({
           ...submissionBase,
@@ -2240,7 +2289,8 @@ export default function App() {
                             handleOperationAction(
                               () => completeWorkOrderOperation(operation.id),
                               nextOperation ? `Operasyon tamamlandı. Sıradaki adım ${nextOperation.assignedOperator?.name ?? "sonraki operatör"} için hazırlandı.` : "Operasyon tamamlandı. İş akışı tamamlandı.",
-                              "Operasyon tamamlanamadı."
+                              "Operasyon tamamlanamadı.",
+                              () => completeLocalOperation(operation.id)
                             )
                           }
                           disabled={!canCompleteOperation(operation, selectedWorkOrder, user) || isSubmitting}
