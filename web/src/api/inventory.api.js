@@ -10,6 +10,11 @@ export async function getStockMovements(params = {}) {
   return response.data.data;
 }
 
+export async function getScrapLots() {
+  const response = await apiClient.get("/inventory/scrap-lots");
+  return response.data.data;
+}
+
 export async function getMaterialCheck(params) {
   const response = await apiClient.get("/inventory/material-check", { params });
   return response.data.data;

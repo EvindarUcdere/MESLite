@@ -101,6 +101,14 @@ enum ScrapActionStatus {
   NOT_REQUIRED
 }
 
+enum ScrapLotStatus {
+  QUARANTINED
+  REWORK_PLANNED
+  REPRODUCTION_PLANNED
+  SCRAPPED
+  CONDITIONALLY_ACCEPTED
+}
+
 enum DowntimeReason {
   MACHINE_FAILURE
   MATERIAL_WAITING
@@ -150,55 +158,56 @@ enum SalesOrderStatus {
 }
 
 model User {
-  id                 String                 @id @default(uuid())
-  name               String
-  email              String                 @unique
-  passwordHash       String
-  employeeCode       String?                @unique
-  phone              String?
-  department         String?
-  position           String?
-  hireDate           DateTime?              @db.Date
-  terminationDate    DateTime?              @db.Date
+  id                    String                 @id @default(uuid())
+  name                  String
+  email                 String                 @unique
+  passwordHash          String
+  employeeCode          String?                @unique
+  phone                 String?
+  department            String?
+  position              String?
+  hireDate              DateTime?              @db.Date
+  terminationDate       DateTime?              @db.Date
   emergencyContactName  String?
   emergencyContactPhone String?
-  role               UserRole               @default(OPERATOR)
-  isActive           Boolean                @default(true)
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  createdWorkOrders  WorkOrder[]            @relation("CreatedWorkOrders")
-  assignedWorkOrders WorkOrder[]            @relation("AssignedWorkOrders")
-  assignedOperations WorkOrderOperation[]   @relation("AssignedWorkOrderOperations")
-  operationMessages  OperationMessage[]
-  productionLogs     ProductionLog[]
-  operationDowntimes OperationDowntime[]
-  createdAlerts      ProductionAlert[]      @relation("CreatedAlerts")
-  assignedAlerts     ProductionAlert[]      @relation("AssignedAlerts")
-  resolvedAlerts     ProductionAlert[]      @relation("ResolvedAlerts")
-  alertEvents        ProductionAlertEvent[]
-  qualityChecks      QualityCheck[]
-  machineStatusLogs  MachineStatusLog[]
-  auditLogs          AuditLog[]
-  notifications      Notification[]
-  pushTokens         PushToken[]
-  mobileDebugLogs    MobileDebugLog[]
-  shiftAssignments   ShiftAssignment[]
-  machineSkills      OperatorMachineSkill[]
-  operatorGroups     OperatorGroupMember[]
-  stockMovements     StockMovement[]
-  createdSalesOrders SalesOrder[]          @relation("CreatedSalesOrders")
-  offlineOperationLogs OfflineOperationLog[]
+  role                  UserRole               @default(OPERATOR)
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  createdWorkOrders     WorkOrder[]            @relation("CreatedWorkOrders")
+  assignedWorkOrders    WorkOrder[]            @relation("AssignedWorkOrders")
+  assignedOperations    WorkOrderOperation[]   @relation("AssignedWorkOrderOperations")
+  operationMessages     OperationMessage[]
+  productionLogs        ProductionLog[]
+  operationDowntimes    OperationDowntime[]
+  createdAlerts         ProductionAlert[]      @relation("CreatedAlerts")
+  assignedAlerts        ProductionAlert[]      @relation("AssignedAlerts")
+  resolvedAlerts        ProductionAlert[]      @relation("ResolvedAlerts")
+  alertEvents           ProductionAlertEvent[]
+  qualityChecks         QualityCheck[]
+  machineStatusLogs     MachineStatusLog[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  pushTokens            PushToken[]
+  mobileDebugLogs       MobileDebugLog[]
+  shiftAssignments      ShiftAssignment[]
+  machineSkills         OperatorMachineSkill[]
+  operatorGroups        OperatorGroupMember[]
+  stockMovements        StockMovement[]
+  createdSalesOrders    SalesOrder[]           @relation("CreatedSalesOrders")
+  offlineOperationLogs  OfflineOperationLog[]
+  resolvedScrapLots     ScrapLot[]             @relation("ResolvedScrapLots")
 }
 
 model Product {
-  id              String         @id @default(uuid())
-  code            String         @unique
+  id              String           @id @default(uuid())
+  code            String           @unique
   name            String
-  unit            String         @default("pcs")
+  unit            String           @default("pcs")
   targetCycleTime Int?
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   workOrders      WorkOrder[]
   routes          ProductRoute[]
   bomItems        ProductBomItem[] @relation("ProductBomParent")
@@ -206,6 +215,7 @@ model Product {
   stockItem       StockItem?
   stockMovements  StockMovement[]
   salesOrderItems SalesOrderItem[]
+  scrapLots       ScrapLot[]
 }
 
 model SalesOrder {
@@ -310,15 +320,15 @@ model ProductionLine {
 }
 
 model Machine {
-  id                     String               @id @default(uuid())
-  code                   String               @unique
+  id                     String                 @id @default(uuid())
+  code                   String                 @unique
   name                   String
   productionLineId       String
-  status                 MachineStatus        @default(IDLE)
-  isActive               Boolean              @default(true)
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
-  productionLine         ProductionLine       @relation(fields: [productionLineId], references: [id])
+  status                 MachineStatus          @default(IDLE)
+  isActive               Boolean                @default(true)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  productionLine         ProductionLine         @relation(fields: [productionLineId], references: [id])
   workOrders             WorkOrder[]
   workOrderOperations    WorkOrderOperation[]
   productionLogs         ProductionLog[]
@@ -420,18 +430,18 @@ model ShiftTemplate {
 }
 
 model ShiftAssignment {
-  id         String                 @id @default(uuid())
+  id         String                @id @default(uuid())
   operatorId String
   shiftId    String
-  workDate   DateTime               @db.Date
+  workDate   DateTime              @db.Date
   startTime  String?
   endTime    String?
-  status     ShiftAssignmentStatus  @default(PLANNED)
+  status     ShiftAssignmentStatus @default(PLANNED)
   note       String?
-  createdAt  DateTime               @default(now())
-  updatedAt  DateTime               @updatedAt
-  operator   User                   @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-  shift      Shift                  @relation(fields: [shiftId], references: [id])
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  operator   User                  @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  shift      Shift                 @relation(fields: [shiftId], references: [id])
 
   @@unique([operatorId, workDate])
   @@index([shiftId, workDate])
@@ -489,36 +499,39 @@ model WorkOrder {
   qualityChecks      QualityCheck[]
   operations         WorkOrderOperation[]
   operationDowntimes OperationDowntime[]
+  sourceScrapLots    ScrapLot[]           @relation("SourceScrapLots")
+  actionScrapLots    ScrapLot[]           @relation("ActionScrapLots")
 
   @@index([salesOrderId])
   @@index([salesOrderItemId])
 }
 
 model WorkOrderOperation {
-  id                 String                   @id @default(uuid())
-  workOrderId        String
-  routeOperationId   String
-  machineId          String?
-  assignedOperatorId String?
-  sequenceNo         Int
-  operationName      String
-  status             WorkOrderOperationStatus @default(WAITING)
-  producedQuantity   Int                      @default(0)
-  scrapQuantity      Int                      @default(0)
-  version            Int                      @default(0)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  workOrder          WorkOrder                @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  routeOperation     RouteOperation           @relation(fields: [routeOperationId], references: [id])
-  machine            Machine?                 @relation(fields: [machineId], references: [id])
-  assignedOperator   User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
-  messages           OperationMessage[]
-  productionLogs     ProductionLog[]
-  qualityChecks      QualityCheck[]
-  downtimes          OperationDowntime[]
+  id                  String                   @id @default(uuid())
+  workOrderId         String
+  routeOperationId    String
+  machineId           String?
+  assignedOperatorId  String?
+  sequenceNo          Int
+  operationName       String
+  status              WorkOrderOperationStatus @default(WAITING)
+  producedQuantity    Int                      @default(0)
+  scrapQuantity       Int                      @default(0)
+  version             Int                      @default(0)
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  workOrder           WorkOrder                @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  routeOperation      RouteOperation           @relation(fields: [routeOperationId], references: [id])
+  machine             Machine?                 @relation(fields: [machineId], references: [id])
+  assignedOperator    User?                    @relation("AssignedWorkOrderOperations", fields: [assignedOperatorId], references: [id])
+  messages            OperationMessage[]
+  productionLogs      ProductionLog[]
+  qualityChecks       QualityCheck[]
+  downtimes           OperationDowntime[]
   qualityReworkAlerts ProductionAlert[]        @relation("QualityReworkOperation")
+  scrapLots           ScrapLot[]
 
   @@unique([workOrderId, sequenceNo])
   @@map("work_order_operations")
@@ -562,33 +575,64 @@ model OperationDowntime {
 }
 
 model ProductionLog {
-  id                   String                    @id @default(uuid())
+  id                      String                    @id @default(uuid())
+  workOrderId             String
+  workOrderOperationId    String?
+  operatorId              String
+  machineId               String
+  shiftId                 String?
+  producedQuantity        Int
+  scrapQuantity           Int                       @default(0)
+  scrapReason             ScrapReason?
+  scrapDisposition        ScrapDisposition?
+  scrapResolutionQuantity Int                       @default(0)
+  scrapDispositionNote    String?
+  scrapActionStatus       ScrapActionStatus         @default(PENDING)
+  scrapActionWorkOrderId  String?
+  scrapActionWorkOrderNo  String?
+  scrapActionNote         String?
+  startedAt               DateTime?
+  endedAt                 DateTime?
+  note                    String?
+  createdAt               DateTime                  @default(now())
+  workOrder               WorkOrder                 @relation(fields: [workOrderId], references: [id])
+  workOrderOperation      WorkOrderOperation?       @relation(fields: [workOrderOperationId], references: [id])
+  operator                User                      @relation(fields: [operatorId], references: [id])
+  machine                 Machine                   @relation(fields: [machineId], references: [id])
+  shift                   Shift?                    @relation(fields: [shiftId], references: [id])
+  attachments             ProductionLogAttachment[]
+  alerts                  ProductionAlert[]
+  scrapLot                ScrapLot?
+}
+
+model ScrapLot {
+  id                   String              @id @default(uuid())
+  productionLogId      String              @unique
   workOrderId          String
   workOrderOperationId String?
-  operatorId           String
-  machineId            String
-  shiftId              String?
-  producedQuantity     Int
-  scrapQuantity        Int                       @default(0)
-  scrapReason          ScrapReason?
-  scrapDisposition     ScrapDisposition?
-  scrapResolutionQuantity Int                    @default(0)
-  scrapDispositionNote String?
-  scrapActionStatus    ScrapActionStatus         @default(PENDING)
-  scrapActionWorkOrderId String?
-  scrapActionWorkOrderNo String?
-  scrapActionNote      String?
-  startedAt            DateTime?
-  endedAt              DateTime?
+  productId            String
+  quantity             Int
+  reason               ScrapReason?
+  disposition          ScrapDisposition    @default(PENDING_REVIEW)
+  status               ScrapLotStatus      @default(QUARANTINED)
+  location             String              @default("KARANTINA")
+  actionWorkOrderId    String?
+  resolvedById         String?
+  resolvedAt           DateTime?
   note                 String?
-  createdAt            DateTime                  @default(now())
-  workOrder            WorkOrder                 @relation(fields: [workOrderId], references: [id])
-  workOrderOperation   WorkOrderOperation?       @relation(fields: [workOrderOperationId], references: [id])
-  operator             User                      @relation(fields: [operatorId], references: [id])
-  machine              Machine                   @relation(fields: [machineId], references: [id])
-  shift                Shift?                    @relation(fields: [shiftId], references: [id])
-  attachments          ProductionLogAttachment[]
-  alerts               ProductionAlert[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  productionLog        ProductionLog       @relation(fields: [productionLogId], references: [id], onDelete: Cascade)
+  workOrder            WorkOrder           @relation("SourceScrapLots", fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrderOperation   WorkOrderOperation? @relation(fields: [workOrderOperationId], references: [id], onDelete: SetNull)
+  product              Product             @relation(fields: [productId], references: [id])
+  actionWorkOrder      WorkOrder?          @relation("ActionScrapLots", fields: [actionWorkOrderId], references: [id], onDelete: SetNull)
+  resolvedBy           User?               @relation("ResolvedScrapLots", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([workOrderId])
+  @@index([productId])
+  @@map("scrap_lots")
 }
 
 model ProductionLogAttachment {
@@ -603,30 +647,30 @@ model ProductionLogAttachment {
 }
 
 model ProductionAlert {
-  id              String                 @id @default(uuid())
-  productionLogId String
-  workOrderId     String
-  createdById     String
-  assignedToId    String?
-  resolvedById    String?
-  title           String
-  message         String
-  severity        AlertSeverity          @default(WARNING)
-  status          AlertStatus            @default(OPEN)
-  resolutionNote  String?
-  qualityDecision QualityActionDecision?
+  id                  String                 @id @default(uuid())
+  productionLogId     String
+  workOrderId         String
+  createdById         String
+  assignedToId        String?
+  resolvedById        String?
+  title               String
+  message             String
+  severity            AlertSeverity          @default(WARNING)
+  status              AlertStatus            @default(OPEN)
+  resolutionNote      String?
+  qualityDecision     QualityActionDecision?
   qualityDecisionNote String?
-  reworkOperationId String?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  resolvedAt      DateTime?
-  productionLog   ProductionLog          @relation(fields: [productionLogId], references: [id])
-  workOrder       WorkOrder              @relation(fields: [workOrderId], references: [id])
-  createdBy       User                   @relation("CreatedAlerts", fields: [createdById], references: [id])
-  assignedTo      User?                  @relation("AssignedAlerts", fields: [assignedToId], references: [id])
-  resolvedBy      User?                  @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
-  reworkOperation WorkOrderOperation?    @relation("QualityReworkOperation", fields: [reworkOperationId], references: [id])
-  events          ProductionAlertEvent[]
+  reworkOperationId   String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  resolvedAt          DateTime?
+  productionLog       ProductionLog          @relation(fields: [productionLogId], references: [id])
+  workOrder           WorkOrder              @relation(fields: [workOrderId], references: [id])
+  createdBy           User                   @relation("CreatedAlerts", fields: [createdById], references: [id])
+  assignedTo          User?                  @relation("AssignedAlerts", fields: [assignedToId], references: [id])
+  resolvedBy          User?                  @relation("ResolvedAlerts", fields: [resolvedById], references: [id])
+  reworkOperation     WorkOrderOperation?    @relation("QualityReworkOperation", fields: [reworkOperationId], references: [id])
+  events              ProductionAlertEvent[]
 }
 
 model ProductionAlertEvent {
@@ -752,22 +796,22 @@ model MobileDebugLog {
 }
 
 model OfflineOperationLog {
-  id          String   @id @default(uuid())
-  operationId String   @unique
-  type        String
-  userId      String
-  workOrderId String?
-  payload     Json?
-  response    Json?
-  status      String
-  errorMessage String?
-  cloudSyncStatus String   @default("NOT_REQUIRED")
-  cloudRetryCount Int      @default(0)
+  id                String    @id @default(uuid())
+  operationId       String    @unique
+  type              String
+  userId            String
+  workOrderId       String?
+  payload           Json?
+  response          Json?
+  status            String
+  errorMessage      String?
+  cloudSyncStatus   String    @default("NOT_REQUIRED")
+  cloudRetryCount   Int       @default(0)
   cloudErrorMessage String?
-  cloudSyncedAt DateTime?
-  createdAt   DateTime @default(now())
-  syncedAt    DateTime?
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cloudSyncedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  syncedAt          DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([type, status])

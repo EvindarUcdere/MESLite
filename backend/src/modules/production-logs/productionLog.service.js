@@ -138,6 +138,39 @@ function buildScrapActionOrderNo(workOrder, disposition) {
   return `${workOrder.orderNo}-${type}-${suffix}-${token}`;
 }
 
+function getScrapLotState(disposition) {
+  switch (disposition) {
+    case "REWORK":
+      return { status: "REWORK_PLANNED", location: "KARANTINA" };
+    case "REPRODUCE":
+      return { status: "REPRODUCTION_PLANNED", location: "KARANTINA" };
+    case "SCRAP":
+      return { status: "SCRAPPED", location: "HURDA" };
+    case "CONDITIONAL_ACCEPT":
+      return { status: "CONDITIONALLY_ACCEPTED", location: "SERBEST" };
+    default:
+      return { status: "QUARANTINED", location: "KARANTINA" };
+  }
+}
+
+async function updateScrapLotDecision(tx, { productionLogId, disposition, actionWorkOrderId, actorId, note }) {
+  const state = getScrapLotState(disposition);
+  const isResolved = disposition && disposition !== "PENDING_REVIEW";
+
+  await tx.scrapLot.update({
+    where: { productionLogId },
+    data: {
+      disposition: disposition ?? "PENDING_REVIEW",
+      status: state.status,
+      location: state.location,
+      actionWorkOrderId: actionWorkOrderId ?? null,
+      resolvedById: isResolved ? actorId : null,
+      resolvedAt: isResolved ? new Date() : null,
+      note: note ?? null
+    }
+  });
+}
+
 async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log, data }) {
   if (!data.scrapQuantity || !data.scrapDisposition) {
     return {
@@ -432,6 +465,21 @@ export async function createProductionLog(actor, data) {
     let scrapAction = null;
 
     if (data.scrapQuantity > 0) {
+      await tx.scrapLot.create({
+        data: {
+          productionLogId: log.id,
+          workOrderId: workOrder.id,
+          workOrderOperationId: operation?.id ?? null,
+          productId: workOrder.productId,
+          quantity: data.scrapQuantity,
+          reason: data.scrapReason,
+          disposition: effectiveScrapDisposition,
+          status: "QUARANTINED",
+          location: "KARANTINA",
+          note: data.scrapDispositionNote
+        }
+      });
+
       await createNotificationsForRoles(
         ["PLANNER", "PRODUCTION_MANAGER", "QUALITY_STAFF"],
         {
@@ -484,6 +532,14 @@ export async function createProductionLog(actor, data) {
           scrapActionNote: scrapAction.note
         },
         include: includeRelations
+      });
+
+      await updateScrapLotDecision(tx, {
+        productionLogId: log.id,
+        disposition: effectiveScrapDisposition,
+        actionWorkOrderId: scrapAction.workOrderId,
+        actorId: actor.id,
+        note: scrapAction.note ?? data.scrapDispositionNote
       });
     }
 
@@ -777,6 +833,14 @@ export async function createScrapActionForProductionLog(actor, id, data) {
         scrapActionNote: scrapAction.note
       },
       include: includeRelations
+    });
+
+    await updateScrapLotDecision(tx, {
+      productionLogId: current.id,
+      disposition: scrapDisposition,
+      actionWorkOrderId: scrapAction.workOrderId,
+      actorId: actor.id,
+      note: scrapAction.note ?? decisionData.scrapDispositionNote
     });
 
     await recordAuditLog(

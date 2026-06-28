@@ -1,6 +1,14 @@
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, Boxes, Save, SlidersHorizontal, Warehouse } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createStockMovement, getStockItems, getStockMovements, updateStockItem } from "../api/inventory.api.js";
+import { createStockMovement, getScrapLots, getStockItems, getStockMovements, updateStockItem } from "../api/inventory.api.js";
+
+const scrapStatusLabels = {
+  QUARANTINED: "Karantinada",
+  REWORK_PLANNED: "Yeniden işlem bekliyor",
+  REPRODUCTION_PLANNED: "Telafi üretimi açıldı",
+  SCRAPPED: "Hurdaya ayrıldı",
+  CONDITIONALLY_ACCEPTED: "Şartlı kabul"
+};
 
 const movementTypeLabels = {
   PURCHASE_IN: "Satın Alma Girişi",
@@ -16,6 +24,7 @@ const inboundTypes = new Set(["PURCHASE_IN", "PRODUCTION_IN", "ADJUSTMENT_IN"]);
 export default function Inventory() {
   const [stockItems, setStockItems] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [scrapLots, setScrapLots] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,13 +62,15 @@ export default function Inventory() {
 
   async function loadInventory(productId = selectedProductId) {
     setError("");
-    const [stockData, movementData] = await Promise.all([
+    const [stockData, movementData, scrapData] = await Promise.all([
       getStockItems(),
-      getStockMovements(productId ? { productId } : {})
+      getStockMovements(productId ? { productId } : {}),
+      getScrapLots()
     ]);
 
     setStockItems(stockData);
     setMovements(movementData);
+    setScrapLots(scrapData);
 
     const nextSelectedProductId = productId || stockData[0]?.productId || "";
     setSelectedProductId(nextSelectedProductId);
@@ -71,11 +82,12 @@ export default function Inventory() {
 
     async function loadInitialData() {
       try {
-        const [stockData, movementData] = await Promise.all([getStockItems(), getStockMovements()]);
+        const [stockData, movementData, scrapData] = await Promise.all([getStockItems(), getStockMovements(), getScrapLots()]);
 
         if (isMounted) {
           setStockItems(stockData);
           setMovements(movementData);
+          setScrapLots(scrapData);
           const firstProductId = stockData[0]?.productId || "";
           setSelectedProductId(firstProductId);
           setMovementForm((current) => ({ ...current, productId: firstProductId }));
@@ -301,6 +313,51 @@ export default function Inventory() {
             </button>
           </form>
         </article>
+      </section>
+
+      <section className="panel production-log-panel">
+        <div className="chart-card-header">
+          <div>
+            <h2>Fire Karantina ve Hurda Takibi</h2>
+            <p>Fire lotlarını iyi stoktan bağımsız olarak, kalite kararı ve telafi iş emriyle birlikte izleyin.</p>
+          </div>
+          <span className="record-count">{scrapLots.length} lot</span>
+        </div>
+        <div className="table-wrap dashboard-table-wrap">
+          <table className="dashboard-data-table modern-record-table">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Kaynak</th>
+                <th>Ürün</th>
+                <th>Miktar</th>
+                <th>Konum</th>
+                <th>Durum</th>
+                <th>Telafi / Rework</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scrapLots.map((lot) => (
+                <tr key={lot.id}>
+                  <td>{new Date(lot.createdAt).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
+                  <td>
+                    <strong className="table-primary">{lot.workOrder.orderNo}</strong>
+                    <span className="table-subtext">{lot.workOrderOperation?.operationName ?? "Operasyon yok"}</span>
+                  </td>
+                  <td>
+                    <strong className="table-primary">{lot.product.code}</strong>
+                    <span className="table-subtext">{lot.product.name}</span>
+                  </td>
+                  <td>{lot.quantity} {lot.product.unit}</td>
+                  <td>{lot.location}</td>
+                  <td><span className={`status-pill ${lot.status === "SCRAPPED" ? "status-paused" : lot.status === "QUARANTINED" ? "status-planned" : "quality-passed"}`}>{scrapStatusLabels[lot.status] ?? lot.status}</span></td>
+                  <td>{lot.actionWorkOrder?.orderNo ?? "-"}</td>
+                </tr>
+              ))}
+              {!isLoading && scrapLots.length === 0 ? <tr><td colSpan="7">Fire lotu bulunmuyor.</td></tr> : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel production-log-panel">

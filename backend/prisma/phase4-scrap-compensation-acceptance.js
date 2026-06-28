@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/config/db.js";
-import { createProductionLog } from "../src/modules/production-logs/productionLog.service.js";
+import { createProductionLog, createScrapActionForProductionLog } from "../src/modules/production-logs/productionLog.service.js";
 import { completeOperation, startOperation } from "../src/modules/work-order-operations/workOrderOperation.service.js";
 
 const PREFIX = "E2E-SCRAP-FLOW";
@@ -300,10 +300,23 @@ async function assertReplacementFlow(fixture) {
     scrapResolutionQuantity: 10
   });
 
+  const pendingReplacementLog = await prisma.productionLog.findFirst({
+    where: { workOrderId: source.id, scrapQuantity: 10 },
+    orderBy: { createdAt: "desc" }
+  });
+  await createScrapActionForProductionLog(fixture.admin, pendingReplacementLog.id, {
+    scrapDisposition: "REPRODUCE",
+    scrapResolutionQuantity: 10,
+    scrapDispositionNote: `${PREFIX} telafi kararı`
+  });
+
   const sourceAfterScrap = await getWorkOrder(sourceOrderNo);
   const scrapLog = sourceAfterScrap.productionLogs.find((log) => log.scrapQuantity === 10);
   assert(scrapLog?.scrapActionStatus === "CREATED", "Fire kaydı telafi iş emri oluşturmalı");
   assert(scrapLog.scrapActionWorkOrderNo?.startsWith(`${sourceOrderNo}-TELAFI-`), "Telafi iş emri numarası kaynak iş emrine bağlı olmalı");
+  const replacementScrapLot = await prisma.scrapLot.findUnique({ where: { productionLogId: scrapLog.id } });
+  assert(replacementScrapLot?.status === "REPRODUCTION_PLANNED", "Yeniden üretim kararı fire lotunu telafi planlandı durumuna almalı");
+  assert(replacementScrapLot.location === "KARANTINA", "Telafi bekleyen fiziksel fire karantinada kalmalı");
 
   const actionOrder = await getWorkOrder(scrapLog.scrapActionWorkOrderNo);
   assert(actionOrder, "Telafi iş emri bulunmalı");
@@ -375,14 +388,22 @@ async function assertReworkAndConditionalFlows(fixture) {
     note: `${PREFIX} rework fire kaydı`
   });
 
-  const reworkLog = await prisma.productionLog.findFirst({
+  let reworkLog = await prisma.productionLog.findFirst({
     where: {
       workOrderId: reworkSource.id,
-      scrapDisposition: "REWORK"
+      scrapQuantity: 5
     },
     orderBy: { createdAt: "desc" }
   });
+  await createScrapActionForProductionLog(fixture.admin, reworkLog.id, {
+    scrapDisposition: "REWORK",
+    scrapResolutionQuantity: 5,
+    scrapDispositionNote: `${PREFIX} yeniden işlem kararı`
+  });
+  reworkLog = await prisma.productionLog.findUnique({ where: { id: reworkLog.id } });
   assert(reworkLog?.scrapActionStatus === "CREATED", "REWORK kararı yeniden işlem iş emri oluşturmalı");
+  const reworkScrapLot = await prisma.scrapLot.findUnique({ where: { productionLogId: reworkLog.id } });
+  assert(reworkScrapLot?.status === "REWORK_PLANNED", "REWORK kararı fire lotunu yeniden işlem durumuna almalı");
 
   const reworkAction = await getWorkOrder(reworkLog.scrapActionWorkOrderNo);
   assert(reworkAction.operations.length === 1, "Yeniden işlem iş emri yalnızca hedef operasyonu içermeli");
@@ -408,15 +429,23 @@ async function assertReworkAndConditionalFlows(fixture) {
     note: `${PREFIX} conditional fire kaydı`
   });
 
-  const conditionalLog = await prisma.productionLog.findFirst({
+  let conditionalLog = await prisma.productionLog.findFirst({
     where: {
       workOrderId: conditionalSource.id,
-      scrapDisposition: "CONDITIONAL_ACCEPT"
+      scrapQuantity: 5
     },
     orderBy: { createdAt: "desc" }
   });
+  await createScrapActionForProductionLog(fixture.admin, conditionalLog.id, {
+    scrapDisposition: "CONDITIONAL_ACCEPT",
+    scrapDispositionNote: `${PREFIX} şartlı kabul kararı`
+  });
+  conditionalLog = await prisma.productionLog.findUnique({ where: { id: conditionalLog.id } });
   assert(conditionalLog?.scrapActionStatus === "NOT_REQUIRED", "Şartlı kabul ek iş emri oluşturmamalı");
   assert(!conditionalLog.scrapActionWorkOrderId, "Şartlı kabulde bağlı telafi iş emri olmamalı");
+  const conditionalScrapLot = await prisma.scrapLot.findUnique({ where: { productionLogId: conditionalLog.id } });
+  assert(conditionalScrapLot?.status === "CONDITIONALLY_ACCEPTED", "Şartlı kabul fire lotunu serbest bırakmalı");
+  assert(conditionalScrapLot.location === "SERBEST", "Şartlı kabul edilen lot karantinadan çıkmalı");
 }
 
 async function main() {
@@ -435,7 +464,8 @@ async function main() {
       "source work order stays open until its main flow and linked compensation are complete",
       "completed compensation closes the source work order when planned quantity is covered",
       "rework disposition creates a single-operation rework order",
-      "conditional acceptance does not create an extra work order"
+      "conditional acceptance does not create an extra work order",
+      "scrap lots track quarantine, rework, reproduction and conditional acceptance states"
     ]
   });
 }

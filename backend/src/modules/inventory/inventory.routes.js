@@ -11,6 +11,7 @@ export const inventoryRoutes = Router();
 inventoryRoutes.use(requireAuth);
 inventoryRoutes.get("/stock-items", asyncHandler(inventoryController.listStockItems));
 inventoryRoutes.get("/movements", asyncHandler(inventoryController.listStockMovements));
+inventoryRoutes.get("/scrap-lots", asyncHandler(inventoryController.listScrapLots));
 inventoryRoutes.get("/material-check", validate(materialCheckSchema), asyncHandler(inventoryController.materialCheck));
 inventoryRoutes.patch(
   "/stock-items/:productId",

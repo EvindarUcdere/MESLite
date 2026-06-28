@@ -10,6 +10,11 @@ export async function listStockMovements(req, res) {
   res.json({ data: movements });
 }
 
+export async function listScrapLots(_req, res) {
+  const lots = await inventoryService.listScrapLots();
+  res.json({ data: lots });
+}
+
 export async function materialCheck(req, res) {
   const result = await inventoryService.calculateMaterialCheck(req.validated.query.productId, req.validated.query.quantity);
   res.json({ data: result });

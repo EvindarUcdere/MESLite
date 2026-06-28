@@ -61,6 +61,20 @@ export async function listStockMovements(filters = {}) {
   });
 }
 
+export async function listScrapLots() {
+  return prisma.scrapLot.findMany({
+    include: {
+      product: true,
+      workOrder: { select: { id: true, orderNo: true } },
+      workOrderOperation: { select: { id: true, operationName: true, sequenceNo: true } },
+      actionWorkOrder: { select: { id: true, orderNo: true, status: true } },
+      resolvedBy: { select: { id: true, name: true, email: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
+}
+
 export async function calculateMaterialCheck(productId, quantity) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
