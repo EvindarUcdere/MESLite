@@ -16,6 +16,7 @@ import { createOperationId, isOfflineQueuedResult } from "./src/offline/offlineA
 import { getOfflineQueueSummary, initOfflineQueue } from "./src/offline/offlineQueue";
 import { syncOfflineQueue } from "./src/offline/syncService";
 import MobileQualityView from "./src/components/MobileQualityView";
+import OfflineQueuePanel from "./src/components/OfflineQueuePanel";
 
 const STATUS_LABELS = {
   PLANNED: "Planlandı",
@@ -1924,6 +1925,12 @@ export default function App() {
           <Text style={styles.inlineButtonText}>{isSyncingOfflineQueue ? "Kontrol ediliyor" : "Şimdi Senkronize Et"}</Text>
         </Pressable>
       </View>
+
+      <OfflineQueuePanel
+        summary={offlineSummary}
+        onSync={() => syncPendingOfflineOperations({ silent: false })}
+        onChanged={refreshOfflineSummary}
+      />
 
       <View style={styles.mobileSummary}>
         <View style={styles.summaryItem}>

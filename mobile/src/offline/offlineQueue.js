@@ -68,6 +68,19 @@ export async function getPendingOfflineOperations(limit = 25) {
   return rows.map(parseQueueRow);
 }
 
+export async function getOfflineOperations({ status, limit = 30 } = {}) {
+  await initOfflineQueue();
+  const database = await getDatabase();
+  const rows = status
+    ? await database.getAllAsync(
+        "SELECT * FROM offline_queue WHERE status = ? ORDER BY createdAt DESC LIMIT ?;",
+        [status, limit]
+      )
+    : await database.getAllAsync("SELECT * FROM offline_queue ORDER BY createdAt DESC LIMIT ?;", [limit]);
+
+  return rows.map(parseQueueRow);
+}
+
 export async function markOfflineOperationSynced(id) {
   const database = await getDatabase();
   await database.runAsync(
@@ -90,6 +103,19 @@ export async function markOfflineOperationFailed(id, retryCount, errorMessage) {
     "UPDATE offline_queue SET status = ?, retryCount = ?, errorMessage = ? WHERE id = ?;",
     [OFFLINE_OPERATION_STATUS.FAILED, retryCount, errorMessage, id]
   );
+}
+
+export async function retryOfflineOperation(id) {
+  const database = await getDatabase();
+  await database.runAsync(
+    "UPDATE offline_queue SET status = ?, retryCount = 0, errorMessage = NULL, syncedAt = NULL WHERE id = ? AND status = ?;",
+    [OFFLINE_OPERATION_STATUS.PENDING, id, OFFLINE_OPERATION_STATUS.FAILED]
+  );
+}
+
+export async function deleteFailedOfflineOperation(id) {
+  const database = await getDatabase();
+  await database.runAsync("DELETE FROM offline_queue WHERE id = ? AND status = ?;", [id, OFFLINE_OPERATION_STATUS.FAILED]);
 }
 
 export async function getOfflineQueueSummary() {

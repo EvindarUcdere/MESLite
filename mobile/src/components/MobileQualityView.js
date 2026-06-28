@@ -4,6 +4,7 @@ import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api";
 import { createScrapAction } from "../api/productionLogs.api";
 import { getWorkOrders } from "../api/workOrders.api";
 import { isOfflineQueuedResult } from "../offline/offlineApi";
+import OfflineQueuePanel from "./OfflineQueuePanel";
 
 const QUALITY_KEYWORDS = ["kalite", "quality", "kontrol"];
 const DECISIONS = [
@@ -227,6 +228,8 @@ export default function MobileQualityView({
           <Text style={styles.syncButtonText}>{isSyncing ? "Kontrol" : "Senkronize Et"}</Text>
         </Pressable>
       </View>
+
+      <OfflineQueuePanel summary={offlineSummary} onSync={onSync} onChanged={onQueued} />
 
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
