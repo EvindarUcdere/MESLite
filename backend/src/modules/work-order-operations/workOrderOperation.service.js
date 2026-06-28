@@ -5,6 +5,7 @@ import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
+import { consumeReservedMaterialStock } from "../work-orders/workOrder.service.js";
 
 const operationInclude = {
   workOrder: {
@@ -389,6 +390,20 @@ export async function startOperation(actor, id) {
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    const isStartingCompensationOrder = current.sequenceNo === 1 && current.workOrder.status === "PLANNED";
+    const compensationLot = isStartingCompensationOrder
+      ? await tx.scrapLot.findFirst({
+          where: {
+            actionWorkOrderId: current.workOrderId,
+            disposition: { in: ["REPRODUCE", "SCRAP"] }
+          }
+        })
+      : null;
+
+    if (compensationLot) {
+      await consumeReservedMaterialStock(tx, current.workOrder, actor.id);
+    }
+
     await tx.operationDowntime.updateMany({
       where: {
         workOrderOperationId: id,

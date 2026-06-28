@@ -6,6 +6,7 @@ import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
 import { createProductionAlert } from "../production-alerts/productionAlert.service.js";
+import { reserveMaterialStock } from "../work-orders/workOrder.service.js";
 
 const includeRelations = {
   workOrder: { include: { product: true } },
@@ -214,6 +215,10 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
       createdById: actor.id
     }
   });
+
+  if (!isRework) {
+    await reserveMaterialStock(tx, workOrder.productId, actionQuantity);
+  }
 
   if (isRework && operation?.routeOperationId) {
     await tx.workOrderOperation.create({

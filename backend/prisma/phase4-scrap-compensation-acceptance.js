@@ -146,6 +146,24 @@ async function ensureFactoryFixture() {
     }
   });
 
+  const componentProduct = await prisma.product.upsert({
+    where: { code: "E2E-SCRAP-COMPONENT" },
+    update: { isActive: true },
+    create: { code: "E2E-SCRAP-COMPONENT", name: "Fire Telafi Test Bileşeni", unit: "adet" }
+  });
+
+  await prisma.stockItem.upsert({
+    where: { productId: componentProduct.id },
+    create: { productId: componentProduct.id, quantityOnHand: 1000, reservedQuantity: 0 },
+    update: { quantityOnHand: 1000, reservedQuantity: 0 }
+  });
+
+  await prisma.productBomItem.upsert({
+    where: { productId_componentProductId: { productId: product.id, componentProductId: componentProduct.id } },
+    create: { productId: product.id, componentProductId: componentProduct.id, quantity: 2, unit: "adet" },
+    update: { quantity: 2, unit: "adet", wastePercent: 0 }
+  });
+
   const route = await prisma.productRoute.upsert({
     where: {
       productId_name: {
@@ -189,7 +207,7 @@ async function ensureFactoryFixture() {
     );
   }
 
-  return { admin, operators, machines, product, route, routeOperations };
+  return { admin, operators, machines, product, componentProduct, route, routeOperations };
 }
 
 async function createRoutedWorkOrder({ orderNo, admin, product, route, routeOperations, machines, operators, plannedQuantity }) {
@@ -321,6 +339,9 @@ async function assertReplacementFlow(fixture) {
   const actionOrder = await getWorkOrder(scrapLog.scrapActionWorkOrderNo);
   assert(actionOrder, "Telafi iş emri bulunmalı");
   assert(actionOrder.plannedQuantity === 10, "Telafi iş emri fire kadar planlanmalı");
+  const reservedComponentStock = await prisma.stockItem.findUnique({ where: { productId: fixture.componentProduct.id } });
+  assert(Number(reservedComponentStock.quantityOnHand) === 1000, "Telafi emri oluşurken stok henüz tüketilmemeli");
+  assert(Number(reservedComponentStock.reservedQuantity) === 20, "Telafi emri BOM ihtiyacı kadar stok rezerve etmeli");
   assert(actionOrder.operations.length === source.operations.length, "Telafi iş emri tüm rotayı kopyalamalı");
   actionOrder.operations.forEach((operation, index) => {
     assert(operation.machineId === source.operations[index].machineId, "Telafi operasyon makinesi kaynak operasyonla aynı olmalı");
@@ -354,6 +375,9 @@ async function assertReplacementFlow(fixture) {
   });
   assert(completedActionOrder.status === "COMPLETED", "Telafi iş emri tamamlanmalı");
   assert(completedActionOrder.producedQuantity === 10, "Telafi final üretimi 10 adet olmalı");
+  const consumedComponentStock = await prisma.stockItem.findUnique({ where: { productId: fixture.componentProduct.id } });
+  assert(Number(consumedComponentStock.quantityOnHand) === 980, "Telafi başladığında BOM malzemesi stoktan tüketilmeli");
+  assert(Number(consumedComponentStock.reservedQuantity) === 0, "Tüketilen telafi rezervasyonu kapatılmalı");
 
   const completedSource = await getWorkOrder(sourceOrderNo);
   assert(completedSource.status === "COMPLETED", "Ana iş emri telafi üretimi tamamlanınca kapanmalı");
@@ -409,6 +433,9 @@ async function assertReworkAndConditionalFlows(fixture) {
   assert(reworkAction.operations.length === 1, "Yeniden işlem iş emri yalnızca hedef operasyonu içermeli");
   assert(reworkAction.operations[0].operationName.includes("Yeniden"), "Yeniden işlem operasyonu açık isimle görünmeli");
   assert(reworkAction.operations[0].assignedOperatorId === reworkSource.operations[0].assignedOperatorId, "Rework operatörü kaynak operasyon operatörü olmalı");
+  const stockAfterReworkDecision = await prisma.stockItem.findUnique({ where: { productId: fixture.componentProduct.id } });
+  assert(Number(stockAfterReworkDecision.quantityOnHand) === 980, "Rework mevcut parçayı kullandığı için BOM stokunu tekrar tüketmemeli");
+  assert(Number(stockAfterReworkDecision.reservedQuantity) === 0, "Rework için ana BOM rezervasyonu oluşmamalı");
 
   const conditionalSource = await createRoutedWorkOrder({
     ...fixture,
@@ -465,7 +492,8 @@ async function main() {
       "completed compensation closes the source work order when planned quantity is covered",
       "rework disposition creates a single-operation rework order",
       "conditional acceptance does not create an extra work order",
-      "scrap lots track quarantine, rework, reproduction and conditional acceptance states"
+      "scrap lots track quarantine, rework, reproduction and conditional acceptance states",
+      "replacement production reserves BOM stock and consumes it when production starts"
     ]
   });
 }

@@ -311,7 +311,7 @@ function assertMaterialRequirements(requirements) {
   };
 }
 
-async function reserveMaterialStock(tx, productId, plannedQuantity) {
+export async function reserveMaterialStock(tx, productId, plannedQuantity) {
   const requirements = await getMaterialRequirements(tx, productId, plannedQuantity);
   const materialCheck = assertMaterialRequirements(requirements);
 
@@ -340,7 +340,7 @@ async function reserveMaterialStock(tx, productId, plannedQuantity) {
   return materialCheck;
 }
 
-async function consumeReservedMaterialStock(tx, workOrder, actorId) {
+export async function consumeReservedMaterialStock(tx, workOrder, actorId) {
   const requirements = await getMaterialRequirements(tx, workOrder.productId, toNumber(workOrder.plannedQuantity));
 
   for (const item of requirements) {
