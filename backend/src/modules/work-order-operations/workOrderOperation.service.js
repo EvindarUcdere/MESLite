@@ -6,6 +6,7 @@ import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
 import { consumeReservedMaterialStock } from "../work-orders/workOrder.service.js";
+import { recordFinishedGoodsReceipt } from "../inventory/inventory.service.js";
 
 const operationInclude = {
   workOrder: {
@@ -293,6 +294,8 @@ async function closeSourceWorkOrdersIfScrapActionsCompleted(tx, actionWorkOrder,
         actualEndDate: sourceWorkOrder.actualEndDate ?? completedAt
       }
     });
+
+    await recordFinishedGoodsReceipt(tx, closedWorkOrder, actor.id);
 
     const firstSourceOperation = sourceWorkOrder.operations.sort((first, second) => first.sequenceNo - second.sequenceNo)[0];
     if (firstSourceOperation) {
@@ -721,6 +724,10 @@ export async function completeOperation(actor, id) {
         ...(isWorkOrderCompleted ? { actualEndDate: new Date() } : {})
       }
     });
+
+    if (isWorkOrderCompleted) {
+      await recordFinishedGoodsReceipt(tx, updatedWorkOrder, actor.id);
+    }
 
     const closedSourceWorkOrders = isWorkOrderCompleted
       ? await closeSourceWorkOrdersIfScrapActionsCompleted(tx, updatedWorkOrder, actor, new Date())

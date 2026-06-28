@@ -5,6 +5,7 @@ import { emitDomainEvent } from "../../events/domainEventBus.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { recordAuditLog } from "../audit-logs/auditLog.service.js";
 import { createNotification, createNotificationsForRoles } from "../notifications/notification.service.js";
+import { recordFinishedGoodsReceipt } from "../inventory/inventory.service.js";
 
 const workOrderInclude = {
   product: true,
@@ -897,6 +898,10 @@ export async function updateWorkOrderStatus(actor, id, status) {
       include: workOrderInclude
     });
 
+    if (status === "COMPLETED" && current.status !== "COMPLETED") {
+      await recordFinishedGoodsReceipt(tx, updated, actor?.id ?? current.createdById);
+    }
+
     await recordAuditLog(
       {
         actorId: actor?.id,
@@ -1304,6 +1309,8 @@ export async function completeWorkOrder(actor, id) {
       },
       include: workOrderInclude
     });
+
+    await recordFinishedGoodsReceipt(tx, updated, actor?.id ?? current.createdById);
 
     let machine = null;
 

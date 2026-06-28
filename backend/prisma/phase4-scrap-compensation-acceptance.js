@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../src/config/db.js";
 import { createProductionLog, createScrapActionForProductionLog } from "../src/modules/production-logs/productionLog.service.js";
 import { completeOperation, startOperation } from "../src/modules/work-order-operations/workOrderOperation.service.js";
+import { recordFinishedGoodsReceipt } from "../src/modules/inventory/inventory.service.js";
 
 const PREFIX = "E2E-SCRAP-FLOW";
 const sourceOrderNo = `${PREFIX}-SOURCE`;
@@ -46,6 +47,7 @@ async function cleanupWorkOrders() {
   await prisma.productionAlertEvent.deleteMany({ where: { alertId: { in: alertIds } } });
   await prisma.productionAlert.deleteMany({ where: { workOrderId: { in: workOrderIds } } });
   await prisma.productionLogAttachment.deleteMany({ where: { productionLogId: { in: productionLogIds } } });
+  await prisma.stockMovement.deleteMany({ where: { referenceId: { in: workOrderIds } } });
   await prisma.productionLog.deleteMany({
     where: {
       OR: [{ workOrderId: { in: workOrderIds } }, { scrapActionWorkOrderId: { in: workOrderIds } }]
@@ -150,6 +152,12 @@ async function ensureFactoryFixture() {
     where: { code: "E2E-SCRAP-COMPONENT" },
     update: { isActive: true },
     create: { code: "E2E-SCRAP-COMPONENT", name: "Fire Telafi Test Bileşeni", unit: "adet" }
+  });
+
+  await prisma.stockItem.upsert({
+    where: { productId: product.id },
+    create: { productId: product.id, quantityOnHand: 0, reservedQuantity: 0 },
+    update: { quantityOnHand: 0, reservedQuantity: 0 }
   });
 
   await prisma.stockItem.upsert({
@@ -381,6 +389,19 @@ async function assertReplacementFlow(fixture) {
 
   const completedSource = await getWorkOrder(sourceOrderNo);
   assert(completedSource.status === "COMPLETED", "Ana iş emri telafi üretimi tamamlanınca kapanmalı");
+  const finishedGoodsStock = await prisma.stockItem.findUnique({ where: { productId: fixture.product.id } });
+  assert(Number(finishedGoodsStock.quantityOnHand) === 100, "Ana iş emri tamamlanınca toplam 100 mamul stoğa girmeli");
+  const sourceReceipts = await prisma.stockMovement.findMany({
+    where: { productId: fixture.product.id, type: "PRODUCTION_IN", referenceId: completedSource.id }
+  });
+  const actionReceipts = await prisma.stockMovement.findMany({
+    where: { productId: fixture.product.id, type: "PRODUCTION_IN", referenceId: completedActionOrder.id }
+  });
+  assert(sourceReceipts.length === 1, "Ana iş emri için tek mamul stok hareketi oluşmalı");
+  assert(actionReceipts.length === 0, "Telafi iş emri ayrı mamul girişi oluşturup stoğu çift saymamalı");
+  await prisma.$transaction((tx) => recordFinishedGoodsReceipt(tx, completedSource, fixture.admin.id));
+  const stockAfterIdempotentRetry = await prisma.stockItem.findUnique({ where: { productId: fixture.product.id } });
+  assert(Number(stockAfterIdempotentRetry.quantityOnHand) === 100, "Aynı kapanış tekrar işlense bile mamul stoku artmamalı");
 
   const closeAudit = await prisma.auditLog.findFirst({
     where: {
@@ -493,7 +514,8 @@ async function main() {
       "rework disposition creates a single-operation rework order",
       "conditional acceptance does not create an extra work order",
       "scrap lots track quarantine, rework, reproduction and conditional acceptance states",
-      "replacement production reserves BOM stock and consumes it when production starts"
+      "replacement production reserves BOM stock and consumes it when production starts",
+      "completed source order creates one idempotent finished-goods receipt without double-counting replacement output"
     ]
   });
 }

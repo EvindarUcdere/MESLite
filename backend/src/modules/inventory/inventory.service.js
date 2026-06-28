@@ -221,3 +221,51 @@ export async function createStockMovement(data, userId) {
     return { stockItem: updatedStockItem, movement };
   });
 }
+
+export async function recordFinishedGoodsReceipt(tx, workOrder, userId) {
+  const quantity = Number(workOrder.producedQuantity ?? 0);
+  if (quantity <= 0) {
+    return null;
+  }
+
+  const linkedScrapAction = await tx.scrapLot.findFirst({
+    where: { actionWorkOrderId: workOrder.id },
+    select: { id: true }
+  });
+  if (linkedScrapAction) {
+    return null;
+  }
+
+  const reference = {
+    productId: workOrder.productId,
+    type: "PRODUCTION_IN",
+    referenceType: "WorkOrder",
+    referenceId: workOrder.id
+  };
+  const existing = await tx.stockMovement.findFirst({ where: reference });
+  if (existing) {
+    return existing;
+  }
+
+  const stockItem = await tx.stockItem.upsert({
+    where: { productId: workOrder.productId },
+    create: { productId: workOrder.productId },
+    update: {}
+  });
+  const nextQuantity = toNumber(stockItem.quantityOnHand) + quantity;
+  await tx.stockItem.update({
+    where: { id: stockItem.id },
+    data: { quantityOnHand: nextQuantity }
+  });
+
+  return tx.stockMovement.create({
+    data: {
+      stockItemId: stockItem.id,
+      ...reference,
+      quantity,
+      balanceAfter: nextQuantity,
+      note: `${workOrder.orderNo} iş emri mamul stok girişi`,
+      createdById: userId
+    }
+  });
+}

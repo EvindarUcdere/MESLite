@@ -306,6 +306,7 @@ model StockMovement {
 
   @@index([productId, createdAt])
   @@index([type])
+  @@unique([productId, type, referenceType, referenceId])
   @@map("stock_movements")
 }
 
