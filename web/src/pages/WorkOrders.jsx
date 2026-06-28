@@ -718,9 +718,32 @@ export default function WorkOrders() {
       return;
     }
 
-    focusWorkOrder(workOrderId);
+    const targetWorkOrder = workOrders.find((workOrder) => workOrder.id === workOrderId);
+
+    if (!targetWorkOrder) {
+      setError("Bildirimdeki iş emri bulunamadı veya artık erişilebilir değil.");
+      return;
+    }
+
+    setSearch(targetWorkOrder.orderNo);
+    setFocusedWorkOrderId(workOrderId);
     setFocusedOperationId(operationId ?? "");
   }, [searchParams, workOrders]);
+
+  useEffect(() => {
+    if (!focusedWorkOrderId) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      workOrderRowRefs.current.get(focusedWorkOrderId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [focusedWorkOrderId, workOrderSections]);
 
   useSocket({
     "workOrder:updated": () => loadData(),

@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { createScrapAction } from "../api/productionLogs.api.js";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api.js";
 import { getWorkOrders } from "../api/workOrders.api.js";
+import { useAuthStore } from "../store/authStore.js";
 
 const QUALITY_LABELS = {
   PASSED: "Geçti",
@@ -315,6 +316,8 @@ function TraceabilityPanel({ traceability, compact = false }) {
 
 export default function Quality() {
   const [searchParams] = useSearchParams();
+  const user = useAuthStore((state) => state.user);
+  const canRecordQualityDecision = user?.role === "QUALITY_STAFF";
   const [workOrders, setWorkOrders] = useState([]);
   const [qualityChecks, setQualityChecks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -466,6 +469,12 @@ export default function Quality() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!canRecordQualityDecision) {
+      setError("Kalite kararını yalnızca Kalite Personeli kaydedebilir.");
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
@@ -798,9 +807,9 @@ export default function Quality() {
                   <div className="quality-info-box">
                     Kaydettiğiniz kalite sonucu ilgili üretim kaydına işlenecek ve raporlarda kullanılacaktır.
                   </div>
-                  <button className="primary-button quality-save-button" type="submit" disabled={isSubmitting}>
+                  <button className="primary-button quality-save-button" type="submit" disabled={isSubmitting || !canRecordQualityDecision}>
                     <Plus size={18} />
-                    Kalite Sonucunu Kaydet
+                    {canRecordQualityDecision ? "Kalite Sonucunu Kaydet" : "Yalnızca Kalite Personeli Kaydedebilir"}
                   </button>
                 </section>
               </div>

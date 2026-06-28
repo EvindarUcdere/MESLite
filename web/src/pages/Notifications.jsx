@@ -42,7 +42,7 @@ function getNotificationTarget(notification) {
   }
 
   if (notification.entityType === "WorkOrder") {
-    const workOrderId = notification.metadata?.workOrderId ?? notification.entityId;
+    const workOrderId = notification.metadata?.actionWorkOrderId ?? notification.metadata?.workOrderId ?? notification.entityId;
     return { label: "İş emrine git", path: `/work-orders?workOrderId=${workOrderId}` };
   }
 

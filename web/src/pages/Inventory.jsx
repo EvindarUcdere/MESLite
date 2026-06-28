@@ -1,5 +1,5 @@
-import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, Boxes, Save, SlidersHorizontal, Warehouse } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, Boxes, ChevronUp, Eye, Filter, RefreshCw, Save, Search, SlidersHorizontal, Warehouse } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createStockMovement, getScrapLots, getStockItems, getStockMovements, updateStockItem } from "../api/inventory.api.js";
 
 const scrapStatusLabels = {
@@ -30,6 +30,9 @@ export default function Inventory() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [scrapSearch, setScrapSearch] = useState("");
+  const [scrapStatusFilter, setScrapStatusFilter] = useState("ALL");
+  const [expandedScrapLotId, setExpandedScrapLotId] = useState(null);
   const [movementForm, setMovementForm] = useState({
     productId: "",
     type: "PURCHASE_IN",
@@ -59,6 +62,20 @@ export default function Inventory() {
       reserved
     };
   }, [stockItems]);
+
+  const filteredScrapLots = useMemo(() => {
+    const query = scrapSearch.trim().toLocaleLowerCase("tr-TR");
+
+    return scrapLots.filter((lot) => {
+      const matchesStatus = scrapStatusFilter === "ALL" || lot.status === scrapStatusFilter;
+      const searchable = [lot.workOrder?.orderNo, lot.workOrderOperation?.operationName, lot.product?.code, lot.product?.name, lot.location, lot.reason]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+
+      return matchesStatus && (!query || searchable.includes(query));
+    });
+  }, [scrapLots, scrapSearch, scrapStatusFilter]);
 
   async function loadInventory(productId = selectedProductId) {
     setError("");
@@ -188,7 +205,7 @@ export default function Inventory() {
   }
 
   return (
-    <div className="page-stack">
+    <div className="page-stack inventory-page">
       <header className="page-header">
         <div>
           <h1>Stok Yönetimi</h1>
@@ -315,13 +332,29 @@ export default function Inventory() {
         </article>
       </section>
 
-      <section className="panel production-log-panel">
-        <div className="chart-card-header">
+      <section className="panel production-log-panel scrap-tracking-panel">
+        <div className="chart-card-header inventory-section-header">
           <div>
             <h2>Fire Karantina ve Hurda Takibi</h2>
             <p>Fire lotlarını iyi stoktan bağımsız olarak, kalite kararı ve telafi iş emriyle birlikte izleyin.</p>
           </div>
-          <span className="record-count">{scrapLots.length} lot</span>
+          <div className="scrap-table-actions">
+            <span className="record-count">{filteredScrapLots.length} lot</span>
+            <label className="inventory-search">
+              <Search size={16} />
+              <input value={scrapSearch} onChange={(event) => setScrapSearch(event.target.value)} placeholder="İş emri, ürün veya operasyon ara" />
+            </label>
+            <label className="inventory-filter">
+              <Filter size={16} />
+              <select value={scrapStatusFilter} onChange={(event) => setScrapStatusFilter(event.target.value)} aria-label="Fire durumu filtresi">
+                <option value="ALL">Tüm durumlar</option>
+                {Object.entries(scrapStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <button className="icon-button inventory-refresh" type="button" title="Verileri yenile" aria-label="Verileri yenile" onClick={() => loadInventory()}>
+              <RefreshCw size={17} />
+            </button>
+          </div>
         </div>
         <div className="table-wrap dashboard-table-wrap">
           <table className="dashboard-data-table modern-record-table">
@@ -334,10 +367,12 @@ export default function Inventory() {
                 <th>Konum</th>
                 <th>Durum</th>
                 <th>Telafi / Rework</th>
+                <th className="inventory-actions-column">İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {scrapLots.map((lot) => (
+              {filteredScrapLots.map((lot) => (
+                <Fragment key={lot.id}>
                 <tr key={lot.id}>
                   <td>{new Date(lot.createdAt).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
                   <td>
@@ -348,13 +383,30 @@ export default function Inventory() {
                     <strong className="table-primary">{lot.product.code}</strong>
                     <span className="table-subtext">{lot.product.name}</span>
                   </td>
-                  <td>{lot.quantity} {lot.product.unit}</td>
-                  <td>{lot.location}</td>
+                  <td><strong>{Number(lot.quantity).toLocaleString("tr-TR")} {lot.product.unit}</strong><span className="scrap-quantity-label">Fire</span></td>
+                  <td><strong className="table-primary">{lot.location}</strong><span className="table-subtext">{lot.status === "SCRAPPED" ? "Hurda alanı" : "Kalite kontrolü"}</span></td>
                   <td><span className={`status-pill ${lot.status === "SCRAPPED" ? "status-paused" : lot.status === "QUARANTINED" ? "status-planned" : "quality-passed"}`}>{scrapStatusLabels[lot.status] ?? lot.status}</span></td>
-                  <td>{lot.actionWorkOrder?.orderNo ?? "-"}</td>
+                  <td><strong className="table-primary">{lot.actionWorkOrder?.orderNo ?? "-"}</strong><span className="table-subtext">{lot.actionWorkOrder?.status ?? "İş emri yok"}</span></td>
+                  <td className="inventory-row-actions">
+                    <button className="icon-button" type="button" title="Lot detayını göster" aria-label="Lot detayını göster" onClick={() => setExpandedScrapLotId((current) => current === lot.id ? null : lot.id)}>
+                      {expandedScrapLotId === lot.id ? <ChevronUp size={17} /> : <Eye size={17} />}
+                    </button>
+                  </td>
                 </tr>
+                {expandedScrapLotId === lot.id ? (
+                  <tr className="scrap-detail-row">
+                    <td colSpan="8">
+                      <div className="scrap-detail-grid">
+                        <span><small>Fire nedeni</small><strong>{lot.reason || "Belirtilmedi"}</strong></span>
+                        <span><small>Kalite kararı</small><strong>{lot.disposition || scrapStatusLabels[lot.status] || "Bekliyor"}</strong></span>
+                        <span><small>Açıklama</small><strong>{lot.note || "Açıklama yok"}</strong></span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+                </Fragment>
               ))}
-              {!isLoading && scrapLots.length === 0 ? <tr><td colSpan="7">Fire lotu bulunmuyor.</td></tr> : null}
+              {!isLoading && filteredScrapLots.length === 0 ? <tr><td colSpan="8">Filtreye uygun fire lotu bulunmuyor.</td></tr> : null}
             </tbody>
           </table>
         </div>

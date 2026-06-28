@@ -571,7 +571,7 @@ function QualityDashboard({ live, isLoading, error, lastUpdatedAt, onRefresh }) 
           </div>
           <div className="priority-list">
             {pendingQualityOperations.slice(0, 8).map((operation) => (
-              <Link className="priority-row" key={operation.id} to="/quality">
+              <Link className="priority-row" key={operation.id} to={`/quality?workOrderId=${operation.workOrder.id}&operationId=${operation.id}`}>
                 <div>
                   <strong>{operation.workOrder.orderNo}</strong>
                   <span>
@@ -878,7 +878,7 @@ export default function Dashboard() {
           </div>
           <div className="priority-list">
             {pendingQualityOperations.slice(0, 5).map((operation) => (
-              <Link className="priority-row" key={operation.id} to="/quality">
+              <Link className="priority-row" key={operation.id} to={`/quality?workOrderId=${operation.workOrder.id}&operationId=${operation.id}`}>
                 <div>
                   <strong>{operation.workOrder.orderNo}</strong>
                   <span>
