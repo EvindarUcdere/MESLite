@@ -12,6 +12,17 @@ export async function createProductionLog(payload) {
   });
 }
 
+export async function createScrapAction(productionLogId, payload) {
+  return executeOrQueue({
+    type: "SCRAP_ACTION",
+    payload: { ...payload, productionLogId },
+    request: async (body) => {
+      const response = await apiClient.post(`/production-logs/${productionLogId}/scrap-action`, body);
+      return response.data.data;
+    }
+  });
+}
+
 export async function uploadProductionLogImage(productionLogId, image) {
   const formData = new FormData();
 

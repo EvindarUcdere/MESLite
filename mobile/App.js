@@ -15,6 +15,7 @@ import { getWorkOrders } from "./src/api/workOrders.api";
 import { createOperationId, isOfflineQueuedResult } from "./src/offline/offlineApi";
 import { getOfflineQueueSummary, initOfflineQueue } from "./src/offline/offlineQueue";
 import { syncOfflineQueue } from "./src/offline/syncService";
+import MobileQualityView from "./src/components/MobileQualityView";
 
 const STATUS_LABELS = {
   PLANNED: "Planlandı",
@@ -1886,6 +1887,20 @@ export default function App() {
           ? "Senkronizasyon bekliyor"
           : "Senkronizasyon tamamlandı";
   const offlineStatusText = `${offlineSummary.pending} bekleyen, ${offlineSummary.failed} başarısız kayıt`;
+
+  if (user.role === "QUALITY_STAFF") {
+    return (
+      <MobileQualityView
+        user={user}
+        offlineSummary={offlineSummary}
+        isOfflineMode={isOfflineMode}
+        isSyncing={isSyncingOfflineQueue}
+        onSync={() => syncPendingOfflineOperations({ silent: false })}
+        onQueued={refreshOfflineSummary}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
