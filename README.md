@@ -1,428 +1,185 @@
 # MES Lite
 
-MES Lite is a realistic factory production tracking MVP built for portfolio, internship, technopark and junior/mid-level engineering interviews.
+MES Lite is a full-stack Manufacturing Execution System for tracking work orders from planning to final quality control. It combines a React management dashboard, an Expo React Native shop-floor application, and a Node.js/Express backend backed by PostgreSQL.
 
-The project is not only a CRUD dashboard. It models a real production flow where a work order moves through multiple operations, operators enter production data from mobile, managers monitor the process from web, quality decisions are tracked, and realtime notifications keep both sides synchronized.
-
-## Demo Factory Profile
-
-The demo data is standardized around a metal parts and machine equipment factory. MES Lite models products such as hydraulic valve bodies, motor cover sets, connection brackets and control panel boxes; their routes include cutting, pressing, CNC machining, drilling, welding, assembly, quality control and packaging.
-
-This factory profile also includes product BOMs, component materials and initial stock records, so the project can evolve naturally toward MRP, stock reservation and production planning.
+The system models production as a sequence of route operations rather than a single completed/not-completed flag. Operators record production, scrap, downtime, and field notes at each step; managers and quality staff follow the same process through role-specific web workflows.
 
 ## Live Demo
 
-| Target | URL |
+| Service | URL |
 | --- | --- |
-| Web dashboard | `https://mes-lite-web.vercel.app` |
-| Backend health | `https://meslite-production.up.railway.app/health` |
-| Swagger API docs | `https://meslite-production.up.railway.app/api/docs` |
-| Android preview APK | `https://expo.dev/artifacts/eas/udS1MUwJXDSZiTTSCaYdQV.apk` |
+| Web dashboard | https://mes-lite-web.vercel.app |
+| Backend health | https://meslite-production.up.railway.app/health |
+| Swagger API documentation | https://meslite-production.up.railway.app/api/docs |
 
-Production deployment stack:
+Demo credentials are intended for local seeded data. See [Demo Users](#demo-users).
 
-- Backend and PostgreSQL run on Railway.
-- Web dashboard runs on Vercel.
-- Mobile operator app is built with Expo EAS as an Android internal distribution APK.
+## Why MES Lite?
 
-Current mobile note:
-
-```text
-Local Android notifications, sound and badge diagnostics work.
-Realtime in-app notifications work through Socket.io.
-Background push token registration is being diagnosed on the EAS/Firebase FCM side.
-```
-
-## Portfolio Highlights
-
-MES Lite was designed to show backend-heavy product thinking, not only screen implementation:
-
-- Critical production rules live in the backend service layer, not only in React state.
-- PostgreSQL is treated as the source of truth.
-- Socket.io is used after database commits, so realtime updates do not replace persistence.
-- Operation-level production quantities prevent inflated work order totals.
-- Scrap in one operation reduces the transferable quantity for the next operation.
-- Quality failures are tracked as decisions, not just labels.
-- Shift, machine, operator, downtime and quality metrics are reportable.
-- Web and mobile clients share the same backend contracts.
-
-## Türkçe Kısa Özet
-
-MES Lite, fabrika üretim süreçlerini takip etmek için geliştirilen gerçekçi bir MVP projesidir. Sistem; iş emirlerini rota ve operasyon adımlarıyla takip eder, operatörlerin mobil uygulama üzerinden üretim, fire, duruş ve not bilgisi girmesini sağlar, üretim yöneticisinin web panelden süreci anlık izlemesine imkân verir.
-
-Projede özellikle şu gerçek üretim problemleri ele alındı:
-
-- Ürünün hangi operasyon adımında olduğunu izleme.
-- Operasyonlar arası fire sonrası aktarılabilir miktarı hesaplama.
-- Operatörün eksik üretimi tamamlandı diye kapatmasını engelleme.
-- Kalite uygunsuzluklarında geri işleme, hurda veya şartlı kabul kararı verme.
-- Vardiya, makine, operatör ve duruş nedeni bazlı raporlama.
-- Web ve mobil arasında anlık bildirim ve operasyon bazlı mesaj akışı.
-
-## What Problem Does It Solve?
-
-Factories need more than a simple "work order completed" status. A production manager needs to answer questions like:
+A production manager needs more than a final work-order status. MES Lite answers operational questions such as:
 
 - Which operation is the product currently in?
 - Which operator and machine worked on each step?
-- How many units were produced and how many became scrap?
-- Did scrap in one operation reduce the quantity available for the next operation?
-- Why was production paused?
-- Which shift, machine or operator caused more downtime or scrap?
-- What happened after a failed quality check?
-- Did the next operator receive a notification when the previous operation finished?
+- How much was produced, scrapped, or transferred forward?
+- Why did production stop and how long did the downtime last?
+- Can the next operation safely start with the available quantity?
+- Which quality decision followed a nonconformity?
+- What happens when factory internet access is interrupted?
 
-MES Lite focuses on these real factory questions.
+## Core Capabilities
 
-## Core Features
+- Route-based work orders with ordered operation handoff
+- Operator and machine assignment for every production step
+- Production, scrap, downtime, field-note, and visual-evidence records
+- Backend-enforced quantity transfer and completion validation
+- Quality checks with passed, failed, and partial decisions
+- Scrap, rework, reproduction, and conditional-acceptance workflows
+- Role-based experiences for planning, production, quality, administration, and operators
+- Persistent notifications and Socket.io realtime updates
+- Shift planning and operator calendars
+- SQL-based production, downtime, machine, operator, shift, and quality reports
+- Audit logs and domain events for critical business actions
 
-- Role-based authentication with JWT and bcrypt.
-- Web management dashboard for admin, production manager and quality staff.
-- Mobile operator app with assigned work orders, operation details and production entry.
-- Route-based work order flow: `Cutting -> Assembly -> Quality`.
-- Operation-level production, scrap, downtime, notes and visual evidence.
-- Quantity transfer control between operations.
-- Operator completion guard: operators cannot close incomplete production as completed.
-- Manager override for exceptional incomplete closures.
-- Realtime updates with Socket.io.
-- Persistent notification center for web and mobile.
-- Expo push token infrastructure for mobile push notifications.
-- Quality checks, nonconformity alerts and quality action decisions.
-- Shift-based production reporting.
-- Downtime reason analysis.
-- Operation delay/time analysis.
-- Quality decision reports by operation and machine.
-- Demo data and backend acceptance tests for repeatable validation.
+## Offline-First Production
 
-## Tech Stack
+MES Lite is designed so an internet interruption does not stop shop-floor data entry.
 
-### Backend
+The mobile application stores critical actions in a local SQLite queue when the backend cannot be reached:
 
-- Node.js
-- Express
-- PostgreSQL
-- Prisma
-- JWT
-- bcrypt
-- Socket.io
-- Zod
-- Multer
-- Swagger
+- production and scrap entries
+- operation start, pause, resume, and completion
+- downtime reasons and operation notes
+- quality checks and quality-action decisions
 
-### Web
-
-- React
-- Vite
-- Tailwind CSS
-- Recharts
-- socket.io-client
-- lucide-react
-
-### Mobile
-
-- React Native Expo
-- React Native Web
-- AsyncStorage
-- expo-image-picker
-- expo-notifications
-- socket.io-client
-
-### Deploy Targets
-
-- Railway for backend and PostgreSQL
-- Vercel for web dashboard
-- Expo/EAS for mobile build
-
-## System Architecture
+Each queued action receives a UUID `operationId`. When connectivity returns, actions are replayed in creation order through the REST API. The backend stores processed identifiers in `OfflineOperationLog`, preventing the same production action from being applied twice.
 
 ```text
-Mobile Operator App        Web Dashboard
-        |                       |
-        | REST API              | REST API
-        | Socket.io             | Socket.io
-        v                       v
-              Express Backend
-                    |
-       Service Layer / Business Rules
-                    |
-              Prisma ORM
-                    |
-              PostgreSQL
+Mobile action
+    |
+    +-- Backend reachable --> REST API --> PostgreSQL
+    |
+    +-- Backend unavailable --> SQLite queue
+                                  |
+                                  +-- Connectivity restored
+                                         |
+                                         v
+                                   Ordered REST sync
+                                         |
+                                         v
+                                Idempotency validation
 ```
 
-Important design decision:
+Business rules still run during synchronization. A queued action can be rejected if, for example, its work order has already closed, its quantity is no longer valid, or the operator is not authorized. Failed items remain visible with an error message instead of being silently discarded.
+
+For factory deployments, a local edge backend can remain reachable over the factory LAN even when external internet access is unavailable. Socket.io improves online responsiveness but is not used as the persistence mechanism.
+
+## Production Integrity Rules
+
+Critical rules live in the backend service layer and are applied to online and synchronized offline requests.
+
+### Operation handoff
+
+A route may look like:
 
 ```text
-REST API writes data.
-Socket.io only announces committed changes.
-PostgreSQL is the source of truth.
+Cutting -> Pressing -> Welding -> Final Quality Control
 ```
 
-This prevents UI-only state bugs. Even if the mobile or web UI behaves incorrectly, critical factory rules are enforced in the backend service layer.
+Completing one operation makes the next assigned operation ready. Operators cannot start arbitrary route steps or complete operations assigned to another user.
 
-## Architecture Highlights
-
-MES Lite intentionally uses a hybrid backend architecture. The project does not force every database operation through the same pattern.
-
-### Prisma ORM for Business Workflows
-
-Prisma is used for transactional factory workflows where data consistency, relation handling and maintainable service-layer code are more important than raw aggregation speed.
-
-Prisma-backed areas:
-
-- authentication and users
-- work orders and operation assignments
-- production logs
-- notifications
-- downtime records
-- machines and operator skills
-- quality checks
-- shift planning
-
-Reason:
-
-```text
-These flows change core factory state.
-They need readable business rules, transactions and relation-safe writes.
-```
-
-### SQL for Reporting and Analytics
-
-Advanced reports use raw SQL through Prisma `$queryRaw` in:
-
-```text
-backend/src/modules/reports/reportSql.service.js
-```
-
-SQL-backed areas:
-
-- OEE dashboard metrics
-- production KPIs
-- shift performance analysis
-- monthly planned vs actual production
-- scrap/fire trends
-- machine efficiency reports
-- downtime and delay analysis
-- operator and machine performance reports
-
-Reason:
-
-```text
-Reports need grouping, date buckets, joins and aggregations.
-SQL is clearer and more efficient than loading large datasets into JavaScript.
-```
-
-The data-access strategy is:
-
-```text
-Prisma ORM = transactional business consistency
-Raw SQL    = analytical reporting and KPI aggregation
-PostgreSQL = source of truth
-```
-
-### Domain Event Layer
-
-MES Lite includes a lightweight domain event layer:
-
-```text
-backend/src/events/domainEventBus.js
-backend/src/events/domainEvents.js
-backend/src/events/registerDomainEventHandlers.js
-```
-
-Important backend actions emit domain events after database transactions are completed:
-
-- `workOrder.created`
-- `workOrder.started`
-- `workOrder.paused`
-- `productionLog.created`
-- `operation.paused`
-- `operation.completed`
-- `scrapActionWorkOrder.created`
-- `qualityCheck.failed`
-- `shift.started`
-- `notification.created`
-
-Reason:
-
-```text
-The business action and its side effects are separated.
-Notifications, realtime updates, push delivery, audit extensions and future ERP integrations
-can react to events without making the core services harder to maintain.
-```
-
-For this MVP, the event bus is in-process with Node.js `EventEmitter`. It is intentionally simple, but the structure can later evolve into RabbitMQ, Kafka or cloud queues if MES Lite becomes a multi-service system.
-
-## Production Flow
-
-A work order can be linked to a route:
-
-```text
-Cutting -> Assembly -> Quality Control
-```
-
-Each operation has its own:
-
-- status
-- assigned operator
-- machine
-- planned quantity
-- produced quantity
-- scrap quantity
-- downtime records
-- operation messages
-- production logs
-
-The system can therefore answer:
-
-```text
-The work order is in Assembly.
-Cutting produced 120 units and 20 scrap.
-Assembly can continue with only 100 transferable units.
-```
-
-## Quantity Transfer Rule
+### Quantity transfer
 
 For the first operation:
 
 ```text
-transfer quantity = work order planned quantity
+transfer quantity = work-order planned quantity
 ```
 
 For later operations:
 
 ```text
-transfer quantity = previous operation produced quantity - previous operation scrap quantity
+transfer quantity = previous operation output after scrap
 ```
 
-Why this matters:
+This prevents downstream operations from producing quantities that were lost in an earlier step.
+
+### Completion validation
+
+An operator cannot close an operation before processing its transferable quantity. Exceptional incomplete closure is restricted to authorized manager workflows.
+
+## Quality Workflow
+
+Completed operations marked for quality control appear in the quality queue. Quality staff can record:
+
+- `PASSED`
+- `FAILED`
+- `PARTIAL`
+
+Failed or partial checks require a defect reason and can create a tracked production alert. Follow-up decisions include:
+
+- rework operation
+- scrap
+- reproduction
+- conditional acceptance
+
+Quality records remain linked to the work order and operation for traceability and reporting.
+
+## Architecture
 
 ```text
-If Cutting produced 120 and 20 became scrap, Assembly must not produce 120.
-It can only continue with 100 usable units.
+React Web Dashboard              Expo React Native App
+          |                               |
+          | REST API + Socket.io          | REST API + Socket.io
+          |                               | SQLite offline queue
+          +---------------+---------------+
+                          |
+                    Express Backend
+                          |
+              Service Layer / Business Rules
+                          |
+                    Prisma + Raw SQL
+                          |
+                      PostgreSQL
 ```
 
-This rule is enforced in the backend, not only in the UI.
+Design principles:
 
-## Realtime and Notifications
+- PostgreSQL is the source of truth.
+- REST API requests perform persistent writes.
+- Socket.io announces changes only after committed operations.
+- Prisma handles transactional business workflows.
+- Raw SQL handles reporting and KPI aggregation.
+- UUID-based idempotency protects replayed offline operations.
 
-When an important backend action happens:
+## Technology Stack
 
-1. Data is written to PostgreSQL.
-2. A persistent notification is created.
-3. Socket.io emits an event to active clients.
-4. If a mobile push token exists, Expo Push API can send a device notification.
-
-Example events:
-
-```text
-notification:created
-workOrder:updated
-workOrderOperation:updated
-production:logged
-operationMessage:created
-operationDowntime:created
-productionAlert:created
-productionAlert:updated
-quality:checked
-```
-
-This means:
-
-- If the app is open, Socket.io updates the screen.
-- If the user opens the app later, the notification is still in PostgreSQL.
-- If native push is configured, mobile can receive background notifications.
-
-## Quality Flow
-
-Quality checks are linked to the work order and the checked operation.
-
-If a quality check fails or is partially accepted, the system creates a production alert. The production manager can then choose a quality action decision:
-
-```text
-REWORK_OPERATION
-SCRAP
-CONDITIONAL_ACCEPT
-```
-
-This turns quality from a simple result field into a tracked decision workflow.
-
-## Reporting
-
-The web reports page uses backend-generated metrics from:
-
-```text
-GET /api/reports/overview
-```
-
-Report areas:
-
-- Shift performance
-- Operator performance by shift
-- Machine performance by shift
-- Downtime reason analysis
-- Downtime by operation, machine and shift
-- Operation time and delay analysis
-- Quality traceability
-- Quality action decision analysis
-
-## Roles
-
-| Role | Main Responsibility |
+| Area | Technologies |
 | --- | --- |
-| `ADMIN` | User management, authorization, audit visibility and system-level administration |
-| `PLANNER` | Sales order intake, MRP checks, work order creation, shift planning and operation assignment |
-| `PRODUCTION_MANAGER` | Live production monitoring, operation interventions, downtime follow-up and reports |
-| `QUALITY_STAFF` | Quality checks, nonconformity follow-up and scrap/rework decisions |
-| `OPERATOR` | Mobile production entry, operation status, notes, downtime |
+| Backend | Node.js, Express, Prisma, PostgreSQL, Zod, JWT, bcrypt |
+| Realtime | Socket.io, persistent notifications, domain events |
+| Web | React, Vite, Recharts, lucide-react |
+| Mobile | Expo React Native, SQLite, AsyncStorage, expo-image-picker |
+| Reporting | PostgreSQL SQL queries through Prisma `$queryRaw` |
+| Deployment | Railway, Vercel, Expo EAS |
 
-## Demo Users
-
-All demo users use this password:
-
-```text
-Admin123!
-```
-
-| User | Email | Role |
-| --- | --- | --- |
-| MES Lite Admin | `admin@meslite.local` | `ADMIN` |
-| Planning Specialist | `planner@meslite.local` | `PLANNER` |
-| Production Manager | `manager@meslite.local` | `PRODUCTION_MANAGER` |
-| Line Operator | `operator@meslite.local` | `OPERATOR` |
-| Ali Kaya | `assembly.operator@meslite.local` | `OPERATOR` |
-| Zeynep Demir | `quality.operator@meslite.local` | `OPERATOR` |
-| Quality Staff | `quality@meslite.local` | `QUALITY_STAFF` |
-
-These credentials are for local demo data only.
-
-## Demo Walkthrough
-
-A repeatable demo can be presented with this story:
-
-1. Login to the web dashboard as admin or production manager.
-2. Create or inspect a route-based work order.
-3. Assign operation steps to operators and machines.
-4. Login to the mobile app as an operator.
-5. Start the assigned operation, enter produced quantity, scrap quantity, downtime reason, note and visual evidence.
-6. Complete the operation and verify that the next operation becomes ready.
-7. Open the web dashboard and inspect realtime updates, operation messages and notifications.
-8. Enter a quality check and, if needed, create a rework, scrap or conditional acceptance decision.
-9. Review reports for shift, downtime, machine, operator and quality decision metrics.
-
-The same scenario is documented in `docs/e2e-demo-scenario.md` and backed by acceptance tests.
-
-## Project Structure
+## Repository Structure
 
 ```text
-backend/  Express API, Prisma schema, Socket.io, Swagger, acceptance tests
-web/      React management dashboard
-mobile/   Expo operator application
-docs/     Architecture, phase notes, technical reviews and demo scenario
-scripts/  Local development helper scripts
+backend/  Express API, Prisma schema, business rules, tests
+web/      React management and reporting dashboard
+mobile/   Expo mobile app and SQLite offline synchronization
+docs/     Architecture, workflow, deployment, and technical notes
+scripts/  Local development helpers
 ```
 
-## Local Development
+## Local Setup
+
+### Requirements
+
+- Node.js
+- PostgreSQL
+- npm
+- Expo Go or an Android development/preview build for mobile testing
 
 ### 1. Install dependencies
 
@@ -430,51 +187,30 @@ scripts/  Local development helper scripts
 npm.cmd install
 ```
 
-### 2. Configure environment files
-
-Backend:
+### 2. Create environment files
 
 ```powershell
 Copy-Item backend\.env.example backend\.env
+Copy-Item web\.env.example web\.env
+Copy-Item mobile\.env.example mobile\.env
 ```
 
-Default PostgreSQL connection:
+Default local PostgreSQL URL:
 
 ```text
 postgresql://postgres:postgres@localhost:5432/mes_lite?schema=public
 ```
 
-Web:
-
-```powershell
-Copy-Item web\.env.example web\.env
-```
-
-Mobile:
-
-```powershell
-Copy-Item mobile\.env.example mobile\.env
-```
-
-For mobile web on the same computer:
-
-```text
-EXPO_PUBLIC_API_URL=http://localhost:4000/api
-```
-
-For Android emulator:
-
-```text
-EXPO_PUBLIC_API_URL=http://10.0.2.2:4000/api
-```
-
-For a physical phone:
+For a physical phone on the same local network:
 
 ```text
 EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_LOCAL_IP:4000/api
+EXPO_PUBLIC_EDGE_API_URL=http://YOUR_COMPUTER_LOCAL_IP:4000/api
 ```
 
-### 3. Prepare database
+For an Android emulator, use `10.0.2.2` instead of `localhost`.
+
+### 3. Prepare the database
 
 ```powershell
 cd backend
@@ -482,125 +218,88 @@ npm.cmd run prisma:migrate
 npm.cmd run seed:demo
 ```
 
-To reset repeatable demo work orders:
+### 4. Start the project
 
-```powershell
-npm.cmd run reset:demo
-```
-
-### 4. Start all services
-
-From the project root:
+From the repository root:
 
 ```powershell
 npm.cmd run dev
 ```
 
-URLs:
+Local services:
 
-- Backend API: `http://localhost:4000`
-- Swagger docs: `http://localhost:4000/api/docs`
-- Web dashboard: `http://localhost:5173`
-- Mobile operator web: `http://localhost:8081` or the Expo port shown in terminal
+| Service | Address |
+| --- | --- |
+| Backend | `http://localhost:4000` |
+| Swagger | `http://localhost:4000/api/docs` |
+| Web | `http://localhost:5173` |
+| Expo | Address shown by the Expo CLI |
 
-If only one service is needed:
+Individual services can be started with:
 
 ```powershell
 npm.cmd run dev:backend
 npm.cmd run dev:web
-npm.cmd run dev:mobile:web
+npm.cmd run dev:mobile:phone
 ```
 
-## Backend Acceptance Tests
+## Demo Users
 
-Run from `backend/`:
+Local seeded users use the password `Admin123!`.
+
+| Role | Email |
+| --- | --- |
+| Administrator | `admin@meslite.local` |
+| Planner | `planner@meslite.local` |
+| Production manager | `manager@meslite.local` |
+| Operator | `operator@meslite.local` |
+| Quality staff | `quality@meslite.local` |
+
+## Demo Flow
+
+1. Sign in to the web dashboard as a planner or production manager.
+2. Create or inspect a route-based work order.
+3. Assign each operation to an operator and machine.
+4. Sign in to the mobile app as the assigned operator.
+5. Start the operation and record production, scrap, downtime, or notes.
+6. Complete the operation and verify the handoff to the next operator.
+7. Complete a quality-required operation and record its quality result.
+8. Review notifications, audit history, and production reports.
+9. Repeat a mobile action offline and verify ordered, duplicate-safe synchronization.
+
+The detailed walkthrough is available in [docs/e2e-demo-scenario.md](docs/e2e-demo-scenario.md).
+
+## Verification
+
+Backend acceptance scripts cover production integrity, transfer control, downtime, quality, reporting, notifications, and concurrent requests.
+
+Examples:
 
 ```powershell
-npm.cmd run test:phase2
-npm.cmd run test:phase3:shifts
+cd backend
+npm.cmd run test:phase3:transfer
 npm.cmd run test:phase3:downtimes
-npm.cmd run test:phase3:time
 npm.cmd run test:phase3:quality
 npm.cmd run test:phase3:quality-action
-npm.cmd run test:phase3:quality-decision
-npm.cmd run test:phase3:quality-decision-report
-npm.cmd run test:phase3:quality-pending
-npm.cmd run test:phase3:transfer
 npm.cmd run test:phase3:notifications
-npm.cmd run test:phase3:push
 npm.cmd run check:production-consistency
 ```
 
-The tests focus on backend business rules because factory data consistency is more important than UI-only behavior.
+See `backend/package.json` for the complete test command list.
 
-## Key Documentation
+## Documentation
 
-- `docs/architecture.md`: system principles and module boundaries
-- `docs/system-flow.md`: role-based factory workflow
-- `docs/phase-2-technical-review.md`: Phase 2 technical review
-- `docs/phase-3-technical-review.md`: Phase 3 technical review
-- `docs/phase-3-operation-transfer-control.md`: quantity transfer rules
-- `docs/phase-3-shift-reporting.md`: shift-based reporting
-- `docs/phase-3-downtime-tracking.md`: downtime reason tracking
-- `docs/phase-3-quality-action-decision.md`: quality decision workflow
-- `docs/phase-4-deployment-plan.md`: deployment and production demo preparation
-- `docs/phase-4-production-env-checklist.md`: Railway, Vercel and mobile production env checklist
-- `docs/phase-4-mobile-build-plan.md`: Expo/EAS mobile APK build plan
-- `docs/e2e-demo-scenario.md`: repeatable demo scenario
-- `docs/demo-data-management.md`: demo reset and cleanup commands
+- [Architecture](docs/architecture.md)
+- [System flow](docs/system-flow.md)
+- [Operation transfer control](docs/phase-3-operation-transfer-control.md)
+- [Downtime tracking](docs/phase-3-downtime-tracking.md)
+- [Quality action decisions](docs/phase-3-quality-action-decision.md)
+- [Deployment plan](docs/phase-4-deployment-plan.md)
+- [Production environment checklist](docs/phase-4-production-env-checklist.md)
+- [End-to-end demo scenario](docs/e2e-demo-scenario.md)
 
-## Phase Summary
+## Türkçe Özet
 
-### MVP
+MES Lite; iş emirlerini rota ve operasyon adımlarıyla takip eden, operatörlerin mobil uygulamadan üretim, fire, duruş ve saha notu girebildiği tam kapsamlı bir üretim yönetim sistemidir. Yönetim ve kalite ekipleri web paneli üzerinden üretimi anlık izleyebilir, kalite kararlarını yönetebilir ve vardiya, makine, operatör, duruş ve kalite raporlarını inceleyebilir.
 
-- Authentication
-- Users, products, machines, shifts
-- Work orders
-- Basic production and quality tracking
-- Dashboard and reports
-
-### Phase 2
-
-- Route-based production flow
-- Work order operations
-- Mobile operator production entry
-- Operation messages
-- Operation-level quality context
-- Realtime synchronization
-
-### Phase 3
-
-- Quantity transfer control
-- Downtime reason tracking
-- Shift-based reports
-- Operation time and delay analysis
-- Quality action decisions
-- Notification routing
-- Web notification center
-- Mobile push token infrastructure
-- Production consistency checks
-
-### Phase 4
-
-- Railway backend and PostgreSQL deployment
-- Vercel web deployment
-- Expo EAS Android preview APK build
-- Production environment variable separation
-- Production health checks and Swagger validation
-- README and demo documentation for portfolio presentation
-- Mobile notification diagnostics for Android push setup
-
-Future Phase 4+ candidates:
-
-- Docker Compose local setup
-- Stronger audit log UI
-- Report filters and export
-- Mobile offline queue
-- Role-specific UI polishing
-- Final Firebase/FCM push credential hardening
-
-## Interview-Level Technical Summary
-
-MES Lite models work orders as route-based operation flows. Each operation has its own operator, machine, production quantity, scrap quantity, downtime and messages. The backend enforces production rules such as quantity transfer, operator authorization and incomplete completion guards. Socket.io is used only for realtime synchronization after database commits, while PostgreSQL remains the source of truth. Quality issues are tracked as production alerts with explicit decisions such as rework, scrap or conditional acceptance. Reports aggregate production by shift, machine, operator, downtime reason and quality decision.
-
-This makes the project closer to a real MES workflow than a standard admin panel.
+Mobil uygulama SQLite tabanlı offline queue kullanır. Bağlantı kesildiğinde kritik saha işlemleri telefonda saklanır; bağlantı geri geldiğinde sırasıyla backend'e aktarılır. Her işlem benzersiz bir `operationId` ile işlendiği için aynı üretim kaydı iki kez uygulanmaz.
