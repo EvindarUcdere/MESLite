@@ -10,6 +10,31 @@ const scrapStatusLabels = {
   CONDITIONALLY_ACCEPTED: "Şartlı kabul"
 };
 
+const scrapReasonLabels = {
+  MACHINE_FAILURE: "Makine Arızası",
+  MATERIAL_DEFECT: "Malzeme Hatası",
+  OPERATOR_ERROR: "Operatör Hatası",
+  PROCESS_DEVIATION: "Proses Sapması",
+  QUALITY_REJECT: "Kalite Reddi",
+  OTHER: "Diğer"
+};
+
+const scrapDispositionLabels = {
+  PENDING_REVIEW: "İnceleme Bekliyor",
+  REWORK: "Yeniden İşlem",
+  REPRODUCE: "Telafi Üretimi",
+  SCRAP: "Hurda",
+  CONDITIONAL_ACCEPT: "Şartlı Kabul"
+};
+
+const workOrderStatusLabels = {
+  PLANNED: "Planlandı",
+  IN_PROGRESS: "Üretimde",
+  PAUSED: "Duraklatıldı",
+  COMPLETED: "Tamamlandı",
+  CANCELLED: "İptal Edildi"
+};
+
 const movementTypeLabels = {
   PURCHASE_IN: "Satın Alma Girişi",
   PRODUCTION_IN: "Üretim Girişi",
@@ -33,6 +58,7 @@ export default function Inventory() {
   const [scrapSearch, setScrapSearch] = useState("");
   const [scrapStatusFilter, setScrapStatusFilter] = useState("ALL");
   const [expandedScrapLotId, setExpandedScrapLotId] = useState(null);
+  const [inventoryTableView, setInventoryTableView] = useState("STOCK");
   const [movementForm, setMovementForm] = useState({
     productId: "",
     type: "PURCHASE_IN",
@@ -332,7 +358,20 @@ export default function Inventory() {
         </article>
       </section>
 
-      <section className="panel production-log-panel scrap-tracking-panel">
+      <nav className="inventory-view-tabs" aria-label="Stok kayıt görünümü">
+        {[
+          { value: "STOCK", label: "Stok Kartları", count: stockItems.length },
+          { value: "SCRAP", label: "Fire ve Hurda", count: scrapLots.length },
+          { value: "MOVEMENTS", label: "Son Hareketler", count: movements.length }
+        ].map((view) => (
+          <button key={view.value} className={inventoryTableView === view.value ? "is-active" : ""} type="button" onClick={() => setInventoryTableView(view.value)}>
+            <span>{view.label}</span>
+            <strong>{view.count}</strong>
+          </button>
+        ))}
+      </nav>
+
+      {inventoryTableView === "SCRAP" ? <section className="panel production-log-panel scrap-tracking-panel">
         <div className="chart-card-header inventory-section-header">
           <div>
             <h2>Fire Karantina ve Hurda Takibi</h2>
@@ -386,7 +425,7 @@ export default function Inventory() {
                   <td><strong>{Number(lot.quantity).toLocaleString("tr-TR")} {lot.product.unit}</strong><span className="scrap-quantity-label">Fire</span></td>
                   <td><strong className="table-primary">{lot.location}</strong><span className="table-subtext">{lot.status === "SCRAPPED" ? "Hurda alanı" : "Kalite kontrolü"}</span></td>
                   <td><span className={`status-pill ${lot.status === "SCRAPPED" ? "status-paused" : lot.status === "QUARANTINED" ? "status-planned" : "quality-passed"}`}>{scrapStatusLabels[lot.status] ?? lot.status}</span></td>
-                  <td><strong className="table-primary">{lot.actionWorkOrder?.orderNo ?? "-"}</strong><span className="table-subtext">{lot.actionWorkOrder?.status ?? "İş emri yok"}</span></td>
+                  <td><strong className="table-primary">{lot.actionWorkOrder?.orderNo ?? "-"}</strong><span className="table-subtext">{lot.actionWorkOrder ? workOrderStatusLabels[lot.actionWorkOrder.status] ?? lot.actionWorkOrder.status : "İş emri yok"}</span></td>
                   <td className="inventory-row-actions">
                     <button className="icon-button" type="button" title="Lot detayını göster" aria-label="Lot detayını göster" onClick={() => setExpandedScrapLotId((current) => current === lot.id ? null : lot.id)}>
                       {expandedScrapLotId === lot.id ? <ChevronUp size={17} /> : <Eye size={17} />}
@@ -397,8 +436,8 @@ export default function Inventory() {
                   <tr className="scrap-detail-row">
                     <td colSpan="8">
                       <div className="scrap-detail-grid">
-                        <span><small>Fire nedeni</small><strong>{lot.reason || "Belirtilmedi"}</strong></span>
-                        <span><small>Kalite kararı</small><strong>{lot.disposition || scrapStatusLabels[lot.status] || "Bekliyor"}</strong></span>
+                        <span><small>Fire nedeni</small><strong>{scrapReasonLabels[lot.reason] ?? lot.reason ?? "Belirtilmedi"}</strong></span>
+                        <span><small>Kalite kararı</small><strong>{scrapDispositionLabels[lot.disposition] ?? lot.disposition ?? scrapStatusLabels[lot.status] ?? "Bekliyor"}</strong></span>
                         <span><small>Açıklama</small><strong>{lot.note || "Açıklama yok"}</strong></span>
                       </div>
                     </td>
@@ -410,9 +449,9 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
 
-      <section className="panel production-log-panel">
+      {inventoryTableView === "STOCK" ? <section className="panel production-log-panel">
         <div className="chart-card-header">
           <div>
             <h2>Stok Kartları</h2>
@@ -462,9 +501,9 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
 
-      <section className="panel production-log-panel">
+      {inventoryTableView === "MOVEMENTS" ? <section className="panel production-log-panel">
         <div className="chart-card-header">
           <div>
             <h2>Son Stok Hareketleri</h2>
@@ -520,7 +559,7 @@ export default function Inventory() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
     </div>
   );
 }

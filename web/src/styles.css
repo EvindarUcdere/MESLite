@@ -2656,6 +2656,50 @@ body {
   border-radius: 8px;
 }
 
+.inventory-view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  overflow-x: auto;
+  background: #eaf0f3;
+  border: 1px solid #d7e1e7;
+  border-radius: 8px;
+}
+
+.inventory-view-tabs button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 0 auto;
+  padding: 0 14px;
+  color: #526675;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inventory-view-tabs button.is-active {
+  color: #0f6f6a;
+  background: #ffffff;
+  border-color: #cbdde1;
+  box-shadow: 0 2px 6px rgba(15, 31, 46, 0.06);
+}
+
+.inventory-view-tabs strong {
+  min-width: 24px;
+  padding: 3px 6px;
+  color: inherit;
+  background: rgba(15, 118, 110, 0.1);
+  border-radius: 5px;
+  font-size: 12px;
+}
+
 .inventory-page .inventory-action-card {
   gap: 13px;
   padding: 16px;
@@ -2663,12 +2707,49 @@ body {
 
 .inventory-page .inventory-action-card .chart-card-header h2,
 .scrap-tracking-panel .chart-card-header h2 {
-  font-size: 16px;
+  color: #132d3f;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.inventory-page .inventory-action-card .chart-card-header p {
+  margin-top: 4px;
+  color: #71808d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.inventory-page .inventory-form {
+  gap: 12px 14px;
+}
+
+.inventory-page .inventory-form label {
+  gap: 5px;
+  color: #405565;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .inventory-page .inventory-form input,
 .inventory-page .inventory-form select {
   min-height: 42px;
+  padding: 0 12px;
+  color: #193246;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inventory-page .inventory-form input::placeholder {
+  color: #9aa7b3;
+  font-weight: 400;
+  opacity: 1;
+}
+
+.inventory-page .inventory-form button {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .scrap-tracking-panel {
