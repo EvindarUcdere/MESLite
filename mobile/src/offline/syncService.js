@@ -7,24 +7,30 @@ const MAX_RETRY_COUNT = 3;
 
 function getSyncRequest(operation) {
   const payload = operation.payload ?? {};
+  const config = {
+    headers: {
+      "X-MES-Operation-Source": "OFFLINE_SYNC",
+      "X-MES-Client-Created-At": operation.createdAt
+    }
+  };
 
   switch (operation.type) {
     case "PRODUCTION_LOG":
-      return () => apiClient.post("/production-logs", payload);
+      return () => apiClient.post("/production-logs", payload, config);
     case "OPERATION_START":
-      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/start`, payload);
+      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/start`, payload, config);
     case "OPERATION_PAUSE":
-      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/pause`, payload);
+      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/pause`, payload, config);
     case "OPERATION_COMPLETE":
-      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/complete`, payload);
+      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/complete`, payload, config);
     case "OPERATION_MESSAGE":
-      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/messages`, payload);
+      return () => apiClient.post(`/work-order-operations/${payload.workOrderOperationId}/messages`, payload, config);
     case "QUALITY_CHECK":
-      return () => apiClient.post("/quality-checks", payload);
+      return () => apiClient.post("/quality-checks", payload, config);
     case "QUALITY_ACTION_DECISION":
-      return () => apiClient.post(`/production-alerts/${payload.alertId}/quality-action`, payload);
+      return () => apiClient.post(`/production-alerts/${payload.alertId}/quality-action`, payload, config);
     case "SCRAP_ACTION":
-      return () => apiClient.post(`/production-logs/${payload.productionLogId}/scrap-action`, payload);
+      return () => apiClient.post(`/production-logs/${payload.productionLogId}/scrap-action`, payload, config);
     default:
       return null;
   }

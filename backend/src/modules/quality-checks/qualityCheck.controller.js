@@ -1,5 +1,5 @@
 import * as qualityCheckService from "./qualityCheck.service.js";
-import { runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
+import { getClientContextFromRequest, runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
 
 export async function list(_req, res) {
   const checks = await qualityCheckService.findQualityChecks();
@@ -19,6 +19,7 @@ export async function create(req, res) {
     user: req.user,
     workOrderId: payload.workOrderId,
     payload,
+    clientContext: getClientContextFromRequest(req),
     handler: () => qualityCheckService.createQualityCheck(req.user, payload)
   });
 

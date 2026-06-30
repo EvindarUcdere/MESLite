@@ -3270,8 +3270,74 @@ body {
 
 .audit-filter-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(220px, 0.8fr);
+  grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(200px, 0.8fr));
   gap: 12px;
+}
+
+.audit-view-tabs {
+  display: flex;
+  width: max-content;
+  padding: 4px;
+  background: #eaf0f3;
+  border: 1px solid #d4dfe5;
+  border-radius: 8px;
+}
+
+.audit-view-tabs button {
+  min-height: 38px;
+  padding: 0 16px;
+  color: #536774;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.audit-view-tabs button.is-active {
+  color: #0f6f6a;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 31, 46, 0.08);
+}
+
+.sync-source-badge {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 5px;
+  color: #425767;
+  background: #edf2f5;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.sync-source-offline_sync {
+  color: #8a4b08;
+  background: #fff0cf;
+}
+
+.sync-source-mobile_online {
+  color: #086c65;
+  background: #dcf5ef;
+}
+
+.sync-status-failed {
+  color: #a12d28;
+  background: #fde5e2;
+}
+
+.sync-status-synced {
+  color: #176a49;
+  background: #ddf2e7;
+}
+
+.sync-error-cell {
+  max-width: 260px;
+  color: #a12d28;
+  font-size: 12px;
+  white-space: normal;
 }
 
 .audit-filter-grid label {

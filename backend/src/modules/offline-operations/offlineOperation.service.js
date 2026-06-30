@@ -10,6 +10,13 @@ function sanitizePayload(payload) {
   return safePayload;
 }
 
+export function getClientContextFromRequest(req) {
+  return {
+    source: req.get("x-mes-operation-source") || "UNKNOWN",
+    clientCreatedAt: req.get("x-mes-client-created-at") || null
+  };
+}
+
 async function findSyncedOperation(operationId) {
   const existing = await prisma.offlineOperationLog.findUnique({
     where: { operationId }
@@ -25,7 +32,39 @@ async function findSyncedOperation(operationId) {
   };
 }
 
-export async function runIdempotentOperation({ operationId, type, user, workOrderId, payload, handler }) {
+async function resolveWorkOrderId(workOrderId, payload) {
+  if (workOrderId) {
+    return workOrderId;
+  }
+
+  if (payload?.workOrderOperationId) {
+    const operation = await prisma.workOrderOperation.findUnique({
+      where: { id: payload.workOrderOperationId },
+      select: { workOrderId: true }
+    });
+    return operation?.workOrderId ?? null;
+  }
+
+  if (payload?.productionLogId) {
+    const productionLog = await prisma.productionLog.findUnique({
+      where: { id: payload.productionLogId },
+      select: { workOrderId: true }
+    });
+    return productionLog?.workOrderId ?? null;
+  }
+
+  if (payload?.alertId) {
+    const alert = await prisma.productionAlert.findUnique({
+      where: { id: payload.alertId },
+      select: { workOrderId: true }
+    });
+    return alert?.workOrderId ?? null;
+  }
+
+  return null;
+}
+
+export async function runIdempotentOperation({ operationId, type, user, workOrderId, payload, clientContext, handler }) {
   if (!operationId) {
     return {
       data: await handler(),
@@ -38,14 +77,19 @@ export async function runIdempotentOperation({ operationId, type, user, workOrde
     return syncedOperation;
   }
 
+  const resolvedWorkOrderId = await resolveWorkOrderId(workOrderId, payload);
+
   try {
     await prisma.offlineOperationLog.create({
       data: {
         operationId,
         type,
         userId: user.id,
-        workOrderId,
-        payload: sanitizePayload(payload),
+        workOrderId: resolvedWorkOrderId,
+        payload: {
+          ...(sanitizePayload(payload) ?? {}),
+          _clientContext: clientContext ?? { source: "UNKNOWN", clientCreatedAt: null }
+        },
         status: "PENDING",
         cloudSyncStatus: env.edgeMode ? "PENDING" : "NOT_REQUIRED"
       }
@@ -108,4 +152,35 @@ export async function runIdempotentOperation({ operationId, type, user, workOrde
 
     throw error;
   }
+}
+
+export async function findOfflineOperationLogs({ limit = 150, status, type, userId, workOrderId } = {}) {
+  const logs = await prisma.offlineOperationLog.findMany({
+    where: {
+      ...(status ? { status } : {}),
+      ...(type ? { type } : {}),
+      ...(userId ? { userId } : {}),
+      ...(workOrderId ? { workOrderId } : {})
+    },
+    include: {
+      user: { select: { id: true, name: true, email: true, role: true } }
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Number(limit) || 150, 300)
+  });
+
+  const workOrderIds = [...new Set(logs.map((log) => log.workOrderId).filter(Boolean))];
+  const workOrders = workOrderIds.length
+    ? await prisma.workOrder.findMany({
+        where: { id: { in: workOrderIds } },
+        select: { id: true, orderNo: true, product: { select: { code: true, name: true } } }
+      })
+    : [];
+  const workOrdersById = new Map(workOrders.map((workOrder) => [workOrder.id, workOrder]));
+
+  return logs.map((log) => ({
+    ...log,
+    clientContext: log.payload?._clientContext ?? { source: "UNKNOWN", clientCreatedAt: null },
+    workOrder: log.workOrderId ? workOrdersById.get(log.workOrderId) ?? null : null
+  }));
 }

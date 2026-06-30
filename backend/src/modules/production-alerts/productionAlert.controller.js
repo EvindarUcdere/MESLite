@@ -1,5 +1,5 @@
 import * as productionAlertService from "./productionAlert.service.js";
-import { runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
+import { getClientContextFromRequest, runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
 
 export async function list(req, res) {
   const alerts = await productionAlertService.findProductionAlerts(req.validated.query);
@@ -18,6 +18,7 @@ export async function decideQualityAction(req, res) {
     type: "QUALITY_ACTION_DECISION",
     user: req.user,
     payload: { alertId: req.params.id, ...payload },
+    clientContext: getClientContextFromRequest(req),
     handler: () => productionAlertService.decideQualityAction(req.user, req.params.id, payload)
   });
 

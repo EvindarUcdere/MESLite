@@ -1,5 +1,5 @@
 import * as productionLogService from "./productionLog.service.js";
-import { runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
+import { getClientContextFromRequest, runIdempotentOperation } from "../offline-operations/offlineOperation.service.js";
 
 export async function list(_req, res) {
   const logs = await productionLogService.findProductionLogs();
@@ -19,6 +19,7 @@ export async function create(req, res) {
     user: req.user,
     workOrderId: payload.workOrderId,
     payload,
+    clientContext: getClientContextFromRequest(req),
     handler: () => productionLogService.createProductionLog(req.user, payload)
   });
 
@@ -32,6 +33,7 @@ export async function createScrapAction(req, res) {
     type: "SCRAP_ACTION",
     user: req.user,
     payload: { productionLogId: req.params.id, ...payload },
+    clientContext: getClientContextFromRequest(req),
     handler: () => productionLogService.createScrapActionForProductionLog(req.user, req.params.id, payload)
   });
 

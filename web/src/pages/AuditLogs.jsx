@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getAuditLogs } from "../api/auditLogs.api.js";
+import { getOfflineOperationLogs } from "../api/offlineOperationLogs.api.js";
 
 const ACTION_LABELS = {
   WORK_ORDER_CREATED: "İş emri oluşturuldu",
@@ -26,6 +27,31 @@ const ENTITY_LABELS = {
   WorkOrderOperation: "Operasyon",
   ProductionLog: "Üretim Kaydı",
   QualityCheck: "Kalite"
+};
+
+const SYNC_TYPE_LABELS = {
+  PRODUCTION_LOG: "Üretim / fire kaydı",
+  OPERATION_START: "Operasyon başlatma",
+  OPERATION_PAUSE: "Operasyon duraklatma",
+  OPERATION_COMPLETE: "Operasyon tamamlama",
+  OPERATION_MESSAGE: "Saha notu",
+  QUALITY_CHECK: "Kalite sonucu",
+  QUALITY_ACTION_DECISION: "Kalite aksiyonu",
+  SCRAP_ACTION: "Fire kararı"
+};
+
+const SYNC_STATUS_LABELS = {
+  PENDING: "Bekliyor",
+  PROCESSING: "İşleniyor",
+  SYNCED: "Senkronize",
+  FAILED: "Başarısız"
+};
+
+const SOURCE_LABELS = {
+  OFFLINE_SYNC: "Offline kuyruk",
+  MOBILE_ONLINE: "Mobil online",
+  EDGE_SYNC: "Yerel sunucu",
+  UNKNOWN: "Eski kayıt"
 };
 
 function formatDateTime(value) {
@@ -57,17 +83,32 @@ function formatMetadata(metadata) {
     .join(" • ");
 }
 
+function formatSyncError(message) {
+  const translations = {
+    "Only started operations can be completed": "Yalnızca başlatılmış operasyonlar tamamlanabilir.",
+    "Only ready, paused or short-completed operations can be started": "Bu operasyon mevcut durumunda başlatılamaz.",
+    "Operation is already being processed": "İşlem hâlihazırda işleniyor."
+  };
+
+  return translations[message] ?? message ?? "-";
+}
+
 export default function AuditLogs() {
+  const [view, setView] = useState("AUDIT");
   const [logs, setLogs] = useState([]);
+  const [syncLogs, setSyncLogs] = useState([]);
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
+  const [syncStatusFilter, setSyncStatusFilter] = useState("ALL");
+  const [syncSourceFilter, setSyncSourceFilter] = useState("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
   async function loadAuditLogs() {
     try {
-      const data = await getAuditLogs({ limit: 150 });
-      setLogs(data);
+      const [auditData, syncData] = await Promise.all([getAuditLogs({ limit: 150 }), getOfflineOperationLogs({ limit: 200 })]);
+      setLogs(auditData);
+      setSyncLogs(syncData);
       setError("");
     } catch (_error) {
       setError("İşlem geçmişi yüklenemedi.");
@@ -102,6 +143,31 @@ export default function AuditLogs() {
     });
   }, [actionFilter, logs, search]);
 
+  const filteredSyncLogs = useMemo(() => {
+    const searchText = normalize(search.trim());
+
+    return syncLogs.filter((log) => {
+      const source = log.clientContext?.source ?? "UNKNOWN";
+      const matchesStatus = syncStatusFilter === "ALL" || log.status === syncStatusFilter;
+      const matchesSource = syncSourceFilter === "ALL" || source === syncSourceFilter;
+      const searchableText = [
+        log.operationId,
+        SYNC_TYPE_LABELS[log.type],
+        log.type,
+        log.user?.name,
+        log.user?.email,
+        log.workOrder?.orderNo,
+        log.workOrder?.product?.code,
+        log.errorMessage
+      ].join(" ");
+
+      return matchesStatus && matchesSource && (!searchText || normalize(searchableText).includes(searchText));
+    });
+  }, [search, syncLogs, syncSourceFilter, syncStatusFilter]);
+
+  const activeLogs = view === "AUDIT" ? filteredLogs : filteredSyncLogs;
+  const allActiveLogs = view === "AUDIT" ? logs : syncLogs;
+
   return (
     <div className="page-stack">
       <header className="page-header">
@@ -113,18 +179,23 @@ export default function AuditLogs() {
 
       {error ? <p className="form-error">{error}</p> : null}
 
+      <nav className="audit-view-tabs" aria-label="İzlenebilirlik görünümü">
+        <button className={view === "AUDIT" ? "is-active" : ""} type="button" onClick={() => setView("AUDIT")}>İşlem Geçmişi</button>
+        <button className={view === "SYNC" ? "is-active" : ""} type="button" onClick={() => setView("SYNC")}>Mobil Senkronizasyon</button>
+      </nav>
+
       <section className="summary-grid">
         <article>
           <span>Toplam Kayıt</span>
-          <strong>{isLoading ? "..." : logs.length}</strong>
+          <strong>{isLoading ? "..." : allActiveLogs.length}</strong>
         </article>
         <article>
           <span>Filtrelenen</span>
-          <strong>{isLoading ? "..." : filteredLogs.length}</strong>
+          <strong>{isLoading ? "..." : activeLogs.length}</strong>
         </article>
         <article>
           <span>Son İşlem</span>
-          <strong>{isLoading || !logs[0] ? "-" : formatDateTime(logs[0].createdAt)}</strong>
+          <strong>{isLoading || !allActiveLogs[0] ? "-" : formatDateTime(allActiveLogs[0].createdAt)}</strong>
         </article>
       </section>
 
@@ -134,7 +205,7 @@ export default function AuditLogs() {
             Arama
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="İş emri, kullanıcı, işlem veya detay ara" />
           </label>
-          <label>
+          {view === "AUDIT" ? <label>
             İşlem Tipi
             <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
               <option value="ALL">Tüm işlemler</option>
@@ -144,13 +215,30 @@ export default function AuditLogs() {
                 </option>
               ))}
             </select>
-          </label>
+          </label> : (
+            <>
+              <label>
+                Senkronizasyon Durumu
+                <select value={syncStatusFilter} onChange={(event) => setSyncStatusFilter(event.target.value)}>
+                  <option value="ALL">Tüm durumlar</option>
+                  {Object.entries(SYNC_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label>
+                Kayıt Kaynağı
+                <select value={syncSourceFilter} onChange={(event) => setSyncSourceFilter(event.target.value)}>
+                  <option value="ALL">Tüm kaynaklar</option>
+                  {Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </>
+          )}
         </div>
       </section>
 
       <section className="panel">
         <div className="table-wrap">
-          <table>
+          {view === "AUDIT" ? <table>
             <thead>
               <tr>
                 <th>Zaman</th>
@@ -183,7 +271,40 @@ export default function AuditLogs() {
                 </tr>
               ) : null}
             </tbody>
-          </table>
+          </table> : (
+            <table className="sync-log-table">
+              <thead>
+                <tr>
+                  <th>Sunucu Zamanı</th>
+                  <th>Kaynak</th>
+                  <th>Kullanıcı</th>
+                  <th>İşlem</th>
+                  <th>İş Emri</th>
+                  <th>Durum</th>
+                  <th>Cihaz Zamanı</th>
+                  <th>Hata</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSyncLogs.map((log) => {
+                  const source = log.clientContext?.source ?? "UNKNOWN";
+                  return (
+                    <tr key={log.id}>
+                      <td>{formatDateTime(log.createdAt)}</td>
+                      <td><span className={`sync-source-badge sync-source-${source.toLowerCase()}`}>{SOURCE_LABELS[source] ?? source}</span></td>
+                      <td><strong>{log.user?.name ?? "-"}</strong><span className="table-subtext">{log.user?.email ?? "-"}</span></td>
+                      <td><strong>{SYNC_TYPE_LABELS[log.type] ?? log.type}</strong><span className="table-subtext">{log.operationId}</span></td>
+                      <td><strong>{log.workOrder?.orderNo ?? "-"}</strong><span className="table-subtext">{log.workOrder?.product?.code ?? "-"}</span></td>
+                      <td><span className={`status-pill sync-status-${log.status.toLowerCase()}`}>{SYNC_STATUS_LABELS[log.status] ?? log.status}</span></td>
+                      <td>{formatDateTime(log.clientContext?.clientCreatedAt)}</td>
+                      <td className={log.errorMessage ? "sync-error-cell" : ""}>{formatSyncError(log.errorMessage)}</td>
+                    </tr>
+                  );
+                })}
+                {!isLoading && filteredSyncLogs.length === 0 ? <tr><td colSpan="8">Senkronizasyon kaydı bulunamadı.</td></tr> : null}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
     </div>

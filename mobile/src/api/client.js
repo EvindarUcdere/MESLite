@@ -106,6 +106,14 @@ apiClient.interceptors.request.use(async (config) => {
   config.baseURL = await resolveApiBaseUrl();
   const token = await AsyncStorage.getItem("mes_lite_mobile_token");
 
+  if (!config.headers["X-MES-Operation-Source"]) {
+    config.headers["X-MES-Operation-Source"] = "MOBILE_ONLINE";
+  }
+
+  if (!config.headers["X-MES-Client-Created-At"]) {
+    config.headers["X-MES-Client-Created-At"] = new Date().toISOString();
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
