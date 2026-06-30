@@ -1,4 +1,5 @@
 import * as SQLite from "expo-sqlite";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const OFFLINE_OPERATION_STATUS = {
   PENDING: "PENDING",
@@ -7,6 +8,20 @@ export const OFFLINE_OPERATION_STATUS = {
 };
 
 let databasePromise = null;
+
+async function getCurrentOwnerId() {
+  const userJson = await AsyncStorage.getItem("mes_lite_mobile_user");
+
+  if (!userJson) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(userJson)?.id ?? null;
+  } catch (_error) {
+    return null;
+  }
+}
 
 function getDatabase() {
   if (!databasePromise) {
@@ -29,6 +44,7 @@ export async function initOfflineQueue() {
     CREATE TABLE IF NOT EXISTS offline_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       operationId TEXT NOT NULL UNIQUE,
+      ownerId TEXT,
       type TEXT NOT NULL,
       payload TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDING',
@@ -39,30 +55,50 @@ export async function initOfflineQueue() {
     );
   `);
 
+  const columns = await database.getAllAsync("PRAGMA table_info(offline_queue);");
+  if (!columns.some((column) => column.name === "ownerId")) {
+    await database.execAsync("ALTER TABLE offline_queue ADD COLUMN ownerId TEXT;");
+  }
+
+  const ownerId = await getCurrentOwnerId();
+  if (ownerId) {
+    await database.runAsync("UPDATE offline_queue SET ownerId = ? WHERE ownerId IS NULL;", [ownerId]);
+  }
+
   await database.execAsync("CREATE INDEX IF NOT EXISTS idx_offline_queue_status_created ON offline_queue(status, createdAt);");
+  await database.execAsync("CREATE INDEX IF NOT EXISTS idx_offline_queue_owner_status_created ON offline_queue(ownerId, status, createdAt);");
 }
 
 export async function enqueueOfflineOperation({ operationId, type, payload }) {
   await initOfflineQueue();
   const database = await getDatabase();
   const createdAt = new Date().toISOString();
+  const ownerId = await getCurrentOwnerId();
+
+  if (!ownerId) {
+    throw new Error("Offline işlem için aktif kullanıcı bulunamadı.");
+  }
 
   await database.runAsync(
-    `INSERT OR IGNORE INTO offline_queue (operationId, type, payload, status, retryCount, errorMessage, createdAt, syncedAt)
-     VALUES (?, ?, ?, ?, 0, NULL, ?, NULL);`,
-    [operationId, type, JSON.stringify(payload), OFFLINE_OPERATION_STATUS.PENDING, createdAt]
+    `INSERT OR IGNORE INTO offline_queue (operationId, ownerId, type, payload, status, retryCount, errorMessage, createdAt, syncedAt)
+     VALUES (?, ?, ?, ?, ?, 0, NULL, ?, NULL);`,
+    [operationId, ownerId, type, JSON.stringify(payload), OFFLINE_OPERATION_STATUS.PENDING, createdAt]
   );
 
-  const row = await database.getFirstAsync("SELECT * FROM offline_queue WHERE operationId = ?;", [operationId]);
+  const row = await database.getFirstAsync("SELECT * FROM offline_queue WHERE operationId = ? AND ownerId = ?;", [operationId, ownerId]);
   return parseQueueRow(row);
 }
 
 export async function getPendingOfflineOperations(limit = 25) {
   await initOfflineQueue();
   const database = await getDatabase();
+  const ownerId = await getCurrentOwnerId();
+  if (!ownerId) {
+    return [];
+  }
   const rows = await database.getAllAsync(
-    "SELECT * FROM offline_queue WHERE status = ? ORDER BY createdAt ASC LIMIT ?;",
-    [OFFLINE_OPERATION_STATUS.PENDING, limit]
+    "SELECT * FROM offline_queue WHERE ownerId = ? AND status = ? ORDER BY createdAt ASC LIMIT ?;",
+    [ownerId, OFFLINE_OPERATION_STATUS.PENDING, limit]
   );
 
   return rows.map(parseQueueRow);
@@ -71,12 +107,16 @@ export async function getPendingOfflineOperations(limit = 25) {
 export async function getOfflineOperations({ status, limit = 30 } = {}) {
   await initOfflineQueue();
   const database = await getDatabase();
+  const ownerId = await getCurrentOwnerId();
+  if (!ownerId) {
+    return [];
+  }
   const rows = status
     ? await database.getAllAsync(
-        "SELECT * FROM offline_queue WHERE status = ? ORDER BY createdAt DESC LIMIT ?;",
-        [status, limit]
+        "SELECT * FROM offline_queue WHERE ownerId = ? AND status = ? ORDER BY createdAt DESC LIMIT ?;",
+        [ownerId, status, limit]
       )
-    : await database.getAllAsync("SELECT * FROM offline_queue ORDER BY createdAt DESC LIMIT ?;", [limit]);
+    : await database.getAllAsync("SELECT * FROM offline_queue WHERE ownerId = ? ORDER BY createdAt DESC LIMIT ?;", [ownerId, limit]);
 
   return rows.map(parseQueueRow);
 }
@@ -118,10 +158,25 @@ export async function deleteFailedOfflineOperation(id) {
   await database.runAsync("DELETE FROM offline_queue WHERE id = ? AND status = ?;", [id, OFFLINE_OPERATION_STATUS.FAILED]);
 }
 
+export async function deleteAllFailedOfflineOperations() {
+  await initOfflineQueue();
+  const database = await getDatabase();
+  const ownerId = await getCurrentOwnerId();
+
+  if (!ownerId) {
+    return;
+  }
+
+  await database.runAsync("DELETE FROM offline_queue WHERE ownerId = ? AND status = ?;", [ownerId, OFFLINE_OPERATION_STATUS.FAILED]);
+}
+
 export async function getOfflineQueueSummary() {
   await initOfflineQueue();
   const database = await getDatabase();
-  const rows = await database.getAllAsync("SELECT status, COUNT(*) as count FROM offline_queue GROUP BY status;");
+  const ownerId = await getCurrentOwnerId();
+  const rows = ownerId
+    ? await database.getAllAsync("SELECT status, COUNT(*) as count FROM offline_queue WHERE ownerId = ? GROUP BY status;", [ownerId])
+    : [];
   const summary = {
     pending: 0,
     synced: 0,

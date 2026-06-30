@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import {
+  deleteAllFailedOfflineOperations,
   deleteFailedOfflineOperation,
   getOfflineOperations,
   OFFLINE_OPERATION_STATUS,
@@ -70,6 +71,10 @@ function getFriendlyError(message) {
   return translations[message] ?? message ?? "Senkronizasyon sırasında işlem reddedildi.";
 }
 
+function isPermanentFailure(operation) {
+  return /bulunamadı|bulunamadi|yetkili değil|yetkili degil|kapalı|kapali|aşamaz|asamaz|eşleşmelidir|eslesmelidir/i.test(operation.errorMessage ?? "");
+}
+
 export default function OfflineQueuePanel({ summary, onSync, onChanged }) {
   const [isExpanded, setIsExpanded] = useState(summary.failed > 0);
   const [filter, setFilter] = useState("ACTIVE");
@@ -127,6 +132,26 @@ export default function OfflineQueuePanel({ summary, onSync, onChanged }) {
     ]);
   }
 
+  async function removeAllFailed() {
+    await deleteAllFailedOfflineOperations();
+    await onChanged();
+    await loadOperations();
+  }
+
+  function handleDeleteAllFailed() {
+    if (Platform.OS === "web") {
+      if (globalThis.confirm?.("Bu kullanıcıya ait tüm başarısız kayıtlar silinsin mi?")) {
+        removeAllFailed();
+      }
+      return;
+    }
+
+    Alert.alert("Başarısız kayıtları temizle", "Bu kullanıcıya ait tüm başarısız kayıtlar kalıcı olarak silinsin mi?", [
+      { text: "Vazgeç", style: "cancel" },
+      { text: "Tümünü Sil", style: "destructive", onPress: removeAllFailed }
+    ]);
+  }
+
   return (
     <View style={styles.container}>
       <Pressable
@@ -152,6 +177,15 @@ export default function OfflineQueuePanel({ summary, onSync, onChanged }) {
             ))}
           </View>
 
+          {summary.failed > 0 ? (
+            <View style={styles.failedToolbar}>
+              <Text style={styles.failedToolbarText}>Artık uygulanamayan kayıtları kuyruktan kaldırabilirsiniz.</Text>
+              <Pressable style={styles.clearFailedButton} onPress={handleDeleteAllFailed}>
+                <Text style={styles.clearFailedText}>Başarısızları Temizle</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {isLoading ? <Text style={styles.empty}>Kayıtlar yükleniyor...</Text> : null}
           {!isLoading && visibleOperations.length === 0 ? <Text style={styles.empty}>Bu durumda kayıt yok.</Text> : null}
 
@@ -166,9 +200,11 @@ export default function OfflineQueuePanel({ summary, onSync, onChanged }) {
               {operation.errorMessage ? <Text style={styles.error}>{getFriendlyError(operation.errorMessage)}</Text> : null}
               {operation.status === OFFLINE_OPERATION_STATUS.FAILED ? (
                 <View style={styles.actions}>
-                  <Pressable style={styles.retryButton} onPress={() => handleRetry(operation)}>
-                    <Text style={styles.retryText}>Tekrar Dene</Text>
-                  </Pressable>
+                  {!isPermanentFailure(operation) ? (
+                    <Pressable style={styles.retryButton} onPress={() => handleRetry(operation)}>
+                      <Text style={styles.retryText}>Tekrar Dene</Text>
+                    </Pressable>
+                  ) : <Text style={styles.permanentFailureText}>Kaynak kayıt artık mevcut değil.</Text>}
                   <Pressable style={styles.deleteButton} onPress={() => handleDelete(operation)}>
                     <Text style={styles.deleteText}>Sil</Text>
                   </Pressable>
@@ -193,6 +229,10 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: "#167d75" },
   filterText: { color: "#52666c", fontWeight: "700", fontSize: 12 },
   filterTextActive: { color: "#ffffff" },
+  failedToolbar: { padding: 10, gap: 8, backgroundColor: "#fff9ed", borderBottomWidth: 1, borderBottomColor: "#f0dfb7" },
+  failedToolbarText: { color: "#795b24", fontSize: 12 },
+  clearFailedButton: { minHeight: 36, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: 12, borderRadius: 5, backgroundColor: "#8a5a13" },
+  clearFailedText: { color: "#ffffff", fontWeight: "800", fontSize: 12 },
   empty: { color: "#6a7b81", textAlign: "center", padding: 16 },
   operation: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#e5ebec", gap: 4 },
   operationHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
@@ -207,6 +247,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: 8, marginTop: 5 },
   retryButton: { backgroundColor: "#167d75", minHeight: 38, paddingHorizontal: 13, alignItems: "center", justifyContent: "center", borderRadius: 5 },
   retryText: { color: "#ffffff", fontWeight: "800" },
+  permanentFailureText: { color: "#87534e", fontSize: 12, flex: 1, alignSelf: "center" },
   deleteButton: { borderWidth: 1, borderColor: "#c75a52", minHeight: 38, paddingHorizontal: 13, alignItems: "center", justifyContent: "center", borderRadius: 5 },
   deleteText: { color: "#a12d28", fontWeight: "800" }
 });

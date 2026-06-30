@@ -34,6 +34,10 @@ function getSyncErrorMessage(error) {
   return error?.response?.data?.message ?? error?.message ?? "Senkronizasyon hatası";
 }
 
+function isPermanentSyncError(error) {
+  return [400, 403, 404, 409, 422].includes(error?.response?.status);
+}
+
 export async function syncOfflineQueue() {
   const isReachable = await checkBackendReachable();
 
@@ -66,7 +70,7 @@ export async function syncOfflineQueue() {
         break;
       }
 
-      if (nextRetryCount >= MAX_RETRY_COUNT) {
+      if (isPermanentSyncError(error) || nextRetryCount >= MAX_RETRY_COUNT) {
         await markOfflineOperationFailed(operation.id, nextRetryCount, errorMessage);
       } else {
         await markOfflineOperationRetry(operation.id, nextRetryCount, errorMessage);
