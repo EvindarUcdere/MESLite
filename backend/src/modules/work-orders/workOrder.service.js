@@ -655,6 +655,14 @@ export async function findAvailableOperators({ workDate, shiftId, machineId }) {
 }
 
 export async function createWorkOrder(userId, data) {
+  if (!data.plannedStartDate || !data.plannedEndDate) {
+    throw new ApiError(400, "Plan başlangıç ve bitiş tarihleri zorunludur");
+  }
+
+  if (new Date(data.plannedEndDate) < new Date(data.plannedStartDate)) {
+    throw new ApiError(400, "Plan bitiş tarihi başlangıç tarihinden önce olamaz");
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     let route = null;
 
@@ -764,8 +772,8 @@ export async function createWorkOrder(userId, data) {
         machineId: data.machineId,
         assignedOperatorId: data.assignedOperatorId,
         plannedQuantity: data.plannedQuantity,
-        plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : undefined,
-        plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : undefined,
+        plannedStartDate: new Date(data.plannedStartDate),
+        plannedEndDate: new Date(data.plannedEndDate),
         salesOrderId: data.salesOrderId,
         salesOrderItemId: data.salesOrderItemId,
         createdById: userId

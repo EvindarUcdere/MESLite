@@ -1,15 +1,15 @@
 import { z } from "zod";
 
-export const createWorkOrderSchema = z.object({
-  body: z.object({
+const workOrderBodySchema = z
+  .object({
     orderNo: z.string().min(2),
     productId: z.string().uuid(),
     routeId: z.string().uuid().optional(),
     machineId: z.string().uuid().optional(),
     assignedOperatorId: z.string().uuid().optional(),
     plannedQuantity: z.number().int().positive(),
-    plannedStartDate: z.string().datetime().optional(),
-    plannedEndDate: z.string().datetime().optional(),
+    plannedStartDate: z.string().datetime(),
+    plannedEndDate: z.string().datetime(),
     salesOrderId: z.string().uuid().optional(),
     salesOrderItemId: z.string().uuid().optional(),
     shiftId: z.string().uuid().optional(),
@@ -23,6 +23,13 @@ export const createWorkOrderSchema = z.object({
       )
       .optional()
   })
+  .refine((data) => new Date(data.plannedEndDate) >= new Date(data.plannedStartDate), {
+    message: "Plan bitiş tarihi başlangıç tarihinden önce olamaz",
+    path: ["plannedEndDate"]
+  });
+
+export const createWorkOrderSchema = z.object({
+  body: workOrderBodySchema
 });
 
 export const availableOperatorsSchema = z.object({

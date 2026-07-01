@@ -139,6 +139,15 @@ function buildScrapActionOrderNo(workOrder, disposition) {
   return `${workOrder.orderNo}-${type}-${suffix}-${token}`;
 }
 
+function calculatePlannedEndDate(startDate, routeOperations = []) {
+  const plannedMinutes = routeOperations.reduce(
+    (sum, routeOperation) => sum + Math.max(Number(routeOperation.estimatedMinutes ?? 0), 0),
+    0
+  );
+
+  return new Date(startDate.getTime() + Math.max(plannedMinutes, 1) * 60_000);
+}
+
 function getScrapLotState(disposition) {
   switch (disposition) {
     case "REWORK":
@@ -203,6 +212,11 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
   const sourceOperationBySequenceNo = new Map((workOrder.operations ?? []).map((sourceOperation) => [sourceOperation.sequenceNo, sourceOperation]));
   const replacementFirstOperatorId = operation?.assignedOperatorId ?? (actor.role === "OPERATOR" ? actor.id : null);
 
+  const plannedStartDate = new Date();
+  const plannedEndDate = calculatePlannedEndDate(
+    plannedStartDate,
+    isRework ? routeOperations.filter((routeOperation) => routeOperation.id === operation?.routeOperationId) : routeOperations
+  );
   const actionWorkOrder = await tx.workOrder.create({
     data: {
       orderNo,
@@ -211,7 +225,8 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
       machineId: isRework ? operation?.machineId ?? data.machineId : workOrder.machineId,
       assignedOperatorId: isRework ? operation?.assignedOperatorId ?? null : null,
       plannedQuantity: actionQuantity,
-      plannedStartDate: new Date(),
+      plannedStartDate,
+      plannedEndDate,
       createdById: actor.id
     }
   });
@@ -941,6 +956,8 @@ export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, d
     const sourceOperationByRouteOperationId = new Map(workOrder.operations.map((operation) => [operation.routeOperationId, operation]));
     const sourceOperationBySequenceNo = new Map(workOrder.operations.map((operation) => [operation.sequenceNo, operation]));
 
+    const plannedStartDate = new Date();
+    const plannedEndDate = calculatePlannedEndDate(plannedStartDate, workOrder.route.operations);
     const actionWorkOrder = await tx.workOrder.create({
       data: {
         orderNo,
@@ -949,7 +966,8 @@ export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, d
         machineId: workOrder.machineId,
         assignedOperatorId: null,
         plannedQuantity: actionQuantity,
-        plannedStartDate: new Date(),
+        plannedStartDate,
+        plannedEndDate,
         createdById: actor.id
       }
     });

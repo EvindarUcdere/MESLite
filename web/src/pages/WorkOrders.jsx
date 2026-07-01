@@ -475,6 +475,7 @@ export default function WorkOrders() {
     machineId: "",
     assignedOperatorId: "",
     workDate: new Date().toISOString().slice(0, 10),
+    plannedEndDate: new Date().toISOString().slice(0, 10),
     shiftId: "",
     plannedQuantity: 100
   });
@@ -756,6 +757,7 @@ export default function WorkOrders() {
     setForm((current) => ({
       ...current,
       [field]: value,
+      ...(field === "workDate" && current.plannedEndDate < value ? { plannedEndDate: value } : {}),
       ...(field === "productId" ? { routeId: "", machineId: "", assignedOperatorId: "" } : {}),
       ...(field === "routeId" ? { machineId: "", assignedOperatorId: "" } : {})
     }));
@@ -893,6 +895,16 @@ export default function WorkOrders() {
         return;
       }
 
+      if (!form.workDate || !form.plannedEndDate) {
+        setError("Plan başlangıç ve bitiş tarihlerini girin.");
+        return;
+      }
+
+      if (form.plannedEndDate < form.workDate) {
+        setError("Plan bitiş tarihi başlangıç tarihinden önce olamaz.");
+        return;
+      }
+
       if (materialCheck?.hasBom && !materialCheck.isStockEnough) {
         setError("Stok yetersiz. Eksik malzemeler tamamlanmadan bu iş emri oluşturulamaz.");
         return;
@@ -903,6 +915,7 @@ export default function WorkOrders() {
         productId: form.productId,
         plannedQuantity: Number(form.plannedQuantity),
         plannedStartDate: form.workDate ? `${form.workDate}T00:00:00.000Z` : undefined,
+        plannedEndDate: `${form.plannedEndDate}T23:59:59.999Z`,
         ...(form.shiftId ? { shiftId: form.shiftId } : {}),
         ...(form.routeId ? { routeId: form.routeId } : {}),
         ...(operationAssignments.length
@@ -1262,6 +1275,10 @@ export default function WorkOrders() {
           <label>
             Plan Başlangıç Tarihi
             <input value={form.workDate} onChange={(event) => updateForm("workDate", event.target.value)} type="date" required />
+          </label>
+          <label>
+            Plan Bitiş Tarihi
+            <input value={form.plannedEndDate} min={form.workDate} onChange={(event) => updateForm("plannedEndDate", event.target.value)} type="date" required />
           </label>
           <label>
             Vardiya

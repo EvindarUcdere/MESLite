@@ -260,6 +260,13 @@ export async function createWorkOrdersFromSalesOrder(userId, id, options = {}) {
     throw new ApiError(404, "Satış siparişi bulunamadı");
   }
 
+  const plannedStartDate = options.plannedStartDate ?? salesOrder.requestedDate?.toISOString();
+  const plannedEndDate = options.plannedEndDate ?? salesOrder.dueDate?.toISOString();
+
+  if (!plannedStartDate || !plannedEndDate) {
+    throw new ApiError(400, "İş emri oluşturmak için plan başlangıç ve bitiş tarihleri zorunludur");
+  }
+
   const createdWorkOrders = [];
 
   for (const [index, item] of salesOrder.items.entries()) {
@@ -280,8 +287,8 @@ export async function createWorkOrdersFromSalesOrder(userId, id, options = {}) {
       routeId: route.id,
       machineId: route.operations[0]?.defaultMachineId ?? undefined,
       plannedQuantity: item.quantity,
-      plannedStartDate: options.plannedStartDate ?? salesOrder.requestedDate?.toISOString(),
-      plannedEndDate: options.plannedEndDate ?? salesOrder.dueDate?.toISOString(),
+      plannedStartDate,
+      plannedEndDate,
       salesOrderId: salesOrder.id,
       salesOrderItemId: item.id
     });
