@@ -56,6 +56,18 @@ const SCRAP_DISPOSITION_LABELS = {
   CONDITIONAL_ACCEPT: "Şartlı Kabul"
 };
 
+function formatDuration(minutes) {
+  if (minutes > 48 * 60) {
+    return `${Number((minutes / (24 * 60)).toFixed(1))} gün`;
+  }
+
+  if (minutes >= 60) {
+    return `${Number((minutes / 60).toFixed(1))} saat`;
+  }
+
+  return `${Math.round(minutes)} dk`;
+}
+
 const ALERT_STATUS_LABELS = {
   OPEN: "Yeni",
   IN_REVIEW: "İnceleniyor",
@@ -414,7 +426,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
           <div className="executive-ranked-list">
             {delayedOperations.map((item, index) => (
               <Link key={item.operationId} to="/reports#delayed-operations">
-                <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode} · {STATUS_LABELS[item.status] ?? item.status}</small></span><em>+{Math.round(item.delayMinutes)} dk</em>
+                <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode} · {STATUS_LABELS[item.status] ?? item.status}</small></span><em>+{formatDuration(item.delayMinutes)}</em>
               </Link>
             ))}
             {!isLoading && delayedOperations.length === 0 ? <p className="empty-state">Geciken operasyon yok.</p> : null}

@@ -95,6 +95,10 @@ async function main() {
     report.staleOperations.every((operation, index, items) => index === 0 || items[index - 1].actualMinutes >= operation.actualMinutes),
     "Stale operations must be sorted by open duration descending"
   );
+  const staleInsight = report.managementInsights.find((insight) => insight.type === "STALE_OPERATION");
+  if (report.staleOperations[0]?.actualMinutes > 48 * 60) {
+    assert(staleInsight?.message.includes("gün"), "Stale operation durations over 48 hours must be displayed in days");
+  }
 
   const processTotal = report.summary.processProducedQuantity + report.summary.scrapQuantity;
   assert(

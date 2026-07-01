@@ -6,6 +6,18 @@ function scrapRate(producedQuantity, scrapQuantity) {
   return totalProcessedQuantity > 0 ? Number(((scrapQuantity / totalProcessedQuantity) * 100).toFixed(2)) : 0;
 }
 
+function formatDuration(minutes) {
+  if (minutes > 48 * 60) {
+    return `${Number((minutes / (24 * 60)).toFixed(1))} gün`;
+  }
+
+  if (minutes >= 60) {
+    return `${Number((minutes / 60).toFixed(1))} saat`;
+  }
+
+  return `${Math.round(minutes)} dk`;
+}
+
 function percent(numerator, denominator) {
   if (denominator <= 0) {
     return 0;
@@ -425,7 +437,7 @@ function buildManagementInsights({ summary, shiftPerformance, delayedOperations,
       type: "STALE_OPERATION",
       severity: "CRITICAL",
       title: "Uzun süredir açık operasyon",
-      message: `${stalestOperation.orderNo} / ${stalestOperation.operationName} operasyonu ${Math.round(stalestOperation.actualMinutes / 60)} saattir kapanmamış görünüyor.`
+      message: `${stalestOperation.orderNo} / ${stalestOperation.operationName} operasyonu ${formatDuration(stalestOperation.actualMinutes)} süredir kapanmamış görünüyor.`
     });
   }
 
@@ -479,7 +491,7 @@ function buildManagementInsights({ summary, shiftPerformance, delayedOperations,
       type: "DELAY",
       severity: mostDelayedOperation.delayMinutes >= 60 ? "WARNING" : "INFO",
       title: "Gecikme odağı",
-      message: `${mostDelayedOperation.orderNo} / ${mostDelayedOperation.operationName} operasyonunda +${mostDelayedOperation.delayMinutes} dk gecikme var.`
+      message: `${mostDelayedOperation.orderNo} / ${mostDelayedOperation.operationName} operasyonunda ${formatDuration(mostDelayedOperation.delayMinutes)} gecikme var.`
     });
   }
 
