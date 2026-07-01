@@ -212,7 +212,8 @@ export async function getSummary() {
 
   const producedQuantity = productionTotals._sum.producedQuantity ?? 0;
   const scrapQuantity = productionTotals._sum.scrapQuantity ?? 0;
-  const scrapRate = producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
+  const totalProcessedQuantity = producedQuantity + scrapQuantity;
+  const scrapRate = totalProcessedQuantity > 0 ? Number(((scrapQuantity / totalProcessedQuantity) * 100).toFixed(2)) : 0;
   const todayProcessTotals = sumProductionLogs(todayProductionLogs);
   const todayFinalProductTotals = sumProductionLogs(todayProductionLogs.filter(isFinalProductLog));
   const todayProducedQuantity = todayFinalProductTotals.producedQuantity;

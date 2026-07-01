@@ -12,7 +12,7 @@ function percent(numerator, denominator) {
 }
 
 function scrapRate(producedQuantity, scrapQuantity) {
-  return percent(scrapQuantity, producedQuantity);
+  return percent(scrapQuantity, toNumber(producedQuantity) + toNumber(scrapQuantity));
 }
 
 function monthLabel(period) {

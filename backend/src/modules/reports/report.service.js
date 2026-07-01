@@ -2,7 +2,8 @@ import { prisma } from "../../config/db.js";
 import { getReportSqlAnalytics } from "./reportSql.service.js";
 
 function scrapRate(producedQuantity, scrapQuantity) {
-  return producedQuantity > 0 ? Number(((scrapQuantity / producedQuantity) * 100).toFixed(2)) : 0;
+  const totalProcessedQuantity = producedQuantity + scrapQuantity;
+  return totalProcessedQuantity > 0 ? Number(((scrapQuantity / totalProcessedQuantity) * 100).toFixed(2)) : 0;
 }
 
 function percent(numerator, denominator) {
@@ -1131,7 +1132,7 @@ export async function getOverviewReport(query = {}) {
     oee: oeeSummary.oee,
     scrapQuantity,
     finalScrapQuantity,
-    scrapRate: scrapRate(producedQuantity, finalScrapQuantity),
+    scrapRate: scrapRate(processProducedQuantity, scrapQuantity),
     qualityCheckCount: qualityChecks.length,
     defectQuantity,
     qualityDecisionCount: productionAlerts.length,
