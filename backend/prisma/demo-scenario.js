@@ -556,7 +556,8 @@ async function main() {
           shiftId: shifts.evening.id,
           reason: "QUALITY_WAITING",
           note: "Montaj sonrasi kalite onayi bekleniyor.",
-          startedAt: minutesAgo(now, 30)
+          startedAt: minutesAgo(now, 30),
+          endedAt: minutesAgo(now, 10)
         }
       ]
     },

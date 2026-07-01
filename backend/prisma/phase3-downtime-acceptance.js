@@ -32,6 +32,10 @@ async function main() {
   assert(downtimes.some((downtime) => downtime.reason === "MATERIAL_WAITING"), "Material waiting downtime reason is missing");
   assert(downtimes.every((downtime) => downtime.workOrderOperationId && downtime.workOrderId), "Downtime must be linked to work order and operation");
   assert(downtimes.some((downtime) => downtime.shift?.name === "E2E Gece Vardiyasi"), "Night shift downtime is missing");
+  assert(
+    downtimes.every((downtime) => downtime.endedAt || downtime.workOrderOperation.status === "PAUSED"),
+    "Every open downtime must belong to a paused operation"
+  );
 
   const report = await getOverviewReport();
 

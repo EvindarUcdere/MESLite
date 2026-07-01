@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, ArrowRight, Award, Bell, CheckCircle2, ClipboardList, Factory, Flame, Gauge, PackageCheck, RefreshCw, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getDashboardSummary, getLiveOverview } from "../api/dashboard.api.js";
+import { getOverviewReport } from "../api/reports.api.js";
 import { useSocket } from "../hooks/useSocket.js";
 import { useAuthStore } from "../store/authStore.js";
 import { ROLES } from "../utils/roles.js";
@@ -262,7 +263,7 @@ function AdminDashboard({ summary, live, isLoading, error, lastUpdatedAt, onRefr
   );
 }
 
-function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRefresh }) {
+function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, lastUpdatedAt, onRefresh }) {
   const machineCount = Object.values(summary?.machineStatusCounts ?? {}).reduce((total, value) => total + value, 0);
   const activeWorkOrderCount = summary?.activeWorkOrders ?? 0;
   const openAlertCount = summary?.openAlerts ?? 0;
@@ -275,14 +276,35 @@ function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRe
   const systemHealthScore = Math.max(0, 100 - openAlertCount * 8 - scrapPendingCount * 6 - stoppedMachineCount * 5 - qualityWaitingCount * 3);
   const healthStatus = systemHealthScore >= 85 ? "Sağlıklı" : systemHealthScore >= 65 ? "Takip gerekli" : "Riskli";
 
-  const adminMetrics = [
-    { label: "Sistem Sağlığı", value: `${systemHealthScore}%`, hint: healthStatus, icon: Gauge, to: "/reports", tone: systemHealthScore >= 85 ? "green" : "amber" },
-    { label: "Aktif İş", value: activeWorkOrderCount, hint: "Sistem genelindeki açık üretim", icon: ClipboardList, to: "/reports#work-order-status", tone: "teal" },
-    { label: "Makine Parkı", value: machineCount, hint: `${summary?.runningMachines ?? 0} çalışıyor, ${stoppedMachineCount} takipte`, icon: Factory, to: "/machines", tone: "blue" },
-    { label: "Açık Uyarı", value: openAlertCount, hint: "Operasyonel aksiyon üretim yöneticisinde", icon: AlertTriangle, to: "/reports#delayed-operations", tone: "amber" },
-    { label: "Fire Kararı", value: scrapPendingCount, hint: "Kalite/üretim kararı bekleyen kayıt", icon: Flame, to: "/notifications", tone: "red" },
-    { label: "Kalite Bekleyen", value: qualityWaitingCount, hint: "Kalite ekibi aksiyon alir", icon: ShieldCheck, to: "/reports#quality-results", tone: "green" }
+  const reportSummary = executiveReport?.summary ?? {};
+  const dataQuality = executiveReport?.dataQuality ?? {};
+  const executiveMetrics = [
+    { label: "Kayıt Bazlı Plan Gerçekleşmesi", value: `${reportSummary.planCompletionRate ?? 0}%`, hint: `${reportSummary.productionGapQuantity ?? 0} adet üretim açığı`, icon: ClipboardList, to: "/reports#plan-actual", tone: (reportSummary.planCompletionRate ?? 0) >= 85 ? "green" : "amber" },
+    { label: "Tahmini OEE", value: `${reportSummary.oee ?? 0}%`, hint: `Veri güveni: %${dataQuality.score ?? 0}`, icon: Gauge, to: "/reports#oee", tone: (reportSummary.oee ?? 0) >= 65 ? "green" : "red" },
+    { label: "Tahmini Kullanılabilirlik", value: `${reportSummary.availability ?? 0}%`, hint: "Operasyon süresi ve duruş kayıtlarından", icon: Activity, to: "/reports#oee", tone: "teal" },
+    { label: "Tahmini Performans", value: `${reportSummary.performance ?? 0}%`, hint: "Tanımlı hedef operasyon süresine göre", icon: Factory, to: "/reports#oee", tone: "blue" },
+    { label: "Kayıt Bazlı Kalite", value: `${reportSummary.quality ?? 0}%`, hint: `${reportSummary.finalScrapQuantity ?? 0} adet final fire`, icon: ShieldCheck, to: "/reports#quality-results", tone: "green" },
+    { label: "Fire Oranı", value: `${reportSummary.scrapRate ?? 0}%`, hint: `${reportSummary.scrapQuantity ?? 0} adet proses firesi`, icon: Flame, to: "/reports#scrap-reasons", tone: (reportSummary.scrapRate ?? 0) >= 5 ? "red" : "green" }
   ];
+
+  const delayedOperations = executiveReport?.delayedOperations?.slice(0, 5) ?? [];
+  const weakMachines = [...(executiveReport?.oeeByMachine ?? [])]
+    .filter((item) => item.operationCount > 0)
+    .sort((first, second) => first.oee - second.oee)
+    .slice(0, 5);
+  const downtimeMachines = executiveReport?.operationDowntimeByMachine?.slice(0, 5) ?? [];
+  const operatorTotals = Object.values(
+    (executiveReport?.operatorShiftPerformance ?? []).reduce((acc, item) => {
+      const current = acc[item.operatorId] ?? { operatorId: item.operatorId, operatorName: item.operatorName, producedQuantity: 0, scrapQuantity: 0 };
+      current.producedQuantity += item.producedQuantity;
+      current.scrapQuantity += item.scrapQuantity;
+      acc[item.operatorId] = current;
+      return acc;
+    }, {})
+  )
+    .map((item) => ({ ...item, scrapRate: item.producedQuantity > 0 ? Number(((item.scrapQuantity / item.producedQuantity) * 100).toFixed(2)) : 0 }))
+    .sort((first, second) => second.scrapRate - first.scrapRate)
+    .slice(0, 5);
 
   const controlItems = [
     { title: "Kullanıcı ve rol yönetimi", description: "Yeni çalışanların web/mobil erişimi, pasife alma ve rol ayrımı.", to: "/users", status: "Admin aksiyonu" },
@@ -302,9 +324,9 @@ function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRe
     <div className="page-stack dashboard-page">
       <header className="page-header dashboard-header">
         <div>
-          <span className="dashboard-eyebrow">Admin Kontrol Alanı</span>
-          <h1>Sistem Kontrol Paneli</h1>
-          <p>Kullanıcı, yetki, ana veri ve izlenebilirliği buradan yönetin. Üretim, kalite ve planlama kararları ilgili rol ekranlarında kalır.</p>
+          <span className="dashboard-eyebrow">Üst Yönetim Karar Merkezi</span>
+          <h1>Fabrika Performansı</h1>
+          <p>Son 30 günlük üretim performansını, kayıp noktalarını ve iyileştirme önceliklerini tek ekrandan yönetin.</p>
         </div>
         <div className="dashboard-header-actions">
           <div className="live-indicator">
@@ -320,10 +342,100 @@ function AdminDashboardV2({ summary, live, isLoading, error, lastUpdatedAt, onRe
 
       {error ? <p className="form-error">{error}</p> : null}
 
-      <section className="role-metric-grid admin-metric-grid">
-        {adminMetrics.map((metric) => (
+      <section className="role-metric-grid admin-metric-grid executive-metric-grid">
+        {executiveMetrics.map((metric) => (
           <RoleMetricCard key={metric.label} {...metric} value={isLoading ? "..." : metric.value} />
         ))}
+      </section>
+
+      <section className={`panel executive-data-quality data-quality-${(dataQuality.level ?? "LOW").toLowerCase()}`}>
+        <div>
+          <span>Veri Güven Seviyesi</span>
+          <strong>%{dataQuality.score ?? 0}</strong>
+          <em>{dataQuality.level === "HIGH" ? "Yüksek" : dataQuality.level === "MEDIUM" ? "Orta" : "Düşük"}</em>
+        </div>
+        <dl>
+          <div><dt>Hedef süre</dt><dd>%{dataQuality.operationTargetCoverage ?? 0}</dd></div>
+          <div><dt>Tamamlanan operasyon</dt><dd>%{dataQuality.completedOperationCoverage ?? 0}</dd></div>
+          <div><dt>Vardiya bilgisi</dt><dd>%{dataQuality.shiftAssignmentCoverage ?? 0}</dd></div>
+          <div><dt>Duruş bütünlüğü</dt><dd>%{dataQuality.closedDowntimeCoverage ?? 0}</dd></div>
+          <div><dt>Hatalı açık duruş</dt><dd>{dataQuality.orphanOpenDowntimeCount ?? 0}</dd></div>
+          <div><dt>Plan tarihleri</dt><dd>%{dataQuality.workOrderPlanDateCoverage ?? 0}</dd></div>
+        </dl>
+        {(dataQuality.warnings ?? []).length ? <p>{dataQuality.warnings[0]}</p> : <p>KPI hesapları için temel veri alanları yeterli seviyede.</p>}
+      </section>
+
+      <section className="executive-decision-grid">
+        <article className="panel executive-insight-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Yönetici İçgörüleri</h2>
+              <p className="muted-text">Verinin işaret ettiği öncelikli müdahale alanları.</p>
+            </div>
+            <Link className="section-link" to="/reports">Tüm analiz</Link>
+          </div>
+          <div className="executive-insight-list">
+            {(executiveReport?.managementInsights ?? []).slice(0, 6).map((insight) => (
+              <div key={`${insight.type}-${insight.title}`} className={`executive-insight executive-insight-${insight.severity.toLowerCase()}`}>
+                <AlertTriangle size={17} />
+                <span><strong>{insight.title}</strong><small>{insight.message}</small></span>
+              </div>
+            ))}
+            {!isLoading && !(executiveReport?.managementInsights?.length) ? <p className="empty-state">Seçili dönemde kritik yönetim içgörüsü oluşmadı.</p> : null}
+          </div>
+        </article>
+
+        <article className="panel executive-insight-panel">
+          <div className="section-title-row">
+            <div>
+              <h2>Canlı Fabrika Durumu</h2>
+              <p className="muted-text">Bugün yönlendirme gerektiren operasyonel sinyaller.</p>
+            </div>
+          </div>
+          <div className="executive-live-grid">
+            <div><span>Aktif iş</span><strong>{activeWorkOrderCount}</strong></div>
+            <div className={summary?.overdueWorkOrders ? "is-risk" : ""}><span>Geciken iş</span><strong>{summary?.overdueWorkOrders ?? 0}</strong></div>
+            <div className={stoppedMachineCount ? "is-risk" : ""}><span>Duruş / bakım</span><strong>{stoppedMachineCount}</strong></div>
+            <div className={openAlertCount ? "is-risk" : ""}><span>Açık uyarı</span><strong>{openAlertCount}</strong></div>
+            <div><span>Kalite bekleyen</span><strong>{qualityWaitingCount}</strong></div>
+            <div><span>Fire kararı</span><strong>{scrapPendingCount}</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section className="executive-analysis-grid">
+        <article className="panel executive-table-panel">
+          <div className="section-title-row"><div><h2>Üretim Darboğazları</h2><p className="muted-text">Hedef süresini en fazla aşan operasyonlar.</p></div></div>
+          <div className="executive-ranked-list">
+            {delayedOperations.map((item, index) => (
+              <Link key={item.operationId} to="/reports#delayed-operations">
+                <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode}</small></span><em>+{Math.round(item.delayMinutes)} dk</em>
+              </Link>
+            ))}
+            {!isLoading && delayedOperations.length === 0 ? <p className="empty-state">Geciken operasyon yok.</p> : null}
+          </div>
+        </article>
+
+        <article className="panel executive-table-panel">
+          <div className="section-title-row"><div><h2>Makine Riskleri</h2><p className="muted-text">Tahmini OEE ve duruş yoğunluğu birlikte izlenir.</p></div></div>
+          <div className="executive-ranked-list">
+            {weakMachines.map((item, index) => {
+              const downtime = downtimeMachines.find((entry) => entry.machineId === item.machineId);
+              return <Link key={item.machineId} to="/reports#machine-performance-detail"><b>{index + 1}</b><span><strong>{item.machineCode}</strong><small>{item.machineName} · {downtime?.totalCount ?? 0} duruş</small></span><em>%{item.oee} tahmini</em></Link>;
+            })}
+            {!isLoading && weakMachines.length === 0 ? <p className="empty-state">OEE hesaplanabilecek makine verisi yok.</p> : null}
+          </div>
+        </article>
+
+        <article className="panel executive-table-panel">
+          <div className="section-title-row"><div><h2>Çalışan Bazlı Süreç Sinyali</h2><p className="muted-text">Fire oranı eğitim ve proses desteği için sinyal üretir; performans cezası değildir.</p></div></div>
+          <div className="executive-ranked-list">
+            {operatorTotals.map((item, index) => (
+              <Link key={item.operatorId} to="/reports#operator-performance"><b>{index + 1}</b><span><strong>{item.operatorName}</strong><small>{item.producedQuantity} üretim · {item.scrapQuantity} fire</small></span><em>%{item.scrapRate} fire</em></Link>
+            ))}
+            {!isLoading && operatorTotals.length === 0 ? <p className="empty-state">Operatör üretim verisi yok.</p> : null}
+          </div>
+        </article>
       </section>
 
       <section className="admin-analysis-grid">
@@ -623,6 +735,7 @@ export default function Dashboard() {
   const user = useAuthStore((state) => state.user);
   const [summary, setSummary] = useState(null);
   const [live, setLive] = useState(null);
+  const [executiveReport, setExecutiveReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
@@ -637,6 +750,9 @@ export default function Dashboard() {
 
       setSummary(summaryData);
       setLive(liveData);
+      if (user?.role === ROLES.ADMIN && showLoading) {
+        setExecutiveReport(await getOverviewReport());
+      }
       setLastUpdatedAt(new Date());
       setError("");
     } catch (_error) {
@@ -651,11 +767,16 @@ export default function Dashboard() {
 
     async function loadInitialDashboard() {
       try {
-        const [summaryData, liveData] = await Promise.all([getDashboardSummary(), getLiveOverview()]);
+        const [summaryData, liveData, reportData] = await Promise.all([
+          getDashboardSummary(),
+          getLiveOverview(),
+          user?.role === ROLES.ADMIN ? getOverviewReport() : Promise.resolve(null)
+        ]);
 
         if (isMounted) {
           setSummary(summaryData);
           setLive(liveData);
+          setExecutiveReport(reportData);
           setLastUpdatedAt(new Date());
         }
       } catch (_error) {
@@ -799,7 +920,7 @@ export default function Dashboard() {
   const qualityStatusTotal = qualityStatusData.reduce((total, item) => total + item.value, 0);
 
   if (user?.role === ROLES.ADMIN) {
-    return <AdminDashboardV2 summary={summary} live={live} isLoading={isLoading} error={error} lastUpdatedAt={lastUpdatedAt} onRefresh={() => loadDashboard({ showLoading: true })} />;
+    return <AdminDashboardV2 summary={summary} live={live} executiveReport={executiveReport} isLoading={isLoading} error={error} lastUpdatedAt={lastUpdatedAt} onRefresh={() => loadDashboard({ showLoading: true })} />;
   }
 
   if (user?.role === ROLES.PLANNER) {

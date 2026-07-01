@@ -1161,6 +1161,29 @@ export async function getOverviewReport(query = {}) {
     qualityDecisionByMachine
   });
 
+  const orphanOpenDowntimes = operationDowntimes.filter(
+    (downtime) => !downtime.endedAt && downtime.workOrderOperation?.status !== "PAUSED"
+  );
+  const validDowntimes = operationDowntimes.filter(
+    (downtime) => Boolean(downtime.endedAt) || downtime.workOrderOperation?.status === "PAUSED"
+  );
+  const dataQuality = {
+    operationTargetCoverage: percent(workOrderOperations.filter((operation) => Number(operation.routeOperation?.estimatedMinutes ?? 0) > 0).length, workOrderOperations.length),
+    completedOperationCoverage: percent(workOrderOperations.filter((operation) => Boolean(operation.completedAt)).length, workOrderOperations.length),
+    shiftAssignmentCoverage: percent(productionLogs.filter((log) => Boolean(log.shiftId)).length, productionLogs.length),
+    closedDowntimeCoverage: percent(validDowntimes.length, operationDowntimes.length),
+    workOrderPlanDateCoverage: percent(workOrders.filter((workOrder) => Boolean(workOrder.plannedStartDate && workOrder.plannedEndDate)).length, workOrders.length)
+  };
+  const dataQualityValues = Object.values(dataQuality);
+  const dataQualityScore = dataQualityValues.length ? Number((dataQualityValues.reduce((sum, value) => sum + value, 0) / dataQualityValues.length).toFixed(2)) : 0;
+  const dataQualityWarnings = [
+    dataQuality.operationTargetCoverage < 80 ? "Operasyon hedef sürelerinin bir bölümü eksik." : null,
+    dataQuality.completedOperationCoverage < 80 ? "Açık operasyonlar dönem süre analizini etkiliyor." : null,
+    dataQuality.shiftAssignmentCoverage < 80 ? "Bazı üretim kayıtlarında vardiya bilgisi yok." : null,
+    orphanOpenDowntimes.length > 0 ? `${orphanOpenDowntimes.length} açık duruş kaydı duraklatılmış bir operasyonla eşleşmiyor.` : null,
+    dataQuality.workOrderPlanDateCoverage < 80 ? "Bazı iş emirlerinde plan başlangıç/bitiş tarihi eksik." : null
+  ].filter(Boolean);
+
   return {
     dateRange: {
       from: toDateInputValue(range.from),
@@ -1171,6 +1194,13 @@ export async function getOverviewReport(query = {}) {
     productionTrend,
     planActualPerformance,
     managementInsights,
+    dataQuality: {
+      ...dataQuality,
+      orphanOpenDowntimeCount: orphanOpenDowntimes.length,
+      score: dataQualityScore,
+      level: dataQualityScore >= 85 ? "HIGH" : dataQualityScore >= 65 ? "MEDIUM" : "LOW",
+      warnings: dataQualityWarnings
+    },
     workOrderStatusCounts: countBy(workOrders, "status"),
     machineStatusCounts: countBy(machines, "status"),
     machineDowntimeReasonCounts: countBy(machineStatusLogs, "reason"),

@@ -532,9 +532,17 @@ export async function pauseOperation(actor, id, data) {
   const result = await prisma.$transaction(async (tx) => {
     const shiftId = await findActiveShiftId(tx);
 
-    const operation = await tx.workOrderOperation.update({
+    const pauseResult = await tx.workOrderOperation.updateMany({
+      where: { id, status: "IN_PROGRESS" },
+      data: { status: "PAUSED" }
+    });
+
+    if (pauseResult.count !== 1) {
+      throw new ApiError(409, "Operation status changed before it could be paused");
+    }
+
+    const operation = await tx.workOrderOperation.findUnique({
       where: { id },
-      data: { status: "PAUSED" },
       include: operationInclude
     });
 
