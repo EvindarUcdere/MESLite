@@ -7,7 +7,7 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const report = await getOverviewReport();
+  const report = await getOverviewReport({ includeTestData: true });
 
   const runMontaj = report.operationTimePerformance.find((item) => item.orderNo === "E2E-DEMO-RUN" && item.operationName === "Montaj");
   const delayedMontaj = report.operationTimePerformance.find((item) => item.orderNo === "E2E-DEMO-QUALITY" && item.operationName === "Montaj");

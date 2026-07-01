@@ -225,6 +225,7 @@ async function createScrapActionWorkOrder(tx, { actor, workOrder, operation, log
       machineId: isRework ? operation?.machineId ?? data.machineId : workOrder.machineId,
       assignedOperatorId: isRework ? operation?.assignedOperatorId ?? null : null,
       plannedQuantity: actionQuantity,
+      isTestData: workOrder.isTestData,
       plannedStartDate,
       plannedEndDate,
       createdById: actor.id
@@ -966,6 +967,7 @@ export async function createGroupedScrapActionForWorkOrder(actor, workOrderId, d
         machineId: workOrder.machineId,
         assignedOperatorId: null,
         plannedQuantity: actionQuantity,
+        isTestData: workOrder.isTestData,
         plannedStartDate,
         plannedEndDate,
         createdById: actor.id

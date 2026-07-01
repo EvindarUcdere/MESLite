@@ -479,6 +479,7 @@ model WorkOrder {
   producedQuantity   Int                  @default(0)
   scrapQuantity      Int                  @default(0)
   status             WorkOrderStatus      @default(PLANNED)
+  isTestData         Boolean              @default(false)
   plannedStartDate   DateTime?
   plannedEndDate     DateTime?
   actualStartDate    DateTime?
@@ -505,6 +506,7 @@ model WorkOrder {
 
   @@index([salesOrderId])
   @@index([salesOrderItemId])
+  @@index([isTestData, status])
 }
 
 model WorkOrderOperation {

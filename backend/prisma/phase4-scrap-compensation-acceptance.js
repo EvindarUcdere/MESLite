@@ -225,6 +225,7 @@ async function createRoutedWorkOrder({ orderNo, admin, product, route, routeOper
       productId: product.id,
       routeId: route.id,
       plannedQuantity,
+      isTestData: true,
       status: "IN_PROGRESS",
       actualStartDate: new Date(),
       createdById: admin.id,
@@ -346,6 +347,7 @@ async function assertReplacementFlow(fixture) {
 
   const actionOrder = await getWorkOrder(scrapLog.scrapActionWorkOrderNo);
   assert(actionOrder, "Telafi iş emri bulunmalı");
+  assert(actionOrder.isTestData, "Test kaynağından oluşan telafi iş emri test verisi olarak kalmalı");
   assert(actionOrder.plannedQuantity === 10, "Telafi iş emri fire kadar planlanmalı");
   const reservedComponentStock = await prisma.stockItem.findUnique({ where: { productId: fixture.componentProduct.id } });
   assert(Number(reservedComponentStock.quantityOnHand) === 1000, "Telafi emri oluşurken stok henüz tüketilmemeli");

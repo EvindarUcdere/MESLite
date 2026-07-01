@@ -97,6 +97,7 @@ async function createFixture() {
       machineId: machine.id,
       assignedOperatorId: operator.id,
       plannedQuantity: 20,
+      isTestData: true,
       plannedStartDate,
       plannedEndDate: new Date(plannedStartDate.getTime() + 10 * 60_000),
       status: "IN_PROGRESS",

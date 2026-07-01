@@ -8,7 +8,7 @@ function assert(condition, message) {
 }
 
 async function main() {
-  const report = await getOverviewReport();
+  const report = await getOverviewReport({ includeTestData: true });
 
   assert(report.summary.qualityDecisionCount >= 3, "Report must include demo quality decisions");
   assert(report.qualityDecisionCounts.REWORK_OPERATION >= 1, "Report must count rework decisions");

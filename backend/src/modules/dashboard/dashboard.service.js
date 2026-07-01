@@ -154,20 +154,22 @@ export async function getSummary() {
     workOrderStatusGroups,
     qualityStatusGroups
   ] = await Promise.all([
-    prisma.workOrder.count({ where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } } }),
-    prisma.workOrder.count({ where: { status: "COMPLETED" } }),
-    prisma.workOrder.count({ where: { status: "PAUSED" } }),
+    prisma.workOrder.count({ where: { isTestData: false, status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } } }),
+    prisma.workOrder.count({ where: { isTestData: false, status: "COMPLETED" } }),
+    prisma.workOrder.count({ where: { isTestData: false, status: "PAUSED" } }),
     prisma.workOrder.count({
       where: {
+        isTestData: false,
         status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] },
         plannedEndDate: { lt: now }
       }
     }),
     prisma.machine.count({ where: { status: "RUNNING" } }),
     prisma.machine.count({ where: { status: { in: ["STOPPED", "MAINTENANCE"] } } }),
-    prisma.productionAlert.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] } } }),
-    prisma.productionAlert.count({ where: { status: { in: ["OPEN", "IN_REVIEW"] }, severity: "CRITICAL" } }),
+    prisma.productionAlert.count({ where: { workOrder: { isTestData: false }, status: { in: ["OPEN", "IN_REVIEW"] } } }),
+    prisma.productionAlert.count({ where: { workOrder: { isTestData: false }, status: { in: ["OPEN", "IN_REVIEW"] }, severity: "CRITICAL" } }),
     prisma.workOrder.aggregate({
+      where: { isTestData: false },
       _sum: {
         producedQuantity: true,
         scrapQuantity: true
@@ -175,6 +177,7 @@ export async function getSummary() {
     }),
     prisma.productionLog.findMany({
       where: {
+        workOrder: { isTestData: false },
         createdAt: {
           gte: start,
           lt: end
@@ -202,10 +205,12 @@ export async function getSummary() {
     }),
     prisma.workOrder.groupBy({
       by: ["status"],
+      where: { isTestData: false },
       _count: { _all: true }
     }),
     prisma.qualityCheck.groupBy({
       by: ["status"],
+      where: { workOrder: { isTestData: false } },
       _count: { _all: true }
     })
   ]);
@@ -220,8 +225,9 @@ export async function getSummary() {
   const todayScrapQuantity = todayProcessTotals.scrapQuantity;
   const todayFinalScrapQuantity = todayFinalProductTotals.scrapQuantity;
   const todayProcessProducedQuantity = todayProcessTotals.producedQuantity;
+  const todayTotalProcessedQuantity = todayProcessProducedQuantity + todayScrapQuantity;
   const todayScrapRate =
-    todayProducedQuantity > 0 ? Number(((todayFinalScrapQuantity / todayProducedQuantity) * 100).toFixed(2)) : 0;
+    todayTotalProcessedQuantity > 0 ? Number(((todayScrapQuantity / todayTotalProcessedQuantity) * 100).toFixed(2)) : 0;
 
   return {
     activeWorkOrders,
@@ -251,7 +257,7 @@ export async function getLiveOverview() {
 
   const [activeWorkOrders, machines, recentProductionLogs, operatorNotes, openAlerts, recentQualityChecks, pendingQualityOperations, scrapTrackingLogs] = await Promise.all([
     prisma.workOrder.findMany({
-      where: { status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
+      where: { isTestData: false, status: { in: ["PLANNED", "IN_PROGRESS", "PAUSED"] } },
       include: {
         product: true,
         machine: true,
@@ -272,6 +278,7 @@ export async function getLiveOverview() {
       orderBy: [{ status: "asc" }, { code: "asc" }]
     }),
     prisma.productionLog.findMany({
+      where: { workOrder: { isTestData: false } },
       include: {
         workOrder: { include: { product: true } },
         operator: {
@@ -291,6 +298,7 @@ export async function getLiveOverview() {
     }),
     prisma.productionLog.findMany({
       where: {
+        workOrder: { isTestData: false },
         createdAt: {
           gte: operatorNotesStart
         },
@@ -316,7 +324,7 @@ export async function getLiveOverview() {
       take: 20
     }),
     prisma.productionAlert.findMany({
-      where: { status: { in: ["OPEN", "IN_REVIEW"] } },
+      where: { workOrder: { isTestData: false }, status: { in: ["OPEN", "IN_REVIEW"] } },
       include: {
         workOrder: { include: { product: true } },
         productionLog: {
@@ -367,6 +375,7 @@ export async function getLiveOverview() {
       take: 20
     }),
     prisma.qualityCheck.findMany({
+      where: { workOrder: { isTestData: false } },
       include: {
         workOrder: { include: { product: true } },
         checkedBy: {
@@ -383,6 +392,7 @@ export async function getLiveOverview() {
     }),
     prisma.workOrderOperation.findMany({
       where: {
+        workOrder: { isTestData: false },
         status: "COMPLETED",
         producedQuantity: { gt: 0 },
         qualityChecks: { none: {} },
@@ -409,6 +419,7 @@ export async function getLiveOverview() {
     }),
     prisma.productionLog.findMany({
       where: {
+        workOrder: { isTestData: false },
         scrapQuantity: { gt: 0 }
       },
       include: {
@@ -440,7 +451,7 @@ export async function getLiveOverview() {
   ];
   const scrapActionWorkOrders = scrapActionWorkOrderIds.length
     ? await prisma.workOrder.findMany({
-        where: { id: { in: scrapActionWorkOrderIds } },
+        where: { id: { in: scrapActionWorkOrderIds }, isTestData: false },
         include: {
           product: true,
           machine: true,

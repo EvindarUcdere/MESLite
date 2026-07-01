@@ -23,6 +23,10 @@ function monthLabel(period) {
 function buildProductionWhere(range, filters) {
   const conditions = [Prisma.sql`pl."createdAt" >= ${range.from}`, Prisma.sql`pl."createdAt" <= ${range.to}`];
 
+  if (!filters.includeTestData) {
+    conditions.push(Prisma.sql`wo."isTestData" = false`);
+  }
+
   if (filters.productId) {
     conditions.push(Prisma.sql`wo."productId" = ${filters.productId}`);
   }
@@ -56,6 +60,10 @@ function buildWorkOrderWhere(range, filters) {
     Prisma.sql`COALESCE(wo."actualEndDate", wo."actualStartDate", wo."plannedStartDate", wo."updatedAt") <= ${range.to}`
   ];
 
+  if (!filters.includeTestData) {
+    conditions.push(Prisma.sql`wo."isTestData" = false`);
+  }
+
   if (filters.productId) {
     conditions.push(Prisma.sql`wo."productId" = ${filters.productId}`);
   }
@@ -77,6 +85,10 @@ function buildOperationWhere(range, filters) {
     Prisma.sql`woo."startedAt" >= ${range.from}`,
     Prisma.sql`woo."startedAt" <= ${range.to}`
   ];
+
+  if (!filters.includeTestData) {
+    conditions.push(Prisma.sql`wo."isTestData" = false`);
+  }
 
   if (filters.productId) {
     conditions.push(Prisma.sql`wo."productId" = ${filters.productId}`);
@@ -110,6 +122,10 @@ function buildOperationWhere(range, filters) {
 
 function buildDowntimeWhere(range, filters) {
   const conditions = [Prisma.sql`od."startedAt" >= ${range.from}`, Prisma.sql`od."startedAt" <= ${range.to}`];
+
+  if (!filters.includeTestData) {
+    conditions.push(Prisma.sql`wo."isTestData" = false`);
+  }
 
   if (filters.productId) {
     conditions.push(Prisma.sql`wo."productId" = ${filters.productId}`);

@@ -15,8 +15,14 @@ function expectedRate(numerator, denominator) {
 }
 
 async function main() {
-  const report = await getOverviewReport();
+  const report = await getOverviewReport({ includeTestData: true });
+  const productionReport = await getOverviewReport();
   const machineTotals = new Map();
+
+  assert(
+    productionReport.operationTimePerformance.every((operation) => !operation.orderNo.startsWith("E2E-")),
+    "Production report must exclude test work orders by default"
+  );
 
   for (const operation of report.operationTimePerformance) {
     const key = operation.machineId ?? "UNASSIGNED";

@@ -153,6 +153,7 @@ async function createDemoWorkOrder({ admin, manager, product, route, routeOperat
       producedQuantity: scenario.producedQuantity,
       scrapQuantity: scenario.scrapQuantity,
       status: scenario.status,
+      isTestData: true,
       plannedStartDate,
       plannedEndDate: scenario.plannedEndDate ?? new Date(plannedStartDate.getTime() + Math.max(plannedMinutes, 1) * 60_000),
       createdById: admin.id,

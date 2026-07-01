@@ -82,7 +82,8 @@ function getReportFilters(query = {}) {
     shiftId: normalizeFilterValue(query.shiftId),
     operatorId: normalizeFilterValue(query.operatorId),
     routeId: normalizeFilterValue(query.routeId),
-    status: WORK_ORDER_STATUSES.has(status) ? status : undefined
+    status: WORK_ORDER_STATUSES.has(status) ? status : undefined,
+    includeTestData: query.includeTestData === true || query.includeTestData === "true"
   };
 }
 
@@ -95,7 +96,7 @@ function hasWorkOrderScope(filters) {
 }
 
 function buildWorkOrderScope(filters) {
-  const scope = {};
+  const scope = filters.includeTestData ? {} : { isTestData: false };
 
   if (filters.productId) {
     scope.productId = filters.productId;
@@ -113,7 +114,7 @@ function buildWorkOrderScope(filters) {
 }
 
 function buildRelatedWorkOrderFilter(filters) {
-  return hasWorkOrderScope(filters) ? { workOrder: buildWorkOrderScope(filters) } : null;
+  return { workOrder: buildWorkOrderScope(filters) };
 }
 
 function buildWorkOrderWhere(range, filters) {
@@ -154,7 +155,7 @@ function buildWorkOrderWhere(range, filters) {
           dateRangeFilter("updatedAt", range)
         ]
       },
-      hasWorkOrderScope(filters) ? buildWorkOrderScope(filters) : null,
+      buildWorkOrderScope(filters),
       assignmentFilters.length ? { OR: assignmentFilters } : null
     )
   };

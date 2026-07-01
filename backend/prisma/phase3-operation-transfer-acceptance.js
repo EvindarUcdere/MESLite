@@ -122,6 +122,7 @@ async function main() {
       productId: product.id,
       routeId: route.id,
       plannedQuantity: 120,
+      isTestData: true,
       status: "IN_PROGRESS",
       actualStartDate: new Date(),
       createdById: admin.id,

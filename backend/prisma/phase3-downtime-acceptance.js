@@ -37,7 +37,7 @@ async function main() {
     "Every open downtime must belong to a paused operation"
   );
 
-  const report = await getOverviewReport();
+  const report = await getOverviewReport({ includeTestData: true });
 
   assert(report.operationDowntimeReasonCounts.MACHINE_FAILURE >= 1, "Report must count machine failure downtimes");
   assert(report.operationDowntimeReasonCounts.QUALITY_WAITING >= 1, "Report must count quality waiting downtimes");
