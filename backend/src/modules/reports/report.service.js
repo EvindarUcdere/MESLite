@@ -438,7 +438,9 @@ function buildManagementInsights({ summary, shiftPerformance, delayedOperations,
       type: "STALE_OPERATION",
       severity: "CRITICAL",
       title: "Uzun süredir açık operasyon",
-      message: `${stalestOperation.orderNo} / ${stalestOperation.operationName} operasyonu ${formatDuration(stalestOperation.actualMinutes)} süredir kapanmamış görünüyor.`
+      message: `${stalestOperation.orderNo} / ${stalestOperation.operationName} operasyonu ${formatDuration(stalestOperation.actualMinutes)} süredir kapanmamış görünüyor.`,
+      workOrderId: stalestOperation.workOrderId,
+      operationId: stalestOperation.operationId
     });
   }
 
@@ -934,6 +936,7 @@ export async function getOverviewReport(query = {}) {
 
     const item = {
       operationId: operation.id,
+      workOrderId: operation.workOrderId,
       orderNo: operation.workOrder.orderNo,
       productCode: operation.workOrder.product.code,
       productName: operation.workOrder.product.name,

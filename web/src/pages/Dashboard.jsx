@@ -391,12 +391,13 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
             <Link className="section-link" to="/reports">Tüm analiz</Link>
           </div>
           <div className="executive-insight-list">
-            {(executiveReport?.managementInsights ?? []).slice(0, 6).map((insight) => (
-              <div key={`${insight.type}-${insight.title}`} className={`executive-insight executive-insight-${insight.severity.toLowerCase()}`}>
-                <AlertTriangle size={17} />
-                <span><strong>{insight.title}</strong><small>{insight.message}</small></span>
-              </div>
-            ))}
+            {(executiveReport?.managementInsights ?? []).slice(0, 6).map((insight) => {
+              const insightContent = <><AlertTriangle size={17} /><span><strong>{insight.title}</strong><small>{insight.message}</small></span></>;
+              const className = `executive-insight executive-insight-${insight.severity.toLowerCase()}`;
+              return insight.workOrderId
+                ? <Link key={`${insight.type}-${insight.title}`} className={className} to={`/work-orders?workOrderId=${insight.workOrderId}&operationId=${insight.operationId ?? ""}`}>{insightContent}</Link>
+                : <div key={`${insight.type}-${insight.title}`} className={className}>{insightContent}</div>;
+            })}
             {!isLoading && !(executiveReport?.managementInsights?.length) ? <p className="empty-state">Seçili dönemde kritik yönetim içgörüsü oluşmadı.</p> : null}
           </div>
         </article>
@@ -425,7 +426,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
           <div className="section-title-row"><div><h2>Üretim Darboğazları</h2><p className="muted-text">Hedef süresini en fazla aşan operasyonlar.</p></div></div>
           <div className="executive-ranked-list">
             {delayedOperations.map((item, index) => (
-              <Link key={item.operationId} to="/reports#delayed-operations">
+              <Link key={item.operationId} to={`/work-orders?workOrderId=${item.workOrderId}&operationId=${item.operationId}`}>
                 <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode} · {STATUS_LABELS[item.status] ?? item.status}</small></span><em>+{formatDuration(item.delayMinutes)}</em>
               </Link>
             ))}

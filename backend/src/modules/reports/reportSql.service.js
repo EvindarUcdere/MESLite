@@ -411,6 +411,7 @@ export async function getReportSqlAnalytics({ range, filters }) {
       WITH operation_base AS (
         SELECT
           woo.id AS operation_id,
+          wo.id AS work_order_id,
           wo."orderNo" AS order_no,
           p.code AS product_code,
           p.name AS product_name,
@@ -566,6 +567,7 @@ export async function getReportSqlAnalytics({ range, filters }) {
 
     return {
       operationId: row.operation_id,
+      workOrderId: row.work_order_id,
       orderNo: row.order_no,
       productCode: row.product_code,
       productName: row.product_name,

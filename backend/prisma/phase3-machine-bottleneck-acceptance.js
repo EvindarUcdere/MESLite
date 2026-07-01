@@ -102,6 +102,10 @@ async function main() {
     "Stale operations must be sorted by open duration descending"
   );
   const staleInsight = report.managementInsights.find((insight) => insight.type === "STALE_OPERATION");
+  assert(report.delayedOperations.every((operation) => operation.workOrderId), "Bottleneck operations must include work order links");
+  if (report.staleOperations.length) {
+    assert(staleInsight?.workOrderId, "Stale operation insight must include a work order link");
+  }
   if (report.staleOperations[0]?.actualMinutes > 48 * 60) {
     assert(staleInsight?.message.includes("gün"), "Stale operation durations over 48 hours must be displayed in days");
   }
