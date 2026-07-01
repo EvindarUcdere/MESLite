@@ -15,13 +15,15 @@ function parseCorsOrigins(value) {
 
 function validateEnv() {
   const nodeEnv = process.env.NODE_ENV ?? "development";
+  const jwtSecret = process.env.JWT_SECRET;
+  const weakJwtSecrets = new Set(["change-this-secret", "development-secret", "secret", "meslite-secret"]);
 
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL zorunludur");
   }
 
-  if (nodeEnv === "production" && (!process.env.JWT_SECRET || process.env.JWT_SECRET === "change-this-secret")) {
-    throw new Error("Production ortamında JWT_SECRET güçlü bir değer olarak ayarlanmalıdır");
+  if (nodeEnv === "production" && (!jwtSecret || jwtSecret.length < 32 || weakJwtSecrets.has(jwtSecret.toLowerCase()))) {
+    throw new Error("Production ortamında JWT_SECRET en az 32 karakterlik güçlü ve benzersiz bir değer olmalıdır");
   }
 
   if (edgeMode && process.env.EDGE_CLOUD_API_URL && !process.env.EDGE_SYNC_SECRET) {
