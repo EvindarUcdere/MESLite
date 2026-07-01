@@ -288,6 +288,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
   ];
 
   const delayedOperations = executiveReport?.delayedOperations?.slice(0, 5) ?? [];
+  const staleOperations = executiveReport?.staleOperations ?? [];
   const weakMachines = [...(executiveReport?.oeeByMachine ?? [])]
     .filter((item) => item.operationCount > 0)
     .sort((first, second) => first.oee - second.oee)
@@ -302,7 +303,10 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
       return acc;
     }, {})
   )
-    .map((item) => ({ ...item, scrapRate: item.producedQuantity > 0 ? Number(((item.scrapQuantity / item.producedQuantity) * 100).toFixed(2)) : 0 }))
+    .map((item) => {
+      const totalProcessedQuantity = item.producedQuantity + item.scrapQuantity;
+      return { ...item, scrapRate: totalProcessedQuantity > 0 ? Number(((item.scrapQuantity / totalProcessedQuantity) * 100).toFixed(2)) : 0 };
+    })
     .sort((first, second) => second.scrapRate - first.scrapRate)
     .slice(0, 5);
 
@@ -397,6 +401,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
             <div className={summary?.overdueWorkOrders ? "is-risk" : ""}><span>Geciken iş</span><strong>{summary?.overdueWorkOrders ?? 0}</strong></div>
             <div className={stoppedMachineCount ? "is-risk" : ""}><span>Duruş / bakım</span><strong>{stoppedMachineCount}</strong></div>
             <div className={openAlertCount ? "is-risk" : ""}><span>Açık uyarı</span><strong>{openAlertCount}</strong></div>
+            <div className={staleOperations.length ? "is-risk" : ""}><span>Uzun süre açık</span><strong>{staleOperations.length}</strong></div>
             <div><span>Kalite bekleyen</span><strong>{qualityWaitingCount}</strong></div>
             <div><span>Fire kararı</span><strong>{scrapPendingCount}</strong></div>
           </div>
@@ -409,7 +414,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
           <div className="executive-ranked-list">
             {delayedOperations.map((item, index) => (
               <Link key={item.operationId} to="/reports#delayed-operations">
-                <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode}</small></span><em>+{Math.round(item.delayMinutes)} dk</em>
+                <b>{index + 1}</b><span><strong>{item.operationName}</strong><small>{item.orderNo} · {item.machineCode} · {STATUS_LABELS[item.status] ?? item.status}</small></span><em>+{Math.round(item.delayMinutes)} dk</em>
               </Link>
             ))}
             {!isLoading && delayedOperations.length === 0 ? <p className="empty-state">Geciken operasyon yok.</p> : null}

@@ -85,6 +85,16 @@ async function main() {
     report.operationTimeByMachine.every((machine, index, items) => index === 0 || items[index - 1].delayMinutes >= machine.delayMinutes),
     "Bottleneck machines must be sorted by delay descending"
   );
+  assert(
+    report.staleOperations.every(
+      (operation) => !operation.completedAt && operation.actualMinutes >= Math.max(8 * 60, operation.plannedMinutes * 2)
+    ),
+    "Stale operations must be open and exceed the duration threshold"
+  );
+  assert(
+    report.staleOperations.every((operation, index, items) => index === 0 || items[index - 1].actualMinutes >= operation.actualMinutes),
+    "Stale operations must be sorted by open duration descending"
+  );
 
   const processTotal = report.summary.processProducedQuantity + report.summary.scrapQuantity;
   assert(
@@ -100,6 +110,7 @@ async function main() {
       "machine OEE components",
       "operation bottleneck ranking",
       "machine bottleneck ranking",
+      "stale operation classification",
       "scrap rate denominator"
     ]
   });

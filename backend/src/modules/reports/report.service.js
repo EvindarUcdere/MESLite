@@ -416,8 +416,18 @@ function buildPlanActualPerformance(workOrders, range) {
     .sort((first, second) => first.period.localeCompare(second.period));
 }
 
-function buildManagementInsights({ summary, shiftPerformance, delayedOperations, operationDowntimeByMachine, operationDowntimeByShift, qualityDecisionByMachine }) {
+function buildManagementInsights({ summary, shiftPerformance, delayedOperations, staleOperations, operationDowntimeByMachine, operationDowntimeByShift, qualityDecisionByMachine }) {
   const insights = [];
+
+  const stalestOperation = staleOperations[0];
+  if (stalestOperation) {
+    insights.push({
+      type: "STALE_OPERATION",
+      severity: "CRITICAL",
+      title: "Uzun süredir açık operasyon",
+      message: `${stalestOperation.orderNo} / ${stalestOperation.operationName} operasyonu ${Math.round(stalestOperation.actualMinutes / 60)} saattir kapanmamış görünüyor.`
+    });
+  }
 
   if (summary.planCompletionRate < 85 && summary.plannedQuantity > 0) {
     insights.push({
@@ -1012,6 +1022,13 @@ export async function getOverviewReport(query = {}) {
 
   const operationTimePerformance = sqlAnalytics.operationTimePerformance.length ? sqlAnalytics.operationTimePerformance : prismaOperationTimePerformance;
   const delayedOperations = sqlAnalytics.delayedOperations.length ? sqlAnalytics.delayedOperations : prismaDelayedOperations;
+  const staleOperations = operationTimePerformance
+    .filter(
+      (operation) =>
+        !operation.completedAt &&
+        operation.actualMinutes >= Math.max(8 * 60, operation.plannedMinutes * 2)
+    )
+    .sort((first, second) => second.actualMinutes - first.actualMinutes);
   const operationTimeByMachine = sqlAnalytics.operationTimeByMachine.length ? sqlAnalytics.operationTimeByMachine : prismaOperationTimeByMachine;
   const operationTimeByOperator = sqlAnalytics.operationTimeByOperator.length ? sqlAnalytics.operationTimeByOperator : prismaOperationTimeByOperator;
   const oeeSummary = sqlAnalytics.oeeSummary.operationCount > 0 ? sqlAnalytics.oeeSummary : prismaOeeSummary;
@@ -1157,6 +1174,7 @@ export async function getOverviewReport(query = {}) {
     summary,
     shiftPerformance,
     delayedOperations,
+    staleOperations,
     operationDowntimeByMachine,
     operationDowntimeByShift,
     qualityDecisionByMachine
@@ -1212,6 +1230,7 @@ export async function getOverviewReport(query = {}) {
     recentOperationDowntimes: operationDowntimes.slice(0, 10),
     operationTimePerformance,
     delayedOperations: delayedOperations.slice(0, 10),
+    staleOperations: staleOperations.slice(0, 10),
     operationTimeByMachine,
     operationTimeByOperator,
     oeeSummary,
