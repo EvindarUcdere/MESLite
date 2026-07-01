@@ -88,6 +88,7 @@ async function createFixture() {
     create: { routeId: route.id, sequenceNo: 1, operationName: "Concurrency Step", defaultMachineId: machine.id, estimatedMinutes: 10 }
   });
 
+  const plannedStartDate = new Date();
   const workOrder = await prisma.workOrder.create({
     data: {
       orderNo: `${PREFIX}-${Date.now()}`,
@@ -96,6 +97,8 @@ async function createFixture() {
       machineId: machine.id,
       assignedOperatorId: operator.id,
       plannedQuantity: 20,
+      plannedStartDate,
+      plannedEndDate: new Date(plannedStartDate.getTime() + 10 * 60_000),
       status: "IN_PROGRESS",
       actualStartDate: new Date(),
       createdById: admin.id,

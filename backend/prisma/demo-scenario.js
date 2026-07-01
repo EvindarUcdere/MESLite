@@ -139,6 +139,11 @@ async function createRoute({ product, machines }) {
 }
 
 async function createDemoWorkOrder({ admin, manager, product, route, routeOperations, operators, machines, scenario }) {
+  const plannedStartDate = scenario.plannedStartDate ?? scenario.actualStartDate ?? new Date();
+  const plannedMinutes = routeOperations.reduce(
+    (sum, operation) => sum + Math.max(Number(operation.estimatedMinutes ?? 0), 0),
+    0
+  );
   const workOrder = await prisma.workOrder.create({
     data: {
       orderNo: scenario.orderNo,
@@ -148,6 +153,8 @@ async function createDemoWorkOrder({ admin, manager, product, route, routeOperat
       producedQuantity: scenario.producedQuantity,
       scrapQuantity: scenario.scrapQuantity,
       status: scenario.status,
+      plannedStartDate,
+      plannedEndDate: scenario.plannedEndDate ?? new Date(plannedStartDate.getTime() + Math.max(plannedMinutes, 1) * 60_000),
       createdById: admin.id,
       actualStartDate: scenario.actualStartDate,
       actualEndDate: scenario.actualEndDate,

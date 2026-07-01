@@ -19,6 +19,8 @@
     "seed:stock": "node prisma/seed-stock-mrp.js",
     "reconcile:production": "node prisma/reconcile-production-totals.js",
     "check:production-consistency": "node prisma/check-production-consistency.js",
+    "backfill:work-order-dates": "node prisma/backfill-work-order-plan-dates.js",
+    "backfill:work-order-dates:apply": "node prisma/backfill-work-order-plan-dates.js --apply",
     "test:phase2": "node prisma/phase2-acceptance.js",
     "test:phase3:shifts": "node prisma/phase3-shift-acceptance.js",
     "test:phase3:downtimes": "node prisma/phase3-downtime-acceptance.js",
