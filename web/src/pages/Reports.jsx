@@ -396,6 +396,7 @@ export default function Reports() {
   const delayedOperations = report?.delayedOperations ?? [];
   const operationTimeByMachine = report?.operationTimeByMachine ?? [];
   const operationTimeByOperator = report?.operationTimeByOperator ?? [];
+  const operatorPerformance = report?.operatorPerformance ?? [];
   const productionTrendData = report?.productionTrend ?? [];
   const planActualData = report?.planActualPerformance ?? [];
   const oeeSummary = report?.oeeSummary ?? {};
@@ -1397,6 +1398,46 @@ export default function Reports() {
               {!isLoading && operationTimeByMachine.length === 0 ? (
                 <tr>
                   <td colSpan="10">Makine bazlı süre verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </ReportDetailSection>
+
+      <ReportDetailSection id="operator-performance" title="Operatör Proses Performansı" description="Hedef işleme, tamamlanan operasyon süresi, kalite ve tamamlama bileşenlerinden oluşan destek önceliği." count={operatorPerformance.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table">
+            <thead>
+              <tr>
+                <th>Operatör</th>
+                <th>Proses Puanı</th>
+                <th>Veri Güveni</th>
+                <th>Operasyon</th>
+                <th>Hedef</th>
+                <th>Süre</th>
+                <th>Kalite</th>
+                <th>Tamamlama</th>
+                <th>Üretim / Fire</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operatorPerformance.map((item) => (
+                <tr key={item.operatorId}>
+                  <td>{item.operatorName}</td>
+                  <td><NumberBadge tone={item.performanceScore < 70 ? "danger" : item.performanceScore < 85 ? "warning" : "success"}>{item.performanceScore}</NumberBadge></td>
+                  <td><NumberBadge tone={item.dataConfidence === "HIGH" ? "success" : item.dataConfidence === "MEDIUM" ? "warning" : "neutral"}>{item.dataConfidence === "HIGH" ? "Yüksek" : item.dataConfidence === "MEDIUM" ? "Orta" : "Düşük"}</NumberBadge></td>
+                  <td><NumberBadge>{item.completedOperationCount}/{item.operationCount}</NumberBadge></td>
+                  <td><NumberBadge tone={item.targetAchievement >= 85 ? "success" : "warning"}>%{item.targetAchievement}</NumberBadge></td>
+                  <td><NumberBadge tone={item.timeEfficiency === null ? "neutral" : item.timeEfficiency >= 85 ? "success" : "warning"}>{item.timeEfficiency === null ? "Veri yok" : `%${item.timeEfficiency}`}</NumberBadge></td>
+                  <td><NumberBadge tone={item.qualityRate >= 95 ? "success" : "warning"}>%{item.qualityRate}</NumberBadge></td>
+                  <td><NumberBadge tone={item.completionRate >= 85 ? "success" : "warning"}>%{item.completionRate}</NumberBadge></td>
+                  <td>{item.producedQuantity} / {item.scrapQuantity}</td>
+                </tr>
+              ))}
+              {!isLoading && operatorPerformance.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Operatör proses verisi yok.</td>
                 </tr>
               ) : null}
             </tbody>

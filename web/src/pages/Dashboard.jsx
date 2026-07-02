@@ -306,21 +306,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
     .sort((first, second) => first.oee - second.oee)
     .slice(0, 5);
   const downtimeMachines = executiveReport?.operationDowntimeByMachine?.slice(0, 5) ?? [];
-  const operatorTotals = Object.values(
-    (executiveReport?.operatorShiftPerformance ?? []).reduce((acc, item) => {
-      const current = acc[item.operatorId] ?? { operatorId: item.operatorId, operatorName: item.operatorName, producedQuantity: 0, scrapQuantity: 0 };
-      current.producedQuantity += item.producedQuantity;
-      current.scrapQuantity += item.scrapQuantity;
-      acc[item.operatorId] = current;
-      return acc;
-    }, {})
-  )
-    .map((item) => {
-      const totalProcessedQuantity = item.producedQuantity + item.scrapQuantity;
-      return { ...item, scrapRate: totalProcessedQuantity > 0 ? Number(((item.scrapQuantity / totalProcessedQuantity) * 100).toFixed(2)) : 0 };
-    })
-    .sort((first, second) => second.scrapRate - first.scrapRate)
-    .slice(0, 5);
+  const operatorSignals = (executiveReport?.operatorPerformance ?? []).slice(0, 5);
 
   const controlItems = [
     { title: "Kullanıcı ve rol yönetimi", description: "Yeni çalışanların web/mobil erişimi, pasife alma ve rol ayrımı.", to: "/users", status: "Admin aksiyonu" },
@@ -446,12 +432,12 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
         </article>
 
         <article className="panel executive-table-panel">
-          <div className="section-title-row"><div><h2>Çalışan Bazlı Süreç Sinyali</h2><p className="muted-text">Fire oranı eğitim ve proses desteği için sinyal üretir; performans cezası değildir.</p></div></div>
+          <div className="section-title-row"><div><h2>Operatör Destek Önceliği</h2><p className="muted-text">Hedef, süre, kalite ve tamamlama bileşenleri proses desteği için birlikte değerlendirilir.</p></div></div>
           <div className="executive-ranked-list">
-            {operatorTotals.map((item, index) => (
-              <Link key={item.operatorId} to="/reports#operator-performance"><b>{index + 1}</b><span><strong>{item.operatorName}</strong><small>{item.producedQuantity} üretim · {item.scrapQuantity} fire</small></span><em>%{item.scrapRate} fire</em></Link>
+            {operatorSignals.map((item, index) => (
+              <Link key={item.operatorId} to="/reports#operator-performance"><b>{index + 1}</b><span><strong>{item.operatorName}</strong><small>Hedef %{item.targetAchievement} · Süre {item.timeEfficiency === null ? "veri yok" : `%${item.timeEfficiency}`} · Kalite %{item.qualityRate} · {item.operationCount} operasyon · Veri {item.dataConfidence === "HIGH" ? "yüksek" : item.dataConfidence === "MEDIUM" ? "orta" : "düşük"}</small></span><em>{item.performanceScore} puan</em></Link>
             ))}
-            {!isLoading && operatorTotals.length === 0 ? <p className="empty-state">Operatör üretim verisi yok.</p> : null}
+            {!isLoading && operatorSignals.length === 0 ? <p className="empty-state">Operatör proses verisi yok.</p> : null}
           </div>
         </article>
       </section>

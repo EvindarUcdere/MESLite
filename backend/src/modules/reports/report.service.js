@@ -282,6 +282,76 @@ function finalizeOeeGroup(group) {
   };
 }
 
+function buildOperatorPerformance(operationTimePerformance) {
+  const map = new Map();
+
+  for (const operation of operationTimePerformance) {
+    if (!operation.operatorId) {
+      continue;
+    }
+
+    const current = map.get(operation.operatorId) ?? {
+      operatorId: operation.operatorId,
+      operatorName: operation.operatorName,
+      operationCount: 0,
+      completedOperationCount: 0,
+      plannedMinutes: 0,
+      idealRunMinutes: 0,
+      completedPlannedMinutes: 0,
+      completedNetMinutes: 0,
+      producedQuantity: 0,
+      scrapQuantity: 0,
+      totalProcessedQuantity: 0
+    };
+
+    current.operationCount += 1;
+    current.completedOperationCount += operation.completedAt ? 1 : 0;
+    current.plannedMinutes += operation.plannedMinutes;
+    current.idealRunMinutes += operation.idealRunMinutes;
+    current.producedQuantity += operation.producedQuantity;
+    current.scrapQuantity += operation.scrapQuantity;
+    current.totalProcessedQuantity += operation.totalProcessedQuantity;
+
+    if (operation.completedAt) {
+      current.completedPlannedMinutes += operation.plannedMinutes;
+      current.completedNetMinutes += operation.netMinutes;
+    }
+
+    map.set(operation.operatorId, current);
+  }
+
+  return [...map.values()]
+    .map((item) => {
+      const targetAchievement = percent(Math.min(item.idealRunMinutes, item.plannedMinutes), item.plannedMinutes);
+      const timeEfficiency = item.completedNetMinutes > 0
+        ? percent(Math.min(item.completedPlannedMinutes, item.completedNetMinutes), item.completedNetMinutes)
+        : null;
+      const qualityRate = percent(item.producedQuantity, item.totalProcessedQuantity);
+      const completionRate = percent(item.completedOperationCount, item.operationCount);
+      const components = [
+        { value: targetAchievement, weight: 35 },
+        ...(timeEfficiency === null ? [] : [{ value: timeEfficiency, weight: 25 }]),
+        { value: qualityRate, weight: 30 },
+        { value: completionRate, weight: 10 }
+      ];
+      const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
+      const performanceScore = totalWeight > 0
+        ? Number((components.reduce((sum, component) => sum + component.value * component.weight, 0) / totalWeight).toFixed(2))
+        : 0;
+
+      return {
+        ...item,
+        targetAchievement,
+        timeEfficiency,
+        qualityRate,
+        completionRate,
+        performanceScore,
+        dataConfidence: item.operationCount >= 5 ? "HIGH" : item.operationCount >= 2 ? "MEDIUM" : "LOW"
+      };
+    })
+    .sort((first, second) => first.performanceScore - second.performanceScore);
+}
+
 function addLogMetrics(item, log) {
   item.producedQuantity += log.producedQuantity;
   item.scrapQuantity += log.scrapQuantity;
@@ -1047,6 +1117,7 @@ export async function getOverviewReport(query = {}) {
     .sort((first, second) => second.actualMinutes - first.actualMinutes);
   const operationTimeByMachine = sqlAnalytics.operationTimeByMachine.length ? sqlAnalytics.operationTimeByMachine : prismaOperationTimeByMachine;
   const operationTimeByOperator = sqlAnalytics.operationTimeByOperator.length ? sqlAnalytics.operationTimeByOperator : prismaOperationTimeByOperator;
+  const operatorPerformance = buildOperatorPerformance(operationTimePerformance);
   const oeeSummary = sqlAnalytics.oeeSummary.operationCount > 0 ? sqlAnalytics.oeeSummary : prismaOeeSummary;
   const oeeByMachine = sqlAnalytics.oeeByMachine.length ? sqlAnalytics.oeeByMachine : prismaOeeByMachine;
   const oeeByOperation = sqlAnalytics.oeeByOperation.length ? sqlAnalytics.oeeByOperation : prismaOeeByOperation;
@@ -1249,6 +1320,7 @@ export async function getOverviewReport(query = {}) {
     staleOperations: staleOperations.slice(0, 10),
     operationTimeByMachine,
     operationTimeByOperator,
+    operatorPerformance,
     oeeSummary,
     oeeByMachine,
     oeeByOperation,
