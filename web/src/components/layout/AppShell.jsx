@@ -8,7 +8,7 @@ import { hasRole, ROLE_GROUPS, ROLE_LABELS } from "../../utils/roles.js";
 
 function getDashboardLabel(role) {
   if (role === "ADMIN") {
-    return "Sistem Paneli";
+    return "Yönetim Paneli";
   }
 
   if (role === "PLANNER") {
@@ -20,6 +20,37 @@ function getDashboardLabel(role) {
   }
 
   return "Üretim Paneli";
+}
+
+const WORKSPACE_LABELS = {
+  management: "Yönetim Alanı",
+  production: "Üretim Alanı",
+  quality: "Kalite Alanı",
+  system: "Sistem Alanı"
+};
+
+function getWorkspace(pathname, role) {
+  if (["/users", "/audit-logs", "/event-logs"].some((path) => pathname.startsWith(path))) {
+    return "system";
+  }
+
+  if (["/quality", "/alerts"].some((path) => pathname.startsWith(path))) {
+    return "quality";
+  }
+
+  if (["/work-orders", "/sales-orders", "/shift-planning", "/field-notes", "/inventory", "/routes", "/products", "/machines"].some((path) => pathname.startsWith(path))) {
+    return "production";
+  }
+
+  if (role === "QUALITY_STAFF") {
+    return "quality";
+  }
+
+  if (role === "PLANNER" || role === "OPERATOR") {
+    return "production";
+  }
+
+  return "management";
 }
 
 const navigationItems = [
@@ -128,6 +159,7 @@ export function AppShell() {
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const workspace = getWorkspace(location.pathname, user?.role);
 
   async function loadUnreadNotificationCount() {
     try {
@@ -176,11 +208,12 @@ export function AppShell() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-workspace={workspace}>
       <aside className="sidebar">
         <div className="brand">
           <strong>MES Lite</strong>
           <span>{ROLE_LABELS[user?.role] ?? "Kullanıcı"}</span>
+          <em>{WORKSPACE_LABELS[workspace]}</em>
         </div>
         <nav>
           {navigationItems
