@@ -3512,6 +3512,61 @@ body {
   gap: 12px;
 }
 
+.machine-root-cause-table {
+  min-width: 960px;
+  table-layout: fixed;
+}
+
+.machine-root-cause-table th:nth-child(1) { width: 13%; }
+.machine-root-cause-table th:nth-child(2) { width: 8%; }
+.machine-root-cause-table th:nth-child(3) { width: 22%; }
+.machine-root-cause-table th:nth-child(4) { width: 27%; }
+.machine-root-cause-table th:nth-child(5) { width: 20%; }
+.machine-root-cause-table th:nth-child(6) { width: 10%; }
+
+.machine-root-cause-table td {
+  padding-block: 12px;
+  vertical-align: top;
+}
+
+.root-cause-components,
+.root-cause-evidence,
+.root-cause-primary {
+  display: grid;
+  gap: 5px;
+}
+
+.root-cause-components span,
+.root-cause-evidence span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #607080;
+  font-size: 12px;
+}
+
+.root-cause-components b,
+.root-cause-evidence b {
+  color: #1c3443;
+  white-space: nowrap;
+}
+
+.root-cause-primary {
+  align-content: start;
+}
+
+.root-cause-primary .report-number-badge {
+  justify-self: start;
+  white-space: normal;
+}
+
+.root-cause-primary small,
+.root-cause-evidence small {
+  color: #607080;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .audit-view-tabs {
   display: flex;
   width: max-content;

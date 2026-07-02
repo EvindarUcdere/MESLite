@@ -74,6 +74,24 @@ async function main() {
     assert(closeEnough(machine.oee, oee), `${machine.machineCode} OEE is inconsistent`);
   }
 
+  for (const analysis of report.machineLossAnalysis) {
+    const machine = report.oeeByMachine.find((item) => item.machineId === analysis.machineId);
+    const weakestComponent = [
+      { type: "AVAILABILITY", value: machine.availability },
+      { type: "PERFORMANCE", value: machine.performance },
+      { type: "QUALITY", value: machine.quality }
+    ].sort((first, second) => first.value - second.value)[0];
+
+    assert(analysis.primaryLoss === weakestComponent.type, `${analysis.machineCode} primary loss is inconsistent`);
+    assert(closeEnough(analysis.lossPercent, 100 - weakestComponent.value), `${analysis.machineCode} loss percentage is inconsistent`);
+    assert(Boolean(analysis.recommendedAction), `${analysis.machineCode} recommended action is missing`);
+  }
+
+  assert(
+    report.machineLossAnalysis.every((item) => ["HIGH", "MEDIUM", "LOW"].includes(item.dataConfidence)),
+    "Machine loss analysis must include data confidence"
+  );
+
   assert(
     report.delayedOperations.every((operation, index, items) => index === 0 || items[index - 1].delayMinutes >= operation.delayMinutes),
     "Bottleneck operations must be sorted by delay descending"
@@ -122,6 +140,8 @@ async function main() {
       "machine time totals",
       "machine downtime totals",
       "machine OEE components",
+      "machine primary loss classification",
+      "machine root cause evidence",
       "operation bottleneck ranking",
       "machine bottleneck ranking",
       "stale operation classification",

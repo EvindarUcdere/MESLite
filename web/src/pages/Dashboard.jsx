@@ -301,11 +301,7 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
 
   const delayedOperations = executiveReport?.delayedOperations?.slice(0, 5) ?? [];
   const staleOperations = executiveReport?.staleOperations ?? [];
-  const weakMachines = [...(executiveReport?.oeeByMachine ?? [])]
-    .filter((item) => item.operationCount > 0)
-    .sort((first, second) => first.oee - second.oee)
-    .slice(0, 5);
-  const downtimeMachines = executiveReport?.operationDowntimeByMachine?.slice(0, 5) ?? [];
+  const machineLossSignals = (executiveReport?.machineLossAnalysis ?? []).slice(0, 5);
   const operatorSignals = (executiveReport?.operatorPerformance ?? []).slice(0, 5);
 
   const controlItems = [
@@ -423,11 +419,10 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
         <article className="panel executive-table-panel">
           <div className="section-title-row"><div><h2>Makine Riskleri</h2><p className="muted-text">Tahmini OEE ve duruş yoğunluğu birlikte izlenir.</p></div></div>
           <div className="executive-ranked-list">
-            {weakMachines.map((item, index) => {
-              const downtime = downtimeMachines.find((entry) => entry.machineId === item.machineId);
-              return <Link key={item.machineId} to="/reports#machine-performance-detail"><b>{index + 1}</b><span><strong>{item.machineCode}</strong><small>{item.machineName} · {downtime?.totalCount ?? 0} duruş</small></span><em>%{item.oee} tahmini</em></Link>;
-            })}
-            {!isLoading && weakMachines.length === 0 ? <p className="empty-state">OEE hesaplanabilecek makine verisi yok.</p> : null}
+            {machineLossSignals.map((item, index) => (
+              <Link key={item.machineId} to="/reports#machine-root-cause"><b>{index + 1}</b><span><strong>{item.machineCode}</strong><small>{item.primaryLossLabel} · {item.downtimeCount} duruş · Veri {item.dataConfidence === "HIGH" ? "yüksek" : item.dataConfidence === "MEDIUM" ? "orta" : "düşük"}</small></span><em>%{item.oee} OEE</em></Link>
+            ))}
+            {!isLoading && machineLossSignals.length === 0 ? <p className="empty-state">OEE hesaplanabilecek makine verisi yok.</p> : null}
           </div>
         </article>
 

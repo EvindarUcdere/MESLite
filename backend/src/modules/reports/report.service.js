@@ -352,6 +352,71 @@ function buildOperatorPerformance(operationTimePerformance) {
     .sort((first, second) => first.performanceScore - second.performanceScore);
 }
 
+function buildMachineLossAnalysis(oeeByMachine, operationTimeByMachine, operationDowntimeByMachine, qualityDecisionByMachine) {
+  const timeMap = new Map(operationTimeByMachine.map((item) => [item.machineId, item]));
+  const downtimeMap = new Map(operationDowntimeByMachine.map((item) => [item.machineId, item]));
+  const qualityMap = new Map(qualityDecisionByMachine.map((item) => [item.machineId, item]));
+  const definitions = {
+    AVAILABILITY: {
+      label: "Kullanılabilirlik / duruş",
+      action: "En sık duruş nedenini bakım, malzeme ve planlama ekipleriyle kapatın."
+    },
+    PERFORMANCE: {
+      label: "Hız / proses performansı",
+      action: "Çevrim süresi, ayar süresi ve standart operasyon süresini sahada doğrulayın."
+    },
+    QUALITY: {
+      label: "Kalite kaybı",
+      action: "Fire nedenlerini, proses parametrelerini ve kalite kararlarını birlikte inceleyin."
+    }
+  };
+
+  return oeeByMachine
+    .filter((machine) => machine.machineId && machine.machineId !== "UNASSIGNED")
+    .map((machine) => {
+      const components = [
+        { type: "AVAILABILITY", value: machine.availability },
+        { type: "PERFORMANCE", value: machine.performance },
+        { type: "QUALITY", value: machine.quality }
+      ].sort((first, second) => first.value - second.value);
+      const primary = components[0];
+      const definition = definitions[primary.type];
+      const time = timeMap.get(machine.machineId);
+      const downtime = downtimeMap.get(machine.machineId);
+      const quality = qualityMap.get(machine.machineId);
+      const topDowntimeReason = downtime
+        ? Object.entries(downtime.reasonCounts ?? {}).sort((first, second) => second[1] - first[1])[0]?.[0] ?? null
+        : null;
+
+      return {
+        machineId: machine.machineId,
+        machineCode: machine.machineCode,
+        machineName: machine.machineName,
+        operationCount: machine.operationCount,
+        oee: machine.oee,
+        availability: machine.availability,
+        performance: machine.performance,
+        quality: machine.quality,
+        primaryLoss: primary.type,
+        primaryLossLabel: definition.label,
+        lossPercent: Number((100 - primary.value).toFixed(2)),
+        recommendedAction: definition.action,
+        downtimeCount: downtime?.totalCount ?? 0,
+        downtimeMinutes: Number((time?.downtimeMinutes ?? machine.downtimeMinutes ?? 0).toFixed(1)),
+        topDowntimeReason,
+        delayMinutes: Number((time?.delayMinutes ?? 0).toFixed(1)),
+        scrapQuantity: machine.scrapQuantity,
+        qualityDecisionCount: quality?.totalCount ?? 0,
+        severity: machine.oee < 40 ? "CRITICAL" : machine.oee < 65 ? "WARNING" : "INFO",
+        dataConfidence: machine.operationCount >= 5 ? "HIGH" : machine.operationCount >= 2 ? "MEDIUM" : "LOW"
+      };
+    })
+    .sort((first, second) => {
+      const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
+      return severityOrder[first.severity] - severityOrder[second.severity] || first.oee - second.oee;
+    });
+}
+
 function addLogMetrics(item, log) {
   item.producedQuantity += log.producedQuantity;
   item.scrapQuantity += log.scrapQuantity;
@@ -1256,6 +1321,12 @@ export async function getOverviewReport(query = {}) {
   const operationDowntimeByOperation = sqlAnalytics.operationDowntimeByOperation.length
     ? sqlAnalytics.operationDowntimeByOperation
     : Object.values(downtimeByOperationMap).sort((first, second) => second.totalCount - first.totalCount);
+  const machineLossAnalysis = buildMachineLossAnalysis(
+    oeeByMachine,
+    operationTimeByMachine,
+    operationDowntimeByMachine,
+    qualityDecisionByMachine
+  );
   const productionTrend = sqlAnalytics.productionTrend.length ? sqlAnalytics.productionTrend : groupDailyProduction(finalProductLogs);
   const managementInsights = buildManagementInsights({
     summary,
@@ -1324,6 +1395,7 @@ export async function getOverviewReport(query = {}) {
     oeeSummary,
     oeeByMachine,
     oeeByOperation,
+    machineLossAnalysis,
     qualityStatusCounts: countBy(qualityChecks, "status"),
     qualityDecisionCounts,
     qualityDecisionByOperation,

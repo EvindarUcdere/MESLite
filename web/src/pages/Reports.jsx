@@ -402,6 +402,7 @@ export default function Reports() {
   const oeeSummary = report?.oeeSummary ?? {};
   const oeeByMachineData = report?.oeeByMachine ?? [];
   const oeeByOperationData = report?.oeeByOperation ?? [];
+  const machineLossAnalysis = report?.machineLossAnalysis ?? [];
   const oeeComponentData = [
     { name: "Kullanılabilirlik", value: oeeSummary.availability ?? 0 },
     { name: "Performans", value: oeeSummary.performance ?? 0 },
@@ -1356,6 +1357,40 @@ export default function Reports() {
               {!isLoading && delayedOperations.length === 0 ? (
                 <tr>
                   <td colSpan="10">Geciken operasyon verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </ReportDetailSection>
+
+      <ReportDetailSection id="machine-root-cause" title="Makine OEE Kök Neden Analizi" description="En zayıf OEE bileşenini duruş, gecikme, kalite ve veri kapsamıyla birlikte gösterir." count={machineLossAnalysis.length}>
+        <div className="table-wrap report-detail-table-wrap">
+          <table className="report-detail-table machine-root-cause-table">
+            <thead>
+              <tr>
+                <th>Makine</th>
+                <th>OEE</th>
+                <th>OEE Bileşenleri</th>
+                <th>Ana Kayıp</th>
+                <th>Kanıt</th>
+                <th>Veri Güveni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {machineLossAnalysis.map((item) => (
+                <tr key={item.machineId}>
+                  <td><strong>{item.machineCode}</strong><br /><small>{item.machineName}</small></td>
+                  <td><NumberBadge tone={item.oee < 40 ? "danger" : item.oee < 65 ? "warning" : "success"}>%{item.oee}</NumberBadge></td>
+                  <td><div className="root-cause-components"><span>Kullanılabilirlik <b>%{item.availability}</b></span><span>Performans <b>%{item.performance}</b></span><span>Kalite <b>%{item.quality}</b></span></div></td>
+                  <td><div className="root-cause-primary"><NumberBadge tone={item.severity === "CRITICAL" ? "danger" : item.severity === "WARNING" ? "warning" : "neutral"}>{item.primaryLossLabel}</NumberBadge><small>{item.recommendedAction}</small></div></td>
+                  <td><div className="root-cause-evidence"><span>Duruş <b>{item.downtimeMinutes} dk</b></span><span>Gecikme <b>{item.delayMinutes} dk</b></span><span>Fire <b>{item.scrapQuantity}</b></span>{item.topDowntimeReason ? <small>{DOWNTIME_REASON_LABELS[item.topDowntimeReason] ?? item.topDowntimeReason}</small> : null}</div></td>
+                  <td><NumberBadge tone={item.dataConfidence === "HIGH" ? "success" : item.dataConfidence === "MEDIUM" ? "warning" : "neutral"}>{item.dataConfidence === "HIGH" ? "Yüksek" : item.dataConfidence === "MEDIUM" ? "Orta" : "Düşük"} ({item.operationCount})</NumberBadge></td>
+                </tr>
+              ))}
+              {!isLoading && machineLossAnalysis.length === 0 ? (
+                <tr>
+                  <td colSpan="6">Makine kök neden verisi yok.</td>
                 </tr>
               ) : null}
             </tbody>
