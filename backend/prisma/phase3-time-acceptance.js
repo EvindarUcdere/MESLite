@@ -16,7 +16,7 @@ async function main() {
   assert(runMontaj, "RUN Montaj time performance is missing");
   assert(runMontaj.plannedMinutes === 55, `RUN Montaj planned minutes must be 55, found ${runMontaj.plannedMinutes}`);
   assert(runMontaj.actualMinutes >= 60, `RUN Montaj actual minutes must be at least 60, found ${runMontaj.actualMinutes}`);
-  assert(runMontaj.downtimeMinutes >= 25, `RUN Montaj downtime minutes must be at least 25, found ${runMontaj.downtimeMinutes}`);
+  assert(runMontaj.downtimeMinutes === 20, `RUN Montaj downtime minutes must be 20, found ${runMontaj.downtimeMinutes}`);
   const expectedRunDelay = Math.max(runMontaj.actualMinutes - runMontaj.downtimeMinutes - runMontaj.plannedMinutes, 0);
   assert(
     Math.abs(runMontaj.delayMinutes - expectedRunDelay) < 0.01,

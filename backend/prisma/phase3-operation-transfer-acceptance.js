@@ -77,7 +77,7 @@ async function main() {
       where: { orderNo: "E2E-DEMO-RUN" },
       include: {
         operations: {
-          include: { machine: true },
+          include: { machine: true, assignedOperator: true },
           orderBy: { sequenceNo: "asc" }
         }
       }
@@ -98,22 +98,22 @@ async function main() {
   assert(cutting, "RUN cutting operation is missing");
   assert(assembly, "RUN assembly operation is missing");
 
-  const transferableQuantity = cutting.producedQuantity - cutting.scrapQuantity;
-  const remainingTransferQuantity = transferableQuantity - assembly.producedQuantity;
+  const transferableQuantity = cutting.producedQuantity;
+  const remainingTransferQuantity = transferableQuantity - assembly.producedQuantity - assembly.scrapQuantity;
 
-  assert(transferableQuantity === 119, `Expected transfer quantity 119, found ${transferableQuantity}`);
-  assert(remainingTransferQuantity === 59, `Expected remaining transfer quantity 59, found ${remainingTransferQuantity}`);
+  assert(transferableQuantity === 120, `Expected transfer quantity 120, found ${transferableQuantity}`);
+  assert(remainingTransferQuantity === 58, `Expected remaining transfer quantity 58, found ${remainingTransferQuantity}`);
 
   await expectRejects(
     () =>
-      createProductionLog(assemblyOperator, {
+      createProductionLog(assembly.assignedOperator, {
         workOrderId: workOrder.id,
         workOrderOperationId: assembly.id,
         machineId: assembly.machineId,
         producedQuantity: 60,
         scrapQuantity: 0
       }),
-    "transferable remaining quantity (59)"
+    "Processed quantity exceeds transferable remaining quantity (58)"
   );
 
   const tempWorkOrder = await prisma.workOrder.create({

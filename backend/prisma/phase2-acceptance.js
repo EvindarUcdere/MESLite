@@ -136,8 +136,9 @@ async function main() {
   assert(operationByName(reopenOrder, "Kesim").producedQuantity === 48, "REOPEN Kesim must be short completed");
   assert(operationByName(reopenOrder, "Montaj").status === "PAUSED", "REOPEN Montaj must start paused");
 
-  const admin = await prisma.user.findUnique({ where: { email: "admin@meslite.local" } });
-  await startOperation(admin, operationByName(reopenOrder, "Kesim").id);
+  const productionManager = await prisma.user.findUnique({ where: { email: "manager@meslite.local" } });
+  assert(productionManager?.role === "PRODUCTION_MANAGER", "Production manager is missing");
+  await startOperation(productionManager, operationByName(reopenOrder, "Kesim").id);
   const reopenedOrder = await prisma.workOrder.findUnique({
     where: { id: reopenOrder.id },
     include: { operations: { orderBy: { sequenceNo: "asc" } } }
@@ -191,7 +192,7 @@ async function main() {
     workOrderId: restartedRunOrder.id,
     workOrderOperationId: runMontaj.id,
     machineId: runMontaj.machineId,
-    producedQuantity: 57,
+    producedQuantity: 58,
     scrapQuantity: 0,
     note: "Acceptance test: montaj devredilen adedi tamamladı."
   });
@@ -201,7 +202,7 @@ async function main() {
     include: { operations: { orderBy: { sequenceNo: "asc" } } }
   });
 
-  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 117, "Montaj production log must increase operation quantity while scrap completes transferred processing");
+  assert(operationByName(afterMontajLog, "Montaj").producedQuantity === 118, "Montaj production log must increase operation quantity while scrap completes transferred processing");
   assert(afterMontajLog.producedQuantity === 0, "Intermediate Montaj production must not increase final work order quantity");
 
   await completeOperation(runMontaj.assignedOperator, runMontaj.id);

@@ -422,7 +422,7 @@ async function seedShiftPlanning({ operators, machines, shifts }) {
 async function main() {
   await resetDemoWorkOrders();
 
-  const [admin, manager, cuttingOperator, assemblyOperator, qualityOperator, qualityStaff] = await Promise.all([
+  const [admin, , manager, cuttingOperator, assemblyOperator, qualityOperator, qualityStaff] = await Promise.all([
     upsertUser({ email: "admin@meslite.local", name: "MES Lite Admin", role: "ADMIN" }),
     upsertUser({ email: "planner@meslite.local", name: "Planlama Uzmanı", role: "PLANNER" }),
     upsertUser({ email: "manager@meslite.local", name: "Üretim Yöneticisi", role: "PRODUCTION_MANAGER" }),
@@ -431,6 +431,7 @@ async function main() {
     upsertUser({ email: "quality.operator@meslite.local", name: "Zeynep Demir", role: "OPERATOR" }),
     upsertUser({ email: "quality@meslite.local", name: "Kalite Personeli", role: "QUALITY_STAFF" })
   ]);
+
 
   const line = await prisma.productionLine.upsert({
     where: { name: "E2E Demo Hattı" },
