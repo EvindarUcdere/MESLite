@@ -1,5 +1,6 @@
 ﻿import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
+import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
@@ -1899,11 +1900,27 @@ export default function App() {
         onSync={() => syncPendingOfflineOperations({ silent: false })}
         onQueued={refreshOfflineSummary}
         onLogout={handleLogout}
+        notifications={notifications}
+        unreadNotificationCount={unreadNotificationCount}
+        onMarkNotificationRead={handleMarkNotificationRead}
+        onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+        onClearNotifications={handleClearNotifications}
+        pushStatus={pushStatus}
       />
     );
   }
 
+  const isWorkTabActive = ["WORKS", "DETAIL", "PRODUCTION"].includes(activeMobileView);
+  const bottomTabs = [
+    { value: "WORKS", label: "İşler", icon: "construct-outline", activeIcon: "construct" },
+    { value: "CALENDAR", label: "Takvim", icon: "calendar-outline", activeIcon: "calendar" },
+    { value: "SYNC", label: "Senkron", icon: "sync-outline", activeIcon: "sync", badge: offlineSummary.pending + offlineSummary.failed },
+    { value: "NOTIFICATIONS", label: "Bildirim", icon: "notifications-outline", activeIcon: "notifications", badge: unreadNotificationCount },
+    { value: "PROFILE", label: "Profil", icon: "person-outline", activeIcon: "person" }
+  ];
+
   return (
+    <View style={styles.appShell}>
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
       <View style={styles.hero}>
         <View>
@@ -1926,13 +1943,13 @@ export default function App() {
         </Pressable>
       </View>
 
-      <OfflineQueuePanel
+      {activeMobileView === "SYNC" ? <OfflineQueuePanel
         summary={offlineSummary}
         onSync={() => syncPendingOfflineOperations({ silent: false })}
         onChanged={refreshOfflineSummary}
-      />
+      /> : null}
 
-      <View style={styles.mobileSummary}>
+      {isWorkTabActive ? <View style={styles.mobileSummary}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryValue}>{activeAssignedWorkOrders.length}</Text>
           <Text style={styles.detailLabel}>Aktif İş</Text>
@@ -1945,7 +1962,7 @@ export default function App() {
           <Text style={styles.summaryValue}>{totalRemainingQuantity}</Text>
           <Text style={styles.detailLabel}>Kalan</Text>
         </View>
-      </View>
+      </View> : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
@@ -1955,7 +1972,7 @@ export default function App() {
         </Pressable>
       ) : null}
 
-      <View style={styles.card}>
+      {activeMobileView === "NOTIFICATIONS" ? <View style={styles.card}>
         <View style={styles.notificationPanelHeader}>
           <View>
             <Text style={styles.sectionTitle}>Bildirimler</Text>
@@ -1987,26 +2004,32 @@ export default function App() {
           ))}
         </ScrollView>
         {!notifications.length ? <Text style={styles.muted}>Henüz bildirim yok.</Text> : null}
-      </View>
+      </View> : null}
 
-      <View style={[styles.card, styles.tabCard]}>
-        <View style={styles.mobileTabBar}>
-          {[
-            { value: "WORKS", label: "İşler" },
-            { value: "DETAIL", label: "Detay" },
-            { value: "PRODUCTION", label: "Üretim" },
-            { value: "CALENDAR", label: "Takvim" }
-          ].map((tab) => (
-            <Pressable
-              key={tab.value}
-              style={[styles.mobileTabButton, activeMobileView === tab.value ? styles.mobileTabButtonActive : null]}
-              onPress={() => setActiveMobileView(tab.value)}
-            >
-              <Text style={[styles.mobileTabText, activeMobileView === tab.value ? styles.mobileTabTextActive : null]}>{tab.label}</Text>
-            </Pressable>
-          ))}
+      {activeMobileView === "SYNC" ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Senkronizasyon Özeti</Text>
+          <Text style={styles.muted}>Offline kaydedilen işlemler burada güvenli biçimde takip edilir.</Text>
+          <View style={styles.mobileSummary}>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.pending}</Text><Text style={styles.detailLabel}>Bekleyen</Text></View>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.failed}</Text><Text style={styles.detailLabel}>Başarısız</Text></View>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.synced}</Text><Text style={styles.detailLabel}>Tamamlanan</Text></View>
+          </View>
         </View>
-      </View>
+      ) : null}
+
+      {activeMobileView === "PROFILE" ? (
+        <View style={styles.card}>
+          <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{user.name?.charAt(0)?.toUpperCase() ?? "M"}</Text></View>
+          <Text style={styles.profileName}>{user.name}</Text>
+          <Text style={styles.muted}>{user.email}</Text>
+          <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>Rol</Text><Text style={styles.detailValue}>{user.role}</Text></View>
+          <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>Bağlantı</Text><Text style={styles.detailValue}>{isOfflineMode ? "Çevrimdışı" : "Çevrimiçi"}</Text></View>
+          <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>API</Text><Text style={styles.profileApiText}>{getApiBaseUrl()}</Text></View>
+          <View style={styles.profileStatusBox}><Text style={styles.detailLabel}>Telefon bildirimleri</Text><Text style={styles.muted}>{pushStatus}</Text></View>
+          <Pressable style={styles.secondaryButton} onPress={handleLogout}><Text style={styles.secondaryButtonText}>Çıkış Yap</Text></Pressable>
+        </View>
+      ) : null}
 
       <View {...mobileViewPanResponder.panHandlers}>
       {activeMobileView === "WORKS" ? (
@@ -2724,10 +2747,36 @@ export default function App() {
 
       </View>
     </ScrollView>
+    <View style={styles.bottomTabBar}>
+      {bottomTabs.map((tab) => {
+        const isActive = tab.value === "WORKS" ? isWorkTabActive : activeMobileView === tab.value;
+
+        return (
+          <Pressable
+            key={tab.value}
+            style={styles.bottomTabButton}
+            onPress={() => setActiveMobileView(tab.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+          >
+            <View style={styles.bottomTabIconWrap}>
+              <Ionicons name={isActive ? tab.activeIcon : tab.icon} size={22} color={isActive ? "#0f7f78" : "#687985"} />
+              {tab.badge > 0 ? <Text style={styles.bottomTabBadge}>{tab.badge > 99 ? "99+" : tab.badge}</Text> : null}
+            </View>
+            <Text style={[styles.bottomTabLabel, isActive ? styles.bottomTabLabelActive : null]} numberOfLines={1}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  appShell: {
+    flex: 1,
+    backgroundColor: "#eef3f6"
+  },
   page: {
     flex: 1,
     backgroundColor: "#eef3f6"
@@ -2740,7 +2789,7 @@ const styles = StyleSheet.create({
     minHeight: fullScreenHeight,
     padding: 12,
     paddingTop: 18,
-    paddingBottom: 36
+    paddingBottom: 24
   },
   authPage: {
     flex: 1,
@@ -3437,37 +3486,96 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3
   },
-  mobileTabBar: {
+  bottomTabBar: {
     flexDirection: "row",
-    gap: 6,
-    padding: 4,
-    backgroundColor: "#edf3f6",
-    borderColor: "#d6e1e8",
-    borderRadius: 14,
-    borderWidth: 1
+    minHeight: 66,
+    paddingTop: 7,
+    paddingBottom: Platform.OS === "ios" ? 18 : 8,
+    backgroundColor: "#ffffff",
+    borderTopColor: "#d6e1e8",
+    borderTopWidth: 1,
+    shadowColor: "#0f2930",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 10
   },
-  mobileTabButton: {
+  bottomTabButton: {
     flex: 1,
-    minHeight: 42,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
-    borderRadius: 10
+    gap: 3,
+    paddingHorizontal: 2
   },
-  mobileTabButtonActive: {
-    backgroundColor: "#0f7f78",
-    shadowColor: "#0f2930",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 7,
-    elevation: 2
+  bottomTabIconWrap: {
+    position: "relative"
   },
-  mobileTabText: {
-    color: "#60707d",
+  bottomTabBadge: {
+    position: "absolute",
+    top: -7,
+    right: -12,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    overflow: "hidden",
+    color: "#ffffff",
+    backgroundColor: "#d93232",
+    borderRadius: 9,
+    fontSize: 9,
+    fontWeight: "900",
+    lineHeight: 17,
+    textAlign: "center"
+  },
+  bottomTabLabel: {
+    maxWidth: "100%",
+    color: "#687985",
+    fontSize: 10,
+    fontWeight: "700"
+  },
+  bottomTabLabelActive: {
+    color: "#0f7f78",
     fontWeight: "900"
   },
-  mobileTabTextActive: {
-    color: "#ffffff"
+  profileAvatar: {
+    width: 64,
+    height: 64,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#d9f3ed",
+    borderRadius: 32
+  },
+  profileAvatarText: {
+    color: "#0f6f69",
+    fontSize: 26,
+    fontWeight: "900"
+  },
+  profileName: {
+    color: "#0f2c34",
+    fontSize: 22,
+    fontWeight: "900"
+  },
+  profileInfoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
+    paddingVertical: 12,
+    borderBottomColor: "#e4ebf0",
+    borderBottomWidth: 1
+  },
+  profileApiText: {
+    flex: 1,
+    color: "#0f2c34",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right"
+  },
+  profileStatusBox: {
+    gap: 5,
+    padding: 12,
+    backgroundColor: "#f4f8fa",
+    borderRadius: 10
   },
   orderNo: {
     color: "#0f2c34",

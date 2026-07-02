@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { getApiBaseUrl } from "../api/client";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api";
 import { createScrapAction } from "../api/productionLogs.api";
 import { getWorkOrders } from "../api/workOrders.api";
@@ -35,8 +37,15 @@ export default function MobileQualityView({
   isSyncing,
   onSync,
   onQueued,
-  onLogout
+  onLogout,
+  notifications = [],
+  unreadNotificationCount = 0,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
+  onClearNotifications,
+  pushStatus
 }) {
+  const [activeTab, setActiveTab] = useState("CONTROLS");
   const [workOrders, setWorkOrders] = useState([]);
   const [qualityChecks, setQualityChecks] = useState([]);
   const [selectedOperationId, setSelectedOperationId] = useState("");
@@ -206,7 +215,16 @@ export default function MobileQualityView({
           ? "Senkronizasyon bekliyor"
           : "Senkronizasyon tamamlandı";
 
+  const tabs = [
+    { value: "CONTROLS", label: "Kontroller", icon: "shield-checkmark-outline", activeIcon: "shield-checkmark", badge: pendingItems.length },
+    { value: "HISTORY", label: "Geçmiş", icon: "time-outline", activeIcon: "time" },
+    { value: "SYNC", label: "Senkron", icon: "sync-outline", activeIcon: "sync", badge: offlineSummary.pending + offlineSummary.failed },
+    { value: "NOTIFICATIONS", label: "Bildirim", icon: "notifications-outline", activeIcon: "notifications", badge: unreadNotificationCount },
+    { value: "PROFILE", label: "Profil", icon: "person-outline", activeIcon: "person" }
+  ];
+
   return (
+    <View style={styles.appShell}>
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View>
@@ -229,11 +247,12 @@ export default function MobileQualityView({
         </Pressable>
       </View>
 
-      <OfflineQueuePanel summary={offlineSummary} onSync={onSync} onChanged={onQueued} />
+      {activeTab === "SYNC" ? <OfflineQueuePanel summary={offlineSummary} onSync={onSync} onChanged={onQueued} /> : null}
 
       {message ? <Text style={styles.success}>{message}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
+      {activeTab === "CONTROLS" ? <>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Kontrol Bekleyenler</Text>
         <Text style={styles.count}>{pendingItems.length}</Text>
@@ -324,13 +343,98 @@ export default function MobileQualityView({
           </Pressable>
         </View>
       ) : null}
+      </> : null}
+
+      {activeTab === "HISTORY" ? (
+        <View style={styles.tabSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Kalite Geçmişi</Text>
+            <Text style={styles.count}>{qualityChecks.length}</Text>
+          </View>
+          {qualityChecks.map((check) => (
+            <View key={check.id} style={styles.historyCard}>
+              <View style={styles.itemTop}>
+                <Text style={styles.itemTitle}>{check.workOrder?.orderNo ?? check.workOrderOperation?.workOrder?.orderNo ?? "Kalite kaydı"}</Text>
+                <Text style={[styles.resultBadge, styles[`result${check.status}`]]}>{check.status}</Text>
+              </View>
+              <Text style={styles.itemOperation}>{check.workOrderOperation?.operationName ?? "Operasyon bilgisi"}</Text>
+              <Text style={styles.muted}>Hatalı adet: {check.defectQuantity ?? 0}</Text>
+              {check.defectReason ? <Text style={styles.muted}>Neden: {check.defectReason}</Text> : null}
+              {check.note ? <Text style={styles.muted}>{check.note}</Text> : null}
+              <Text style={styles.itemDate}>{formatDate(check.createdAt)}</Text>
+            </View>
+          ))}
+          {!qualityChecks.length ? <Text style={styles.empty}>Henüz kalite geçmişi bulunmuyor.</Text> : null}
+        </View>
+      ) : null}
+
+      {activeTab === "SYNC" ? (
+        <View style={styles.tabSection}>
+          <Text style={styles.sectionTitle}>Senkronizasyon Özeti</Text>
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.pending}</Text><Text style={styles.muted}>Bekleyen</Text></View>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.failed}</Text><Text style={styles.muted}>Başarısız</Text></View>
+            <View style={styles.summaryItem}><Text style={styles.summaryValue}>{offlineSummary.synced}</Text><Text style={styles.muted}>Tamamlanan</Text></View>
+          </View>
+        </View>
+      ) : null}
+
+      {activeTab === "NOTIFICATIONS" ? (
+        <View style={styles.tabSection}>
+          <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Bildirimler</Text><Text style={styles.count}>{unreadNotificationCount}</Text></View>
+          <View style={styles.notificationActions}>
+            <Pressable style={styles.secondaryButton} onPress={onMarkAllNotificationsRead} disabled={!unreadNotificationCount}><Text style={styles.secondaryButtonText}>Tümünü Okundu Yap</Text></Pressable>
+            <Pressable style={styles.secondaryButton} onPress={onClearNotifications} disabled={!notifications.length}><Text style={styles.secondaryButtonText}>Temizle</Text></Pressable>
+          </View>
+          {notifications.map((notification) => (
+            <View key={notification.id} style={[styles.notificationCard, !notification.readAt ? styles.notificationUnread : null]}>
+              <Text style={styles.itemTitle}>{notification.title}</Text>
+              <Text style={styles.muted}>{notification.message}</Text>
+              <View style={styles.itemTop}>
+                <Text style={styles.itemDate}>{formatDate(notification.createdAt)}</Text>
+                {!notification.readAt ? <Pressable onPress={() => onMarkNotificationRead?.(notification.id)}><Text style={styles.notificationRead}>Okundu</Text></Pressable> : null}
+              </View>
+            </View>
+          ))}
+          {!notifications.length ? <Text style={styles.empty}>Henüz bildirim yok.</Text> : null}
+        </View>
+      ) : null}
+
+      {activeTab === "PROFILE" ? (
+        <View style={styles.tabSection}>
+          <View style={styles.profileAvatar}><Text style={styles.profileAvatarText}>{user.name?.charAt(0)?.toUpperCase() ?? "K"}</Text></View>
+          <Text style={styles.profileName}>{user.name}</Text>
+          <Text style={styles.muted}>{user.email}</Text>
+          <View style={styles.profileRow}><Text style={styles.label}>Rol</Text><Text style={styles.profileValue}>Kalite Personeli</Text></View>
+          <View style={styles.profileRow}><Text style={styles.label}>Bağlantı</Text><Text style={styles.profileValue}>{isOfflineMode ? "Çevrimdışı" : "Çevrimiçi"}</Text></View>
+          <View style={styles.profileRow}><Text style={styles.label}>API</Text><Text style={styles.profileApi}>{getApiBaseUrl()}</Text></View>
+          <View style={styles.profileStatus}><Text style={styles.label}>Telefon bildirimleri</Text><Text style={styles.muted}>{pushStatus}</Text></View>
+          <Pressable style={styles.secondaryButton} onPress={onLogout}><Text style={styles.secondaryButtonText}>Çıkış Yap</Text></Pressable>
+        </View>
+      ) : null}
     </ScrollView>
+    <View style={styles.bottomTabBar}>
+      {tabs.map((tab) => {
+        const active = activeTab === tab.value;
+        return (
+          <Pressable key={tab.value} style={styles.bottomTabButton} onPress={() => setActiveTab(tab.value)} accessibilityRole="tab" accessibilityState={{ selected: active }}>
+            <View style={styles.bottomTabIconWrap}>
+              <Ionicons name={active ? tab.activeIcon : tab.icon} size={22} color={active ? "#b66b12" : "#687985"} />
+              {tab.badge > 0 ? <Text style={styles.bottomTabBadge}>{tab.badge > 99 ? "99+" : tab.badge}</Text> : null}
+            </View>
+            <Text style={[styles.bottomTabLabel, active ? styles.bottomTabLabelActive : null]} numberOfLines={1}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  appShell: { flex: 1, backgroundColor: "#eef4f5" },
   page: { flex: 1, backgroundColor: "#eef4f5" },
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  content: { padding: 16, gap: 12, paddingBottom: 24 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8 },
   eyebrow: { color: "#167d75", fontSize: 12, fontWeight: "800" },
   title: { color: "#15252d", fontSize: 26, fontWeight: "800" },
@@ -373,5 +477,31 @@ const styles = StyleSheet.create({
   scrapChoiceActive: { backgroundColor: "#167d75", borderColor: "#167d75" },
   primaryButton: { backgroundColor: "#167d75", minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 6, marginTop: 4 },
   primaryButtonText: { color: "#ffffff", fontWeight: "800" },
-  disabled: { opacity: 0.55 }
+  disabled: { opacity: 0.55 },
+  tabSection: { gap: 12 },
+  historyCard: { gap: 5, padding: 13, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderRadius: 6, borderWidth: 1 },
+  resultBadge: { paddingHorizontal: 8, paddingVertical: 4, overflow: "hidden", borderRadius: 5, fontSize: 11, fontWeight: "800" },
+  resultPASSED: { color: "#146c43", backgroundColor: "#ddf4e8" },
+  resultPARTIAL: { color: "#8a4c12", backgroundColor: "#fff1d6" },
+  resultFAILED: { color: "#a52a2a", backgroundColor: "#fde8e6" },
+  summaryRow: { flexDirection: "row", gap: 8 },
+  summaryItem: { flex: 1, alignItems: "center", gap: 2, padding: 12, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderRadius: 6, borderWidth: 1 },
+  summaryValue: { color: "#172b33", fontSize: 22, fontWeight: "900" },
+  notificationActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  notificationCard: { gap: 7, padding: 13, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderLeftColor: "#b7c8cc", borderLeftWidth: 4, borderRadius: 6, borderWidth: 1 },
+  notificationUnread: { backgroundColor: "#fff8e8", borderColor: "#d7952b", borderLeftColor: "#d7952b" },
+  notificationRead: { color: "#9a5b0e", fontSize: 12, fontWeight: "800" },
+  profileAvatar: { width: 64, height: 64, alignItems: "center", justifyContent: "center", backgroundColor: "#ffedc2", borderRadius: 32 },
+  profileAvatarText: { color: "#9a5b0e", fontSize: 26, fontWeight: "900" },
+  profileName: { color: "#172b33", fontSize: 22, fontWeight: "900" },
+  profileRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 14, paddingVertical: 11, borderBottomColor: "#d5e0e2", borderBottomWidth: 1 },
+  profileValue: { color: "#172b33", fontWeight: "800", textAlign: "right" },
+  profileApi: { flex: 1, color: "#172b33", fontSize: 12, fontWeight: "700", textAlign: "right" },
+  profileStatus: { gap: 5, padding: 12, backgroundColor: "#fff8e8", borderRadius: 6 },
+  bottomTabBar: { flexDirection: "row", minHeight: 66, paddingTop: 7, paddingBottom: 8, backgroundColor: "#ffffff", borderTopColor: "#d5e0e2", borderTopWidth: 1, shadowColor: "#172b33", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 10 },
+  bottomTabButton: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", gap: 3, paddingHorizontal: 2 },
+  bottomTabIconWrap: { position: "relative" },
+  bottomTabBadge: { position: "absolute", top: -7, right: -12, minWidth: 17, height: 17, paddingHorizontal: 4, overflow: "hidden", color: "#ffffff", backgroundColor: "#d93232", borderRadius: 9, fontSize: 9, fontWeight: "900", lineHeight: 17, textAlign: "center" },
+  bottomTabLabel: { maxWidth: "100%", color: "#687985", fontSize: 10, fontWeight: "700" },
+  bottomTabLabelActive: { color: "#9a5b0e", fontWeight: "900" }
 });
