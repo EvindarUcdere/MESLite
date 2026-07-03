@@ -2,7 +2,7 @@
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
+import { ActivityIndicator, Alert, AppState, Image, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Vibration } from "react-native";
 import { getStoredSession, login, logout } from "./src/api/auth.api";
 import { getApiBaseUrl } from "./src/api/client";
 import { createMobileDebugLog } from "./src/api/mobileDebugLogs.api";
@@ -1760,6 +1760,32 @@ export default function App() {
     setSelectedOperationId(nextProductionOperation?.id ?? "");
   }
 
+  function handleOpenMobileNotification(notification) {
+    const metadata = notification.metadata ?? {};
+    const targetWorkOrderId = metadata.workOrderId ?? metadata.actionWorkOrderId ?? (notification.entityType === "WorkOrder" ? notification.entityId : null);
+    const targetOperationId = metadata.operationId ?? metadata.workOrderOperationId ?? (notification.entityType === "WorkOrderOperation" ? notification.entityId : null);
+    const targetWorkOrder = assignedWorkOrders.find(
+      (workOrder) =>
+        workOrder.id === targetWorkOrderId ||
+        (targetOperationId && (workOrder.operations ?? []).some((operation) => operation.id === targetOperationId))
+    );
+
+    if (!targetWorkOrder) {
+      setError("Bu bildirimdeki kayıt mobil iş listenizde bulunmuyor.");
+      Alert.alert("Kayıt açılamadı", "Bu bildirimdeki iş emri hesabınızın mobil iş listesinde bulunmuyor.");
+      return;
+    }
+
+    selectWorkOrder(targetWorkOrder);
+    if (targetOperationId) {
+      setSelectedOperationId(targetOperationId);
+    }
+    setError("");
+    if (!notification.readAt) {
+      handleMarkNotificationRead(notification.id);
+    }
+  }
+
   function moveMobileView(direction) {
     setActiveMobileView((currentView) => {
       const currentIndex = MOBILE_VIEW_ORDER.indexOf(currentView);
@@ -1918,19 +1944,27 @@ export default function App() {
     { value: "NOTIFICATIONS", label: "Bildirim", icon: "notifications-outline", activeIcon: "notifications", badge: unreadNotificationCount },
     { value: "PROFILE", label: "Profil", icon: "person-outline", activeIcon: "person" }
   ];
+  const activeViewTitle = activeMobileView === "DETAIL"
+    ? "İş Emri Detayı"
+    : activeMobileView === "PRODUCTION"
+      ? "Üretim Girişi"
+      : bottomTabs.find((tab) => tab.value === activeMobileView)?.label ?? "İşler";
 
   return (
     <View style={styles.appShell}>
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-      <View style={styles.hero}>
-        <View>
-          <Text style={styles.eyebrow}>MES Lite Operatör</Text>
-          <Text style={styles.title}>İş Emirlerim</Text>
-          <Text style={styles.subtitle}>{user.name}</Text>
+      <View style={styles.compactHeader}>
+        <View style={styles.compactHeaderIcon}>
+          <Ionicons name="construct" size={20} color="#70d7c0" />
         </View>
-        <Pressable style={styles.secondaryButton} onPress={handleLogout}>
-          <Text style={styles.secondaryButtonText}>Çıkış</Text>
-        </Pressable>
+        <View style={styles.compactHeaderText}>
+          <Text style={styles.compactHeaderTitle}>{activeViewTitle}</Text>
+          <Text style={styles.compactHeaderSubtitle} numberOfLines={1}>{user.name}</Text>
+        </View>
+        <View style={styles.connectionIndicator}>
+          <View style={[styles.connectionDot, isOfflineMode ? styles.connectionDotOffline : null]} />
+          <Text style={styles.connectionLabel}>{isOfflineMode ? "Offline" : "Online"}</Text>
+        </View>
       </View>
 
       <View style={[styles.syncStatus, isOfflineMode || offlineSummary.failed > 0 ? styles.syncStatusWarning : null]}>
@@ -1972,7 +2006,7 @@ export default function App() {
         </Pressable>
       ) : null}
 
-      {activeMobileView === "NOTIFICATIONS" ? <View style={styles.card}>
+      {activeMobileView === "NOTIFICATIONS" ? <View style={[styles.card, styles.notificationPanelCard]}>
         <View style={styles.notificationPanelHeader}>
           <View>
             <Text style={styles.sectionTitle}>Bildirimler</Text>
@@ -1994,9 +2028,13 @@ export default function App() {
                 <Text style={styles.detailValue}>{notification.title}</Text>
                 <Text style={styles.muted}>{notification.message}</Text>
                 <Text style={styles.detailLabel}>{formatDateTime(notification.createdAt)}</Text>
+                <Pressable style={styles.notificationTargetButton} onPress={() => handleOpenMobileNotification(notification)}>
+                  <Ionicons name="arrow-forward-circle-outline" size={17} color="#0f7f78" />
+                  <Text style={styles.notificationTargetLink}>Kayda git</Text>
+                </Pressable>
               </View>
               {!notification.readAt ? (
-                <Pressable style={styles.inlineButton} onPress={() => handleMarkNotificationRead(notification.id)} disabled={isSubmitting}>
+                <Pressable style={styles.inlineButton} onPress={(event) => { event.stopPropagation(); handleMarkNotificationRead(notification.id); }} disabled={isSubmitting}>
                   <Text style={styles.inlineButtonText}>Okundu</Text>
                 </Pressable>
               ) : null}
@@ -2043,7 +2081,7 @@ export default function App() {
               onPress={() => selectWorkOrder(workOrder)}
             >
               <View style={styles.orderCardHeader}>
-                <View>
+                <View style={styles.orderCardMain}>
                   <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
@@ -2076,7 +2114,7 @@ export default function App() {
               onPress={() => selectWorkOrder(workOrder)}
             >
               <View style={styles.orderCardHeader}>
-                <View>
+                <View style={styles.orderCardMain}>
                   <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
@@ -2108,7 +2146,7 @@ export default function App() {
               onPress={() => selectWorkOrder(workOrder)}
             >
               <View style={styles.orderCardHeader}>
-                <View>
+                <View style={styles.orderCardMain}>
                   <Text style={styles.orderNo}>{workOrder.orderNo}</Text>
                   <Text style={styles.muted}>
                     {workOrder.product.code} - {workOrder.product.name}
@@ -2777,6 +2815,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#eef3f6"
   },
+  compactHeader: {
+    minHeight: 62,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "#173038",
+    borderColor: "#294952",
+    borderRadius: 10,
+    borderWidth: 1
+  },
+  compactHeaderIcon: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#21474a",
+    borderColor: "#3b6a69",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  compactHeaderText: { flex: 1, minWidth: 0 },
+  compactHeaderTitle: { color: "#ffffff", fontSize: 17, fontWeight: "900" },
+  compactHeaderSubtitle: { marginTop: 2, color: "#b8c8cc", fontSize: 12, fontWeight: "600" },
+  connectionIndicator: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: "#233e46", borderRadius: 7 },
+  connectionDot: { width: 7, height: 7, backgroundColor: "#1b9b67", borderRadius: 4 },
+  connectionDotOffline: { backgroundColor: "#d7952b" },
+  connectionLabel: { color: "#d9e5e7", fontSize: 10, fontWeight: "800" },
   page: {
     flex: 1,
     backgroundColor: "#eef3f6"
@@ -2936,6 +3003,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   statusBadge: {
+    maxWidth: "100%",
     paddingHorizontal: 12,
     paddingVertical: 6,
     color: "#11635e",
@@ -3181,7 +3249,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 11,
     fontWeight: "900",
-    overflow: "hidden"
+    lineHeight: 15,
+    overflow: "hidden",
+    textAlign: "center"
   },
   lastSubmissionGrid: {
     flexDirection: "row",
@@ -3272,11 +3342,18 @@ const styles = StyleSheet.create({
   },
   orderCardHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 10
   },
+  orderCardMain: {
+    flex: 1,
+    minWidth: 180
+  },
   cardBadgeStack: {
+    maxWidth: "48%",
+    flexShrink: 1,
     alignItems: "flex-end",
     gap: 6
   },
@@ -3329,7 +3406,11 @@ const styles = StyleSheet.create({
     gap: 8
   },
   notificationListScroll: {
-    maxHeight: 310
+    height: Math.max(fullScreenHeight - 330, 360),
+    maxHeight: Math.max(fullScreenHeight - 330, 360)
+  },
+  notificationPanelCard: {
+    minHeight: Math.max(fullScreenHeight - 260, 440)
   },
   calendarHeader: {
     flexDirection: "row",
@@ -3485,6 +3566,24 @@ const styles = StyleSheet.create({
   mobileNotificationText: {
     flex: 1,
     gap: 3
+  },
+  notificationTargetLink: {
+    color: "#0f7f78",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  notificationTargetButton: {
+    minHeight: 34,
+    flexDirection: "row",
+    alignSelf: "flex-start",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 3,
+    paddingHorizontal: 9,
+    backgroundColor: "#effdf9",
+    borderColor: "#9bd7ca",
+    borderRadius: 6,
+    borderWidth: 1
   },
   bottomTabBar: {
     flexDirection: "row",

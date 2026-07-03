@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getApiBaseUrl } from "../api/client";
 import { createQualityCheck, getQualityChecks } from "../api/qualityChecks.api";
@@ -46,6 +46,8 @@ export default function MobileQualityView({
   pushStatus
 }) {
   const [activeTab, setActiveTab] = useState("CONTROLS");
+  const [highlightedQualityCheckId, setHighlightedQualityCheckId] = useState("");
+  const [expandedQualityCheckId, setExpandedQualityCheckId] = useState("");
   const [workOrders, setWorkOrders] = useState([]);
   const [qualityChecks, setQualityChecks] = useState([]);
   const [selectedOperationId, setSelectedOperationId] = useState("");
@@ -131,6 +133,42 @@ export default function MobileQualityView({
     setScrapDispositionNote("");
     setError("");
     setMessage("");
+  }
+
+  function openNotificationTarget(notification) {
+    const metadata = notification.metadata ?? {};
+    const workOrderId = metadata.workOrderId ?? metadata.sourceWorkOrderId ?? metadata.actionWorkOrderId ?? (notification.entityType === "WorkOrder" ? notification.entityId : null);
+    const operationId = metadata.operationId ?? metadata.workOrderOperationId ?? (notification.entityType === "WorkOrderOperation" ? notification.entityId : null);
+    const pendingItem = pendingItems.find(
+      (item) => item.operation.id === operationId || item.workOrder.id === workOrderId
+    );
+
+    if (pendingItem) {
+      selectItem(pendingItem);
+      setActiveTab("CONTROLS");
+      setHighlightedQualityCheckId("");
+    } else {
+      const qualityCheck = qualityChecks.find(
+        (check) =>
+          check.workOrderOperationId === operationId ||
+          check.workOrderId === workOrderId ||
+          check.workOrder?.id === workOrderId
+      );
+
+      if (qualityCheck) {
+        setHighlightedQualityCheckId(qualityCheck.id);
+        setExpandedQualityCheckId(qualityCheck.id);
+        setActiveTab("HISTORY");
+        setMessage("İlgili kalite sonucu geçmişte gösteriliyor.");
+      } else {
+        setMessage("Bu bildirimdeki kayıt mobil kalite listesinde bulunmuyor.");
+        Alert.alert("Kayıt açılamadı", "Bu bildirimdeki kayıt bekleyen kalite kontrollerinde veya kalite geçmişinde bulunmuyor.");
+      }
+    }
+
+    if (!notification.readAt) {
+      onMarkNotificationRead?.(notification.id);
+    }
   }
 
   async function submitQualityCheck() {
@@ -222,19 +260,23 @@ export default function MobileQualityView({
     { value: "NOTIFICATIONS", label: "Bildirim", icon: "notifications-outline", activeIcon: "notifications", badge: unreadNotificationCount },
     { value: "PROFILE", label: "Profil", icon: "person-outline", activeIcon: "person" }
   ];
+  const activeTabTitle = tabs.find((tab) => tab.value === activeTab)?.label ?? "Kontroller";
 
   return (
     <View style={styles.appShell}>
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.eyebrow}>MES Lite Kalite</Text>
-          <Text style={styles.title}>Kalite Kontrol</Text>
-          <Text style={styles.muted}>{user.name}</Text>
+      <View style={styles.compactHeader}>
+        <View style={styles.compactHeaderIcon}>
+          <Ionicons name="shield-checkmark" size={20} color="#f3bf5a" />
         </View>
-        <Pressable style={styles.secondaryButton} onPress={onLogout}>
-          <Text style={styles.secondaryButtonText}>Çıkış</Text>
-        </Pressable>
+        <View style={styles.compactHeaderText}>
+          <Text style={styles.compactHeaderTitle}>{activeTabTitle}</Text>
+          <Text style={styles.compactHeaderSubtitle} numberOfLines={1}>{user.name}</Text>
+        </View>
+        <View style={styles.connectionIndicator}>
+          <View style={[styles.connectionDot, isOfflineMode ? styles.connectionDotOffline : null]} />
+          <Text style={styles.connectionLabel}>{isOfflineMode ? "Offline" : "Online"}</Text>
+        </View>
       </View>
 
       <View style={[styles.syncBar, isOfflineMode || offlineSummary.failed > 0 ? styles.syncWarning : null]}>
@@ -354,17 +396,36 @@ export default function MobileQualityView({
             <Text style={styles.count}>{qualityChecks.length}</Text>
           </View>
           {qualityChecks.map((check) => (
-            <View key={check.id} style={styles.historyCard}>
+            <Pressable
+              key={check.id}
+              style={[styles.historyCard, highlightedQualityCheckId === check.id ? styles.historyCardHighlighted : null]}
+              onPress={() => setExpandedQualityCheckId((current) => current === check.id ? "" : check.id)}
+            >
               <View style={styles.itemTop}>
-                <Text style={styles.itemTitle}>{check.workOrder?.orderNo ?? check.workOrderOperation?.workOrder?.orderNo ?? "Kalite kaydı"}</Text>
-                <Text style={[styles.resultBadge, styles[`result${check.status}`]]}>{check.status}</Text>
+                <View style={styles.historyTitleWrap}>
+                  <Text style={styles.itemTitle}>{check.workOrder?.orderNo ?? check.workOrderOperation?.workOrder?.orderNo ?? "Kalite kaydı"}</Text>
+                  <Text style={styles.itemOperation}>{check.workOrderOperation?.operationName ?? "Operasyon bilgisi"}</Text>
+                </View>
+                <View style={styles.historyHeaderActions}>
+                  <Text style={[styles.resultBadge, styles[`result${check.status}`]]}>{check.status}</Text>
+                  <Ionicons name={expandedQualityCheckId === check.id ? "chevron-up" : "chevron-down"} size={18} color="#687985" />
+                </View>
               </View>
-              <Text style={styles.itemOperation}>{check.workOrderOperation?.operationName ?? "Operasyon bilgisi"}</Text>
               <Text style={styles.muted}>Hatalı adet: {check.defectQuantity ?? 0}</Text>
               {check.defectReason ? <Text style={styles.muted}>Neden: {check.defectReason}</Text> : null}
               {check.note ? <Text style={styles.muted}>{check.note}</Text> : null}
-              <Text style={styles.itemDate}>{formatDate(check.createdAt)}</Text>
-            </View>
+              <Text style={styles.itemDate}>{formatDate(check.checkedAt ?? check.createdAt)}</Text>
+              {expandedQualityCheckId === check.id ? (
+                <View style={styles.historyDetail}>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Ürün</Text><Text style={styles.historyDetailValue}>{check.workOrder?.product?.code ?? "-"} · {check.workOrder?.product?.name ?? "-"}</Text></View>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Planlanan</Text><Text style={styles.historyDetailValue}>{check.workOrder?.plannedQuantity ?? "-"} adet</Text></View>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Operatör</Text><Text style={styles.historyDetailValue}>{check.workOrderOperation?.assignedOperator?.name ?? "-"}</Text></View>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Makine</Text><Text style={styles.historyDetailValue}>{check.workOrderOperation?.machine?.name ?? check.workOrderOperation?.machine?.code ?? "-"}</Text></View>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Kontrol eden</Text><Text style={styles.historyDetailValue}>{check.checkedBy?.name ?? user.name}</Text></View>
+                  <View style={styles.historyDetailRow}><Text style={styles.label}>Karar zamanı</Text><Text style={styles.historyDetailValue}>{formatDate(check.checkedAt ?? check.createdAt)}</Text></View>
+                </View>
+              ) : null}
+            </Pressable>
           ))}
           {!qualityChecks.length ? <Text style={styles.empty}>Henüz kalite geçmişi bulunmuyor.</Text> : null}
         </View>
@@ -392,9 +453,13 @@ export default function MobileQualityView({
             <View key={notification.id} style={[styles.notificationCard, !notification.readAt ? styles.notificationUnread : null]}>
               <Text style={styles.itemTitle}>{notification.title}</Text>
               <Text style={styles.muted}>{notification.message}</Text>
-              <View style={styles.itemTop}>
+              <View style={styles.notificationFooter}>
                 <Text style={styles.itemDate}>{formatDate(notification.createdAt)}</Text>
-                {!notification.readAt ? <Pressable onPress={() => onMarkNotificationRead?.(notification.id)}><Text style={styles.notificationRead}>Okundu</Text></Pressable> : null}
+                <Pressable style={styles.notificationTargetButton} onPress={() => openNotificationTarget(notification)}>
+                  <Ionicons name="arrow-forward-circle-outline" size={17} color="#9a5b0e" />
+                  <Text style={styles.notificationTargetLink}>Kayda git</Text>
+                </Pressable>
+                {!notification.readAt ? <Pressable onPress={(event) => { event.stopPropagation(); onMarkNotificationRead?.(notification.id); }}><Text style={styles.notificationRead}>Okundu</Text></Pressable> : null}
               </View>
             </View>
           ))}
@@ -435,6 +500,15 @@ export default function MobileQualityView({
 
 const styles = StyleSheet.create({
   appShell: { flex: 1, backgroundColor: "#eef4f5" },
+  compactHeader: { minHeight: 62, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: "#173038", borderColor: "#294952", borderRadius: 8, borderWidth: 1 },
+  compactHeaderIcon: { width: 38, height: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#4b3b22", borderColor: "#78613a", borderRadius: 7, borderWidth: 1 },
+  compactHeaderText: { flex: 1, minWidth: 0 },
+  compactHeaderTitle: { color: "#ffffff", fontSize: 17, fontWeight: "900" },
+  compactHeaderSubtitle: { marginTop: 2, color: "#b8c8cc", fontSize: 12, fontWeight: "600" },
+  connectionIndicator: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: "#233e46", borderRadius: 6 },
+  connectionDot: { width: 7, height: 7, backgroundColor: "#1b9b67", borderRadius: 4 },
+  connectionDotOffline: { backgroundColor: "#d7952b" },
+  connectionLabel: { color: "#d9e5e7", fontSize: 10, fontWeight: "800" },
   page: { flex: 1, backgroundColor: "#eef4f5" },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8 },
@@ -484,6 +558,12 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.55 },
   tabSection: { gap: 12 },
   historyCard: { gap: 5, padding: 13, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderRadius: 6, borderWidth: 1 },
+  historyCardHighlighted: { backgroundColor: "#fff8e8", borderColor: "#d7952b", borderWidth: 2 },
+  historyTitleWrap: { flex: 1, gap: 3 },
+  historyHeaderActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  historyDetail: { gap: 9, marginTop: 8, paddingTop: 10, borderTopColor: "#d5e0e2", borderTopWidth: 1 },
+  historyDetailRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 14 },
+  historyDetailValue: { flex: 1, color: "#172b33", fontSize: 13, fontWeight: "700", textAlign: "right" },
   resultBadge: { paddingHorizontal: 8, paddingVertical: 4, overflow: "hidden", borderRadius: 5, fontSize: 11, fontWeight: "800" },
   resultPASSED: { color: "#146c43", backgroundColor: "#ddf4e8" },
   resultPARTIAL: { color: "#8a4c12", backgroundColor: "#fff1d6" },
@@ -492,9 +572,12 @@ const styles = StyleSheet.create({
   summaryItem: { flex: 1, alignItems: "center", gap: 2, padding: 12, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderRadius: 6, borderWidth: 1 },
   summaryValue: { color: "#172b33", fontSize: 22, fontWeight: "900" },
   notificationActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  notificationFooter: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8 },
   notificationCard: { gap: 7, padding: 13, backgroundColor: "#ffffff", borderColor: "#d5e0e2", borderLeftColor: "#b7c8cc", borderLeftWidth: 4, borderRadius: 6, borderWidth: 1 },
   notificationUnread: { backgroundColor: "#fff8e8", borderColor: "#d7952b", borderLeftColor: "#d7952b" },
   notificationRead: { color: "#9a5b0e", fontSize: 12, fontWeight: "800" },
+  notificationTargetLink: { color: "#9a5b0e", fontSize: 12, fontWeight: "900" },
+  notificationTargetButton: { minHeight: 34, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, backgroundColor: "#fff8e8", borderColor: "#e0b75f", borderRadius: 5, borderWidth: 1 },
   profileAvatar: { width: 64, height: 64, alignItems: "center", justifyContent: "center", backgroundColor: "#ffedc2", borderRadius: 32 },
   profileAvatarText: { color: "#9a5b0e", fontSize: 26, fontWeight: "900" },
   profileName: { color: "#172b33", fontSize: 22, fontWeight: "900" },
