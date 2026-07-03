@@ -254,32 +254,34 @@ export default function MobileQualityView({
 
       {activeTab === "CONTROLS" ? <>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Kontrol Bekleyenler</Text>
-        <Text style={styles.count}>{pendingItems.length}</Text>
+        <Text style={styles.sectionTitle}>{selectedItem ? "Kalite Kararı" : "Kontrol Bekleyenler"}</Text>
+        {selectedItem ? (
+          <Pressable style={styles.backButton} onPress={() => setSelectedOperationId("")}>
+            <Ionicons name="arrow-back" size={17} color="#9a5b0e" />
+            <Text style={styles.backButtonText}>Listeye Dön</Text>
+          </Pressable>
+        ) : <Text style={styles.count}>{pendingItems.length}</Text>}
       </View>
 
-      {isLoading ? <ActivityIndicator color="#167d75" /> : null}
-      {!isLoading && pendingItems.length === 0 ? <Text style={styles.empty}>Kalite sonucu bekleyen operasyon yok.</Text> : null}
+      {!selectedItem ? <>
+        {isLoading ? <ActivityIndicator color="#167d75" /> : null}
+        {!isLoading && pendingItems.length === 0 ? <Text style={styles.empty}>Kalite sonucu bekleyen operasyon yok.</Text> : null}
 
-      {pendingItems.map((item) => (
-        <Pressable
-          key={item.operation.id}
-          style={[styles.item, selectedOperationId === item.operation.id ? styles.itemSelected : null]}
-          onPress={() => selectItem(item)}
-        >
-          <View style={styles.itemTop}>
-            <Text style={styles.itemTitle}>{item.workOrder.orderNo}</Text>
-            <Text style={styles.itemDate}>{formatDate(item.operation.completedAt)}</Text>
-          </View>
-          <Text style={styles.itemOperation}>{item.operation.sequenceNo}. {item.operation.operationName}</Text>
-          <Text style={styles.muted}>Operatör: {item.operation.assignedOperator?.name ?? "-"}</Text>
-          <Text style={styles.metrics}>Üretim {item.operation.producedQuantity}  |  Fire {item.operation.scrapQuantity}</Text>
-        </Pressable>
-      ))}
+        {pendingItems.map((item) => (
+          <Pressable key={item.operation.id} style={styles.item} onPress={() => selectItem(item)}>
+            <View style={styles.itemTop}>
+              <Text style={styles.itemTitle}>{item.workOrder.orderNo}</Text>
+              <Text style={styles.itemDate}>{formatDate(item.operation.completedAt)}</Text>
+            </View>
+            <Text style={styles.itemOperation}>{item.operation.sequenceNo}. {item.operation.operationName}</Text>
+            <Text style={styles.muted}>Operatör: {item.operation.assignedOperator?.name ?? "-"}</Text>
+            <Text style={styles.metrics}>Üretim {item.operation.producedQuantity}  |  Fire {item.operation.scrapQuantity}</Text>
+          </Pressable>
+        ))}
+      </> : null}
 
       {selectedItem ? (
         <View style={styles.form}>
-          <Text style={styles.sectionTitle}>Kalite Kararı</Text>
           <Text style={styles.formContext}>{selectedItem.workOrder.orderNo} / {selectedItem.operation.operationName}</Text>
 
           <View style={styles.segmented}>
@@ -451,6 +453,8 @@ const styles = StyleSheet.create({
   error: { color: "#a52a2a", backgroundColor: "#fde8e6", padding: 10, borderRadius: 5 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   sectionTitle: { color: "#172b33", fontSize: 18, fontWeight: "800" },
+  backButton: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, borderColor: "#e0b75f", borderRadius: 5, borderWidth: 1, backgroundColor: "#fff8e8" },
+  backButtonText: { color: "#9a5b0e", fontSize: 12, fontWeight: "800" },
   count: { minWidth: 30, textAlign: "center", color: "#ffffff", backgroundColor: "#167d75", paddingVertical: 4, borderRadius: 5, fontWeight: "800" },
   empty: { color: "#64747b", paddingVertical: 18, textAlign: "center" },
   item: { backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#d5e0e2", borderRadius: 6, padding: 13, gap: 5 },
