@@ -201,7 +201,7 @@ Default local PostgreSQL URL:
 postgresql://postgres:postgres@localhost:5432/mes_lite?schema=public
 ```
 
-For a physical phone on the same local network:
+For a physical phone started manually on the same local network:
 
 ```text
 EXPO_PUBLIC_API_URL=http://YOUR_COMPUTER_LOCAL_IP:4000/api
@@ -220,7 +220,15 @@ npm.cmd run seed:demo
 
 ### 4. Start the project
 
-From the repository root:
+On Windows, the recommended one-command launcher is:
+
+```powershell
+.\start-mes-lite.cmd
+```
+
+The launcher detects the local IPv4 address, reuses healthy MES Lite services, avoids port conflicts, connects Expo to the local API, and writes the current addresses to `logs/dev-runtime.json`. The Expo Go QR is refreshed at `logs/expo-go-qr.svg`.
+
+The same launcher can be called through npm:
 
 ```powershell
 npm.cmd run dev

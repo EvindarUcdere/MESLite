@@ -9,20 +9,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "%~dp0backend\package.json" (
-  echo HATA: backend klasoru bulunamadi.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-dev.ps1"
+if errorlevel 1 (
+  echo.
+  echo HATA: MES Lite servisleri baslatilamadi.
   pause
   exit /b 1
 )
 
-echo MES Lite servisleri baslatiliyor...
-start "MES Lite Backend" /D "%~dp0backend" cmd.exe /k npm.cmd run dev
-start "MES Lite Web" /D "%~dp0web" cmd.exe /k npm.cmd run dev -- --host 0.0.0.0
-start "MES Lite Expo" /D "%~dp0mobile" cmd.exe /k npm.cmd run phone
-
 echo.
-echo Uc terminal acildi. Bu pencereyi kapatabilirsiniz.
-echo Backend: http://localhost:4000
-echo Web:     http://localhost:5173
-echo Expo:    exp://10.103.7.51:8081
+echo Bu pencereyi kapatabilirsiniz. Servisler arka planda calismaya devam eder.
 pause
