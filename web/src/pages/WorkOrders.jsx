@@ -1449,7 +1449,7 @@ export default function WorkOrders() {
           <span>{isLoading ? "Liste yükleniyor..." : `${filteredWorkOrders.length}/${workOrders.length} iş emri gösteriliyor`}</span>
         </div>
         <div className="table-wrap">
-          <table>
+          <table className="work-order-table">
             <thead>
               <tr>
                 <th>İş Emri</th>

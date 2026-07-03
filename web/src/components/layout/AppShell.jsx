@@ -22,6 +22,22 @@ function getDashboardLabel(role) {
   return "Üretim Paneli";
 }
 
+function getRoleTheme(role) {
+  if (role === "ADMIN") {
+    return "system";
+  }
+
+  if (role === "QUALITY_STAFF") {
+    return "quality";
+  }
+
+  if (role === "PLANNER" || role === "OPERATOR") {
+    return "production";
+  }
+
+  return "manager";
+}
+
 const navigationItems = [
   {
     to: "/",
@@ -128,6 +144,7 @@ export function AppShell() {
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const roleTheme = getRoleTheme(user?.role);
 
   async function loadUnreadNotificationCount() {
     try {
@@ -176,7 +193,7 @@ export function AppShell() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-role-theme={roleTheme}>
       <aside className="sidebar">
         <div className="brand">
           <strong>MES Lite</strong>
