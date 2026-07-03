@@ -1967,6 +1967,7 @@ export default function App() {
         </View>
       </View>
 
+      {isOfflineMode || isSyncingOfflineQueue || offlineSummary.pending > 0 || offlineSummary.failed > 0 ? (
       <View style={[styles.syncStatus, isOfflineMode || offlineSummary.failed > 0 ? styles.syncStatusWarning : null]}>
         <View>
           <Text style={styles.syncStatusTitle}>{offlineStatusTitle}</Text>
@@ -1976,6 +1977,7 @@ export default function App() {
           <Text style={styles.inlineButtonText}>{isSyncingOfflineQueue ? "Kontrol ediliyor" : "Şimdi Senkronize Et"}</Text>
         </Pressable>
       </View>
+      ) : null}
 
       {activeMobileView === "SYNC" ? <OfflineQueuePanel
         summary={offlineSummary}
@@ -2071,9 +2073,8 @@ export default function App() {
 
       <View {...mobileViewPanResponder.panHandlers}>
       {activeMobileView === "WORKS" ? (
-        <View style={styles.card}>
+        <View style={styles.workSection}>
           <Text style={styles.sectionTitle}>Aktif İşlerim</Text>
-          <Text style={styles.muted}>Sadece devam eden ve işlem yapabileceğiniz operasyonlar burada görünür.</Text>
           {activeAssignedWorkOrders.map((workOrder) => (
             <Pressable
               key={workOrder.id}
@@ -2104,9 +2105,8 @@ export default function App() {
       ) : null}
 
       {activeMobileView === "WORKS" && handoffAssignedWorkOrders.length ? (
-        <View style={styles.card}>
+        <View style={styles.workSection}>
           <Text style={styles.sectionTitle}>Devam Eden Takiplerim</Text>
-          <Text style={styles.muted}>Sizin adımınız tamamlandı; ürün sonraki operatörde üretime devam ediyor.</Text>
           {handoffAssignedWorkOrders.map((workOrder) => (
             <Pressable
               key={workOrder.id}
@@ -2136,9 +2136,8 @@ export default function App() {
       ) : null}
 
       {activeMobileView === "WORKS" && closedAssignedWorkOrders.length ? (
-        <View style={styles.card}>
+        <View style={styles.workSection}>
           <Text style={styles.sectionTitle}>Geçmiş / Kapalı İşler</Text>
-          <Text style={styles.muted}>Tamamlanmış veya eksik kapatılmış işler burada sadece bilgi amaçlı görünür.</Text>
           {closedAssignedWorkOrders.map((workOrder) => (
             <Pressable
               key={workOrder.id}
@@ -2920,7 +2919,11 @@ const styles = StyleSheet.create({
   },
   mobileSummary: {
     flexDirection: "row",
-    gap: 10
+    overflow: "hidden",
+    backgroundColor: "#ffffff",
+    borderColor: "#d9e4ea",
+    borderRadius: 10,
+    borderWidth: 1
   },
   syncStatus: {
     flexDirection: "row",
@@ -2953,23 +2956,18 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     flex: 1,
-    minHeight: 76,
+    minWidth: 0,
+    minHeight: 64,
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
-    backgroundColor: "#ffffff",
-    borderColor: "#d9e4ea",
-    borderRadius: 14,
-    borderWidth: 1,
-    shadowColor: "#18313a",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2
+    gap: 2,
+    padding: 8,
+    borderRightColor: "#e6edf1",
+    borderRightWidth: 1
   },
   summaryValue: {
     color: "#0f2c34",
-    fontSize: 24,
+    fontSize: 21,
     fontWeight: "900"
   },
   card: {
@@ -2984,6 +2982,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 14,
     elevation: 2
+  },
+  workSection: {
+    gap: 10
   },
   tabCard: {
     padding: 8,

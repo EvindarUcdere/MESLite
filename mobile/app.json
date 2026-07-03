@@ -26,6 +26,17 @@
         "android.permission.RECORD_AUDIO"
       ]
     },
+    "androidNavigationBar": {
+      "backgroundColor": "#eef3f6",
+      "barStyle": "dark-content",
+      "visible": "sticky-immersive"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#173038",
+      "barStyle": "light-content",
+      "hidden": true,
+      "translucent": false
+    },
     "ios": {
       "bundleIdentifier": "com.meslite.mobile",
       "supportsTablet": false,
