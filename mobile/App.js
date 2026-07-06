@@ -2178,6 +2178,19 @@ export default function App() {
             <Text style={[styles.statusBadge, isShortClosedWorkOrder(selectedWorkOrder) ? styles.shortClosedBadge : null]}>{getWorkOrderStatusLabel(selectedWorkOrder)}</Text>
           </View>
 
+          <View style={styles.detailCommandBar}>
+            <Pressable style={styles.detailBackButton} onPress={() => setActiveMobileView("WORKS")}>
+              <Ionicons name="arrow-back" size={18} color="#526670" />
+              <Text style={styles.detailBackButtonText}>İş Listesi</Text>
+            </Pressable>
+            {!isClosedWorkOrder(selectedWorkOrder) && mySelectedOperations.length ? (
+              <Pressable style={styles.productionEntryButton} onPress={() => setActiveMobileView("PRODUCTION")}>
+                <Ionicons name="add-circle-outline" size={19} color="#ffffff" />
+                <Text style={styles.productionEntryButtonText}>Üretim Girişi</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           {getSpecialWorkOrderInfo(selectedWorkOrder) ? (
             <View style={styles.specialOrderNotice}>
               <Text style={styles.specialOrderNoticeTitle}>{getSpecialWorkOrderInfo(selectedWorkOrder).label}</Text>
@@ -2537,7 +2550,13 @@ export default function App() {
 
       {activeMobileView === "PRODUCTION" ? (
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Üretim Girişi</Text>
+        <View style={styles.productionFormHeader}>
+          <Text style={styles.sectionTitle}>Üretim Girişi</Text>
+          <Pressable style={styles.detailBackButton} onPress={() => setActiveMobileView("DETAIL")}>
+            <Ionicons name="arrow-back" size={18} color="#526670" />
+            <Text style={styles.detailBackButtonText}>Detaya Dön</Text>
+          </Pressable>
+        </View>
         <Text style={styles.label}>İş Emri</Text>
         {selectedWorkOrder ? (
           <View style={[styles.operationChoiceButton, styles.choiceButtonActive]}>
@@ -3002,6 +3021,52 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12
+  },
+  detailCommandBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  detailBackButton: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 11,
+    backgroundColor: "#f4f8fa",
+    borderColor: "#cbd8df",
+    borderRadius: 8,
+    borderWidth: 1
+  },
+  detailBackButtonText: {
+    color: "#526670",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  productionEntryButton: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 14,
+    backgroundColor: "#0f7f78",
+    borderRadius: 8
+  },
+  productionEntryButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  productionFormHeader: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
   },
   statusBadge: {
     maxWidth: "100%",
