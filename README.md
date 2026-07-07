@@ -11,6 +11,9 @@ The system models production as a sequence of route operations rather than a sin
 | Web dashboard | https://mes-lite-web.vercel.app |
 | Backend health | https://meslite-production.up.railway.app/health |
 | Swagger API documentation | https://meslite-production.up.railway.app/api/docs |
+| Android preview APK | https://expo.dev/artifacts/eas/JeZhhYm9xjlx9RLykHJxSYTrnRrpGvnoWchqBB7G3KQ.apk |
+
+The Android preview APK is an Expo EAS internal build artifact and may expire. For a permanent public demo, attach the APK to a GitHub Release.
 
 Demo credentials are intended for local seeded data. See [Demo Users](#demo-users).
 
