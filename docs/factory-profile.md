@@ -1,73 +1,111 @@
-# MES Lite Fabrika Profili
+# MES Lite Factory Profile
 
-MES Lite demo ortamı, metal parça ve makine ekipmanı üreten orta ölçekli bir fabrika senaryosuna göre modellenmiştir.
+MES Lite demo data is modeled as a medium-sized metal door-hardware factory. The scenario is intentionally concrete so the web dashboard, mobile operator app, quality workflow, inventory, routing, and shift planning screens tell one consistent story.
 
-## Fabrika tipi
+## Factory Type
 
-- Sektör: Metal parça, bağlantı elemanı ve makine ekipmanı üretimi
-- Üretim şekli: Siparişe ve plana bağlı iş emirleri
-- Temel akış: Kesim, presleme, CNC işleme, kaynak, montaj, kalite kontrol ve paketleme
+- Sector: metal door handles, hinge sets, lock plates, and door-handle rosettes
+- Production model: planned and order-based work orders
+- Main flow: cutting, CNC machining, drilling, deburring, surface treatment, assembly, function testing, final quality, and packaging
 
-Bu profil seçildi çünkü MES tarafında gerçekçi ve ölçülebilir problemler üretir: makine uygunluğu, operatör yetkinliği, vardiya planı, fire, telafi üretimi, kalite kararı, stok ve reçete takibi aynı süreçte birleşir.
+This profile creates realistic MES problems: operator authorization, machine skills, route handoff, scrap quarantine, rework/reproduction decisions, stock consumption, quality traceability, and offline mobile production entry.
 
-## Ürün aileleri
+## Product Families
 
-- Hidrolik Valf Gövdesi
-- Ambalajlı Final Modül
-- Bağlantı Braketi
-- Motor Kapak Seti
-- Kontrol Panel Kutusu
+- Aluminum Door Handle
+- Stainless Door Handle
+- Lock Strike Plate
+- Hinge Set
+- Door Handle Rosette
 
-Bu ürünler farklı rota uzunluklarına ve farklı makine ihtiyaçlarına sahiptir. Böylece sistem yalnızca tek adımlı üretim değil, çok operasyonlu üretim akışını da gösterebilir.
+These products have different routes and material needs, which makes the demo more believable than a single generic product.
 
-## Standart üretim rotaları
+## Standard Routes
 
-Demo veri, tek tip sahte rota yerine ürün ailesine göre farklı akışlar üretir:
+Aluminum Door Handle:
 
-- Hidrolik Valf Gövdesi: CNC tornalama, CNC frezeleme, delik delme/diş açma, fonksiyon test, final kalite, paketleme.
-- Ambalajlı Final Modül: lazer kesim, presleme, manuel montaj, fonksiyon test, final kalite, paketleme.
-- Bağlantı Braketi: lazer kesim, abkant büküm, delik delme/çapak alma, toz boya, ölçü kontrol, paketleme.
-- Motor Kapak Seti: presleme, delik delme, CNC frezeleme, manuel montaj, final kalite, paketleme.
-- Kontrol Panel Kutusu: lazer kesim, abkant büküm, robot kaynak, toz boya, manuel montaj, final kalite, paketleme.
+```text
+Profile Cutting -> CNC Machining -> Drilling and Countersink -> Deburring
+-> Electrostatic Painting -> Mechanism Assembly -> Function Test
+-> Final Quality -> Packaging
+```
 
-Bu yaklaşımın amacı, iş emrinin her adımında doğru makine ailesinin ve doğru operatör yetkinliğinin seçilmesini sağlamaktır. Pres adımında pres makineleri, CNC adımında CNC makineleri, kalite adımında kalite masaları görünmelidir.
+Stainless Door Handle:
 
-## Makine grupları
+```text
+Sheet Cutting -> CNC Machining -> Drilling and Countersink -> Polishing
+-> Mechanism Assembly -> Function Test -> Final Quality -> Packaging
+```
 
-- Lazer kesim
-- Presleme
-- Delik delme
-- CNC torna ve freze
-- Robot kaynak
-- Boya
-- Montaj
-- Fonksiyon test
-- Kalite kontrol
-- Paketleme
+Lock Strike Plate:
 
-İş emri oluştururken seçilecek makineler operasyon tipine göre filtrelenmelidir. Örneğin presleme adımında sadece pres makineleri, final kontrolde kalite masaları görünmelidir.
+```text
+Laser Cutting -> Press Brake Bending -> Deburring -> Dimensional Control -> Packaging
+```
 
-## Reçete ve stok mantığı
+Hinge Set:
 
-Final ürünler; sac, alüminyum blok, civata seti, boya, etiket ve koli gibi bileşenlerden oluşur. Bu yapı `ProductBomItem` tablosunda ürün reçetesi olarak tutulur.
+```text
+Sheet Cutting -> Pressing -> Drilling -> Pin and Screw Assembly
+-> Function Test -> Final Quality -> Packaging
+```
 
-Stok tarafında iki ana grup vardır:
+Door Handle Rosette:
 
-- Hammadde ve yardımcı malzeme stokları
-- Bitmiş ürün stokları
+```text
+Pressing -> Drilling -> Deburring -> Electrostatic Painting
+-> Dimensional Control -> Packaging
+```
 
-Bu temel, Faz 5'te MRP için kullanılacaktır. Örneğin 100 adet Motor Kapak Seti üretilecekse sistem reçeteden gerekli sac, civata, etiket ve koli miktarını hesaplayabilecek hale getirilecektir.
+## Machine Groups
 
-## Neden önemli?
+- Laser cutting
+- Pressing and bending
+- CNC machining
+- Drilling and countersink
+- Deburring and polishing
+- Electrostatic painting
+- Assembly
+- Function testing
+- Quality control
+- Packaging
 
-Bu profil sayesinde proje artık yalnızca genel bir üretim takip ekranı değil, belirli bir fabrika tipine göre kurgulanmış gerçekçi bir MVP haline gelir.
+Operators are grouped by capability. Shift planning and machine-skill records make sure a cutting operator, CNC operator, surface-treatment operator, assembly operator, and quality operator each work in the right part of the process.
 
-İş problemi olarak şunları çözer:
+## BOM and Inventory
 
-- Hangi iş emri hangi operasyonda?
-- Hangi operatör hangi makinede çalışabilir?
-- Vardiyada kim müsait?
-- Fire oluşursa hurda mı, yeniden işlem mi, yeniden üretim mi?
-- Eksik üretim nasıl telafi edilir?
-- Hangi ürün için hangi malzeme gerekir?
-- Stok seviyesi üretimi destekliyor mu?
+Finished products use components such as:
+
+- Aluminum profile 6061
+- Stainless steel sheet 304
+- Zamak casting body
+- M5 screw set
+- Spring mechanism
+- Black electrostatic powder paint
+- Product label
+- Door-hardware carton
+
+Inventory is split into raw material, assembly component, paint, packaging, and finished-goods locations. The demo seed creates starting stock and stock movements so inventory screens are meaningful immediately.
+
+## Shift Automation
+
+The demo seed creates:
+
+- 3 shift types: morning, evening, night
+- 5 operator groups
+- 5 monthly shift templates
+- 2 months of generated roster assignments
+- machine-skill records for each operator group
+
+The web Shift Planning screen can then generate additional monthly plans from these templates. This keeps the roster from being hand-entered one cell at a time.
+
+## Demo Seed
+
+Run the door-hardware demo seed locally:
+
+```powershell
+cd backend
+npm.cmd run seed:door
+```
+
+The seed resets demo operational data and creates a clean factory profile with products, routes, machines, stock, operators, shift groups, shift templates, roster assignments, and work orders.

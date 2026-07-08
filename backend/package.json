@@ -13,6 +13,7 @@
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "seed:demo": "node prisma/demo-scenario.js",
+    "seed:door": "node prisma/seed-door-hardware-factory.js",
     "cleanup:test-data": "node prisma/cleanup-test-work-orders.js",
     "reset:demo": "npm run cleanup:test-data && npm run seed:demo",
     "seed:factory": "node prisma/seed-realistic-factory.js",

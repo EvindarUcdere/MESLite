@@ -221,6 +221,15 @@ npm.cmd run prisma:migrate
 npm.cmd run seed:demo
 ```
 
+For a clean portfolio demo based on a door-hardware factory, use:
+
+```powershell
+cd backend
+npm.cmd run seed:door
+```
+
+This creates realistic products, BOM/stock data, machines, routes, operators, shift groups, shift templates, two months of roster assignments, and demo work orders for a metal door-handle and hinge production scenario.
+
 ### 4. Start the project
 
 On Windows, the recommended one-command launcher is:
