@@ -1171,6 +1171,15 @@ export default function App() {
     }
   }
 
+  async function handleEnablePushNotifications() {
+    const wasRegistered = await registerDevicePushToken();
+    await loadPushStatus();
+
+    if (wasRegistered) {
+      setSuccessMessage("Telefon bildirimleri aktif edildi.");
+    }
+  }
+
   async function handleMarkNotificationRead(notificationId) {
     try {
       const response = await markNotificationRead(notificationId);
@@ -1932,6 +1941,7 @@ export default function App() {
         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
         onClearNotifications={handleClearNotifications}
         pushStatus={pushStatus}
+        onEnablePushNotifications={handleEnablePushNotifications}
       />
     );
   }
@@ -2066,7 +2076,13 @@ export default function App() {
           <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>Rol</Text><Text style={styles.detailValue}>{user.role}</Text></View>
           <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>Bağlantı</Text><Text style={styles.detailValue}>{isOfflineMode ? "Çevrimdışı" : "Çevrimiçi"}</Text></View>
           <View style={styles.profileInfoRow}><Text style={styles.detailLabel}>API</Text><Text style={styles.profileApiText}>{getApiBaseUrl()}</Text></View>
-          <View style={styles.profileStatusBox}><Text style={styles.detailLabel}>Telefon bildirimleri</Text><Text style={styles.muted}>{pushStatus}</Text></View>
+          <View style={styles.profileStatusBox}>
+            <Text style={styles.detailLabel}>Telefon bildirimleri</Text>
+            <Text style={styles.muted}>{pushStatus}</Text>
+            <Pressable style={styles.inlineButton} onPress={handleEnablePushNotifications} disabled={isSubmitting}>
+              <Text style={styles.inlineButtonText}>Bildirimleri Aktifleştir</Text>
+            </Pressable>
+          </View>
           <Pressable style={styles.secondaryButton} onPress={handleLogout}><Text style={styles.secondaryButtonText}>Çıkış Yap</Text></Pressable>
         </View>
       ) : null}

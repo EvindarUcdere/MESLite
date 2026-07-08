@@ -43,7 +43,8 @@ export default function MobileQualityView({
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
   onClearNotifications,
-  pushStatus
+  pushStatus,
+  onEnablePushNotifications
 }) {
   const [activeTab, setActiveTab] = useState("CONTROLS");
   const [highlightedQualityCheckId, setHighlightedQualityCheckId] = useState("");
@@ -475,7 +476,13 @@ export default function MobileQualityView({
           <View style={styles.profileRow}><Text style={styles.label}>Rol</Text><Text style={styles.profileValue}>Kalite Personeli</Text></View>
           <View style={styles.profileRow}><Text style={styles.label}>Bağlantı</Text><Text style={styles.profileValue}>{isOfflineMode ? "Çevrimdışı" : "Çevrimiçi"}</Text></View>
           <View style={styles.profileRow}><Text style={styles.label}>API</Text><Text style={styles.profileApi}>{getApiBaseUrl()}</Text></View>
-          <View style={styles.profileStatus}><Text style={styles.label}>Telefon bildirimleri</Text><Text style={styles.muted}>{pushStatus}</Text></View>
+          <View style={styles.profileStatus}>
+            <Text style={styles.label}>Telefon bildirimleri</Text>
+            <Text style={styles.muted}>{pushStatus}</Text>
+            <Pressable style={styles.secondaryButton} onPress={onEnablePushNotifications}>
+              <Text style={styles.secondaryButtonText}>Bildirimleri Aktifleştir</Text>
+            </Pressable>
+          </View>
           <Pressable style={styles.secondaryButton} onPress={onLogout}><Text style={styles.secondaryButtonText}>Çıkış Yap</Text></Pressable>
         </View>
       ) : null}
