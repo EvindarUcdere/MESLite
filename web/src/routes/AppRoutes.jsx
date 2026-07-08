@@ -15,6 +15,7 @@ import Reports from "../pages/Reports.jsx";
 import RouteManagement from "../pages/Routes.jsx";
 import SalesOrders from "../pages/SalesOrders.jsx";
 import ShiftPlanning from "../pages/ShiftPlanning.jsx";
+import SystemAdmin from "../pages/SystemAdmin.jsx";
 import Users from "../pages/Users.jsx";
 import WorkOrders from "../pages/WorkOrders.jsx";
 import { ProtectedRoute } from "./ProtectedRoute.jsx";
@@ -55,6 +56,7 @@ export function AppRoutes() {
             <Route path="/event-logs" element={<EventLogs />} />
           </Route>
           <Route element={<RoleRoute allowedRoles={ROLE_GROUPS.adminOnly} />}>
+            <Route path="/system-admin" element={<SystemAdmin />} />
             <Route path="/users" element={<Users />} />
           </Route>
           <Route path="*" element={<Dashboard />} />

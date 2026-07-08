@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, PackageSearch, ShoppingCart, Users } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Bell, Boxes, CalendarDays, ClipboardCheck, ClipboardList, Cpu, FileBarChart, GitBranch, History, LogOut, MessageSquareText, PackageSearch, Settings, ShoppingCart, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { getNotifications } from "../../api/notifications.api.js";
@@ -129,6 +129,12 @@ const navigationItems = [
     label: "Sistem Olayları",
     icon: Activity,
     roles: ROLE_GROUPS.reports
+  },
+  {
+    to: "/system-admin",
+    label: "Sistem Admin",
+    icon: Settings,
+    roles: ROLE_GROUPS.adminOnly
   },
   {
     to: "/users",

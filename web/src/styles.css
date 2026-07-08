@@ -606,6 +606,252 @@ body {
   font-size: 22px;
 }
 
+.system-admin-page {
+  --system-accent: #9f1d35;
+  --system-accent-soft: #fff1f2;
+}
+
+.system-admin-hero {
+  padding: 18px;
+  background: linear-gradient(135deg, #fff7f8, #ffffff 62%);
+  border: 1px solid #ead3d8;
+  border-left: 5px solid var(--system-accent);
+  border-radius: 8px;
+}
+
+.system-health-chip {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  color: #7f1d1d;
+  background: #fee2e2;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.system-health-chip span {
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.system-health-chip.is-online {
+  color: #047857;
+  background: #d8f7e9;
+}
+
+.system-health-chip.is-checking {
+  color: #b45309;
+  background: #fff0c2;
+}
+
+.system-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.system-stat-card {
+  min-height: 142px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  align-content: start;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 31, 46, 0.045);
+}
+
+.system-stat-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.system-stat-card > span:not(.system-stat-icon) {
+  color: #52606d;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.system-stat-card strong {
+  color: #0f1f2e;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.system-stat-card small {
+  color: #66788a;
+  line-height: 1.35;
+}
+
+.system-stat-green .system-stat-icon {
+  color: #047857;
+  background: #d8f7e9;
+}
+
+.system-stat-red .system-stat-icon {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.system-stat-amber .system-stat-icon {
+  color: #b45309;
+  background: #fff0c2;
+}
+
+.system-stat-blue .system-stat-icon,
+.system-stat-system .system-stat-icon {
+  color: #ffffff;
+  background: linear-gradient(135deg, #9f1d35, #334155);
+}
+
+.system-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 16px;
+}
+
+.system-admin-panel {
+  min-width: 0;
+}
+
+.system-action-list,
+.system-signal-stack,
+.system-role-list {
+  display: grid;
+  gap: 10px;
+}
+
+.system-action-list a {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon title arrow"
+    "icon desc arrow";
+  align-items: center;
+  column-gap: 12px;
+  padding: 13px;
+  color: inherit;
+  text-decoration: none;
+  background: #f8fbfc;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.system-action-list a:hover {
+  background: #ffffff;
+  border-color: #c08497;
+  transform: translateY(-1px);
+}
+
+.system-action-list a > span {
+  grid-area: icon;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9f1d35;
+  background: #fff1f2;
+  border-radius: 999px;
+}
+
+.system-action-list strong {
+  grid-area: title;
+  color: #0f1f2e;
+}
+
+.system-action-list small {
+  grid-area: desc;
+  color: #66788a;
+  line-height: 1.35;
+}
+
+.system-action-list a > svg {
+  grid-area: arrow;
+  color: #8a9aaa;
+}
+
+.system-role-list div,
+.system-signal-card {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: #f8fbfc;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+}
+
+.system-role-list div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.system-role-list span {
+  color: #52606d;
+  font-weight: 800;
+}
+
+.system-role-list strong {
+  min-width: 34px;
+  padding: 5px 9px;
+  color: #7f1d1d;
+  text-align: center;
+  background: #fff1f2;
+  border-radius: 999px;
+}
+
+.system-signal-card {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.system-signal-card svg {
+  color: #9f1d35;
+}
+
+.system-signal-card strong,
+.system-signal-card small {
+  display: block;
+}
+
+.system-signal-card strong {
+  color: #0f1f2e;
+}
+
+.system-signal-card small {
+  margin-top: 3px;
+  color: #66788a;
+  line-height: 1.35;
+}
+
+.system-signal-card.is-ok {
+  border-color: #b7ead6;
+  background: #f3fbf7;
+}
+
+.system-signal-card.is-ok svg {
+  color: #047857;
+}
+
+.system-signal-card.is-warning {
+  border-color: #f6d389;
+  background: #fffbeb;
+}
+
+.system-signal-card.is-warning svg {
+  color: #b45309;
+}
+
 .executive-decision-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
@@ -8092,8 +8338,13 @@ th {
 
 @media (max-width: 1180px) {
   .admin-analysis-grid,
+  .system-admin-grid,
   .executive-decision-grid {
     grid-template-columns: 1fr;
+  }
+
+  .system-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .executive-analysis-grid {
@@ -8139,8 +8390,22 @@ th {
 @media (max-width: 760px) {
   .admin-control-item,
   .admin-role-boundary-list a,
-  .admin-risk-list {
+  .admin-risk-list,
+  .system-stat-grid,
+  .system-action-list a {
     grid-template-columns: 1fr;
+  }
+
+  .system-action-list a {
+    grid-template-areas:
+      "icon"
+      "title"
+      "desc"
+      "arrow";
+  }
+
+  .system-admin-hero {
+    align-items: stretch;
   }
 
   .sales-flow-steps,
