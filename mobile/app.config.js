@@ -3,7 +3,8 @@ const path = require("node:path");
 
 const appJson = require("./app.json");
 const config = appJson.expo;
-const googleServicesFile = "./google-services.json";
+const localGoogleServicesFile = "./google-services.json";
+const easGoogleServicesFile = process.env.GOOGLE_SERVICES_JSON;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 const edgeApiUrl = process.env.EXPO_PUBLIC_EDGE_API_URL;
 
@@ -13,10 +14,15 @@ config.extra = {
   ...(edgeApiUrl ? { edgeApiUrl } : {})
 };
 
-if (fs.existsSync(path.join(__dirname, googleServicesFile))) {
+if (easGoogleServicesFile) {
   config.android = {
     ...config.android,
-    googleServicesFile
+    googleServicesFile: easGoogleServicesFile
+  };
+} else if (fs.existsSync(path.join(__dirname, localGoogleServicesFile))) {
+  config.android = {
+    ...config.android,
+    googleServicesFile: localGoogleServicesFile
   };
 }
 

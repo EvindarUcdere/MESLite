@@ -11,6 +11,7 @@ logs/
 .env
 .env.local
 .env.*.local
+mobile/google-services.json
 
 *.log
 npm-debug.log*
