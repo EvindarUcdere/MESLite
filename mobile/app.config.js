@@ -5,6 +5,7 @@ const appJson = require("./app.json");
 const config = appJson.expo;
 const localGoogleServicesFile = "./google-services.json";
 const easGoogleServicesFile = process.env.GOOGLE_SERVICES_JSON;
+const useLocalGoogleServicesFile = process.env.USE_LOCAL_GOOGLE_SERVICES === "1";
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 const edgeApiUrl = process.env.EXPO_PUBLIC_EDGE_API_URL;
 
@@ -19,7 +20,7 @@ if (easGoogleServicesFile) {
     ...config.android,
     googleServicesFile: easGoogleServicesFile
   };
-} else if (fs.existsSync(path.join(__dirname, localGoogleServicesFile))) {
+} else if (useLocalGoogleServicesFile && fs.existsSync(path.join(__dirname, localGoogleServicesFile))) {
   config.android = {
     ...config.android,
     googleServicesFile: localGoogleServicesFile
