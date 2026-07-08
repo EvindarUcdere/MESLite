@@ -2,7 +2,9 @@ import { prisma } from "../../config/db.js";
 import { emitEvent } from "../../config/socket.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 const NOTIFICATION_CHANNEL_ID = "default";
+const RECEIPT_DELAY_MS = 2500;
 
 function isExpoPushToken(token) {
   return typeof token === "string" && (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
@@ -14,6 +16,12 @@ function chunk(items, size) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 export async function registerPushToken(userId, data) {
@@ -167,6 +175,7 @@ export async function sendPushNotificationToUser(userId, notification) {
 
   let disabled = 0;
   const tickets = [];
+  const ticketTokenPairs = [];
   for (const batch of chunk(expoMessages, 100)) {
     try {
       const response = await fetch(EXPO_PUSH_URL, {
@@ -182,6 +191,11 @@ export async function sendPushNotificationToUser(userId, notification) {
       const payload = await response.json();
       const results = Array.isArray(payload.data) ? payload.data : [];
       tickets.push(...results);
+      results.forEach((result, index) => {
+        if (result?.id && batch[index]?.to) {
+          ticketTokenPairs.push({ ticketId: result.id, token: batch[index].to });
+        }
+      });
       console.log(
         "Expo push response",
         JSON.stringify({
@@ -209,5 +223,64 @@ export async function sendPushNotificationToUser(userId, notification) {
     }
   }
 
-  return { sent: expoMessages.length, disabled, tickets };
+  const receiptResult = await collectPushReceipts(ticketTokenPairs);
+  disabled += receiptResult.disabled;
+
+  return { sent: expoMessages.length, disabled, tickets, receipts: receiptResult.receipts };
+}
+
+async function collectPushReceipts(ticketTokenPairs) {
+  if (!ticketTokenPairs.length) {
+    return { disabled: 0, receipts: {} };
+  }
+
+  await wait(RECEIPT_DELAY_MS);
+
+  const ids = ticketTokenPairs.map((pair) => pair.ticketId);
+  const tokenByTicketId = new Map(ticketTokenPairs.map((pair) => [pair.ticketId, pair.token]));
+  const receipts = {};
+  let disabled = 0;
+
+  for (const batchIds of chunk(ids, 100)) {
+    try {
+      const response = await fetch(EXPO_RECEIPTS_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ ids: batchIds })
+      });
+
+      const payload = await response.json();
+      Object.assign(receipts, payload.data ?? {});
+
+      const disabledTokens = Object.entries(payload.data ?? {})
+        .filter(([, receipt]) => receipt?.status === "error" && receipt?.details?.error === "DeviceNotRegistered")
+        .map(([ticketId]) => tokenByTicketId.get(ticketId))
+        .filter(Boolean);
+
+      if (disabledTokens.length) {
+        const updateResult = await prisma.pushToken.updateMany({
+          where: { token: { in: disabledTokens } },
+          data: { isActive: false }
+        });
+        disabled += updateResult.count;
+      }
+
+      console.log(
+        "Expo push receipts",
+        JSON.stringify({
+          requested: batchIds.length,
+          disabled,
+          receipts: payload.data ?? {}
+        })
+      );
+    } catch (error) {
+      console.warn("Expo push receipt check failed", error.message);
+    }
+  }
+
+  return { disabled, receipts };
 }
