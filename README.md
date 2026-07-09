@@ -11,7 +11,7 @@ The system models production as a sequence of route operations rather than a sin
 | Web dashboard | https://mes-lite-web.vercel.app |
 | Backend health | https://meslite-production.up.railway.app/health |
 | Swagger API documentation | https://meslite-production.up.railway.app/api/docs |
-| Android preview APK | https://expo.dev/artifacts/eas/JeZhhYm9xjlx9RLykHJxSYTrnRrpGvnoWchqBB7G3KQ.apk |
+| Android preview APK | https://expo.dev/artifacts/eas/Yrf3o1f7R1272zbckeLHTO8WJHdQXwzSjxiHWxPXDg0.apk |
 
 The Android preview APK is an Expo EAS internal build artifact and may expire. For a permanent public demo, attach the APK to a GitHub Release.
 
@@ -212,6 +212,21 @@ EXPO_PUBLIC_EDGE_API_URL=http://YOUR_COMPUTER_LOCAL_IP:4000/api
 ```
 
 For an Android emulator, use `10.0.2.2` instead of `localhost`.
+
+### Android push notifications
+
+Android push notifications require Firebase/FCM configuration during the EAS build.
+
+- Keep `mobile/google-services.json` out of Git. It is ignored by `.gitignore`.
+- For local checks, place the Firebase Android app config at `mobile/google-services.json`.
+- For EAS builds, provide the same file as a project environment variable named `GOOGLE_SERVICES_JSON`.
+- Do not commit Firebase service account private keys, Expo tokens, Railway variables, `.env` files, or database credentials.
+
+The Android Firebase package name must match the Expo app package:
+
+```text
+com.meslite.mobile
+```
 
 ### 3. Prepare the database
 
