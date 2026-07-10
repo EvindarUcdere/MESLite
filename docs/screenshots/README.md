@@ -8,7 +8,6 @@ Place portfolio screenshots in this folder.
 - `mobile-02-work-order-detail.png`
 - `mobile-03-operation-actions.png`
 - `mobile-04-production-entry.png`
-- `mobile-05-production-evidence.png`
 - `mobile-06-shift-calendar.png`
 - `mobile-07-notifications.png`
 - `mobile-08-profile-push.png`

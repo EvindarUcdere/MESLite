@@ -30,7 +30,6 @@ Add screenshots under `docs/screenshots/` using the following filenames. This ke
     <td align="center"><img src="screenshots/mobile-04-production-entry.png" width="220" alt="Production entry form"><br><strong>Production Entry</strong></td>
   </tr>
   <tr>
-    <td align="center"><img src="screenshots/mobile-05-production-evidence.png" width="220" alt="Production note, critical flag, and visual evidence"><br><strong>Evidence And Notes</strong></td>
     <td align="center"><img src="screenshots/mobile-06-shift-calendar.png" width="220" alt="Operator shift calendar"><br><strong>Shift Calendar</strong></td>
     <td align="center"><img src="screenshots/mobile-07-notifications.png" width="220" alt="Mobile notifications"><br><strong>Notifications</strong></td>
     <td align="center"><img src="screenshots/mobile-08-profile-push.png" width="220" alt="Profile and push notification status"><br><strong>Profile And Push</strong></td>
@@ -45,7 +44,6 @@ Add screenshots under `docs/screenshots/` using the following filenames. This ke
 | `docs/screenshots/mobile-02-work-order-detail.png` | Work order detail and operation flow |
 | `docs/screenshots/mobile-03-operation-actions.png` | Operation action panel |
 | `docs/screenshots/mobile-04-production-entry.png` | Production entry form |
-| `docs/screenshots/mobile-05-production-evidence.png` | Production note, critical flag, and visual evidence |
 | `docs/screenshots/mobile-06-shift-calendar.png` | Operator shift calendar |
 | `docs/screenshots/mobile-07-notifications.png` | Mobile notifications |
 | `docs/screenshots/mobile-08-profile-push.png` | Profile and push notification status |
