@@ -14,6 +14,35 @@ The system includes a React web dashboard, an Expo React Native mobile applicati
 | Backend health | https://meslite-production.up.railway.app/health |
 | Swagger API documentation | https://meslite-production.up.railway.app/api/docs |
 | Android preview APK | https://expo.dev/artifacts/eas/Yrf3o1f7R1272zbckeLHTO8WJHdQXwzSjxiHWxPXDg0.apk |
+| GitHub Release | https://github.com/EvindarUcdere/MESLite/releases/tag/v0.1.0 |
+
+## Screenshot Plan
+
+Add screenshots under `docs/screenshots/` using the following filenames. This keeps README, release notes, and portfolio material easy to maintain.
+
+### Mobile
+
+| File | Screen |
+| --- | --- |
+| `docs/screenshots/mobile-01-active-work.png` | Active operator work list |
+| `docs/screenshots/mobile-02-work-order-detail.png` | Work order detail and operation flow |
+| `docs/screenshots/mobile-03-operation-actions.png` | Operation action panel |
+| `docs/screenshots/mobile-04-production-entry.png` | Production entry form |
+| `docs/screenshots/mobile-05-production-evidence.png` | Production note, critical flag, and visual evidence |
+| `docs/screenshots/mobile-06-shift-calendar.png` | Operator shift calendar |
+| `docs/screenshots/mobile-07-notifications.png` | Mobile notifications |
+| `docs/screenshots/mobile-08-profile-push.png` | Profile and push notification status |
+
+### Web
+
+| File | Screen |
+| --- | --- |
+| `docs/screenshots/web-01-manager-dashboard.png` | Manager factory performance dashboard |
+| `docs/screenshots/web-02-production-panel.png` | Production panel and work order tracking |
+| `docs/screenshots/web-03-quality-workflow.png` | Quality queue and decisions |
+| `docs/screenshots/web-04-inventory-scrap.png` | Inventory, scrap quarantine, and rework/reproduction tracking |
+| `docs/screenshots/web-05-reports-oee.png` | Reports and OEE/root-cause analysis |
+| `docs/screenshots/web-06-system-admin.png` | System admin dashboard and user management |
 
 ## Suggested Demo Flow
 
