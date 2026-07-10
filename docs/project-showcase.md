@@ -54,12 +54,47 @@ Add screenshots under `docs/screenshots/` using the following filenames. This ke
 
 | File | Screen |
 | --- | --- |
-| `docs/screenshots/web-01-manager-dashboard.png` | Manager factory performance dashboard |
-| `docs/screenshots/web-02-production-panel.png` | Production panel and work order tracking |
-| `docs/screenshots/web-03-quality-workflow.png` | Quality queue and decisions |
-| `docs/screenshots/web-04-inventory-scrap.png` | Inventory, scrap quarantine, and rework/reproduction tracking |
-| `docs/screenshots/web-05-reports-oee.png` | Reports and OEE/root-cause analysis |
-| `docs/screenshots/web-06-system-admin.png` | System admin dashboard and user management |
+| `docs/screenshots/web-01-admin-factory-performance.png` | Admin factory performance and executive insight dashboard |
+| `docs/screenshots/web-02-admin-inventory.png` | Admin inventory, stock card, and warehouse movement management |
+| `docs/screenshots/web-03-admin-reports.png` | Admin reporting charts for shifts, machines, products, work orders, quality, scrap, and downtime |
+| `docs/screenshots/web-04-manager-production-dashboard.png` | Production manager cockpit and operational intervention queue |
+| `docs/screenshots/web-05-manager-sales-mrp.png` | Manager sales and MRP flow for order intake and planning handoff |
+| `docs/screenshots/web-06-manager-field-notes.png` | Manager field notes review with operator, machine, and visual-evidence filters |
+| `docs/screenshots/web-07-quality-dashboard.png` | Quality staff dashboard for pending checks, scrap review, and quality follow-up |
+
+## Web Screenshots
+
+### Admin
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/web-01-admin-factory-performance.png" width="460" alt="Admin factory performance and executive insight dashboard"><br><strong>Factory Performance</strong></td>
+    <td align="center"><img src="screenshots/web-02-admin-inventory.png" width="460" alt="Admin inventory and stock management"><br><strong>Inventory Management</strong></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="screenshots/web-03-admin-reports.png" width="720" alt="Admin reporting charts"><br><strong>Reporting And Analytics</strong></td>
+  </tr>
+</table>
+
+### Production Manager
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/web-04-manager-production-dashboard.png" width="460" alt="Production manager cockpit"><br><strong>Production Cockpit</strong></td>
+    <td align="center"><img src="screenshots/web-05-manager-sales-mrp.png" width="460" alt="Sales and MRP planning flow"><br><strong>Sales And MRP</strong></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="screenshots/web-06-manager-field-notes.png" width="720" alt="Manager field notes review"><br><strong>Field Notes Review</strong></td>
+  </tr>
+</table>
+
+### Quality
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/web-07-quality-dashboard.png" width="720" alt="Quality dashboard for pending checks and scrap review"><br><strong>Quality Tracking Panel</strong></td>
+  </tr>
+</table>
 
 ## Suggested Demo Flow
 
