@@ -23,3 +23,5 @@ Place portfolio screenshots in this folder.
 - `web-06-system-admin.png`
 
 After adding the files, link them from `docs/project-showcase.md` or the main `README.md`.
+
+The mobile gallery is already linked from `docs/project-showcase.md`. Save the screenshots with the exact mobile filenames above and they will render automatically on GitHub.

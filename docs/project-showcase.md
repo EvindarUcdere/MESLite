@@ -20,6 +20,23 @@ The system includes a React web dashboard, an Expo React Native mobile applicati
 
 Add screenshots under `docs/screenshots/` using the following filenames. This keeps README, release notes, and portfolio material easy to maintain.
 
+## Mobile Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/mobile-01-active-work.png" width="220" alt="Active operator work list"><br><strong>Active Work</strong></td>
+    <td align="center"><img src="screenshots/mobile-02-work-order-detail.png" width="220" alt="Work order detail and operation flow"><br><strong>Work Order Detail</strong></td>
+    <td align="center"><img src="screenshots/mobile-03-operation-actions.png" width="220" alt="Operation action panel"><br><strong>Operation Actions</strong></td>
+    <td align="center"><img src="screenshots/mobile-04-production-entry.png" width="220" alt="Production entry form"><br><strong>Production Entry</strong></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/mobile-05-production-evidence.png" width="220" alt="Production note, critical flag, and visual evidence"><br><strong>Evidence And Notes</strong></td>
+    <td align="center"><img src="screenshots/mobile-06-shift-calendar.png" width="220" alt="Operator shift calendar"><br><strong>Shift Calendar</strong></td>
+    <td align="center"><img src="screenshots/mobile-07-notifications.png" width="220" alt="Mobile notifications"><br><strong>Notifications</strong></td>
+    <td align="center"><img src="screenshots/mobile-08-profile-push.png" width="220" alt="Profile and push notification status"><br><strong>Profile And Push</strong></td>
+  </tr>
+</table>
+
 ### Mobile
 
 | File | Screen |
