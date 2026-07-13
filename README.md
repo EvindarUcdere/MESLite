@@ -336,6 +336,7 @@ See `backend/package.json` for the complete test command list.
 - [Production environment checklist](docs/phase-4-production-env-checklist.md)
 - [End-to-end demo scenario](docs/e2e-demo-scenario.md)
 - [Project showcase and release notes](docs/project-showcase.md)
+- [Render + Neon deployment](docs/render-neon-deployment.md)
 
 ## Türkçe Özet
 
