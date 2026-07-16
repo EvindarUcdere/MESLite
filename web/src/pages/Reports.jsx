@@ -402,6 +402,8 @@ export default function Reports() {
   const oeeSummary = report?.oeeSummary ?? {};
   const oeeByMachineData = report?.oeeByMachine ?? [];
   const oeeByOperationData = report?.oeeByOperation ?? [];
+  const capacityOeeSummary = report?.capacityOeeSummary ?? {};
+  const capacityOeeByMachineData = report?.capacityOeeByMachine ?? [];
   const machineLossAnalysis = report?.machineLossAnalysis ?? [];
   const oeeComponentData = [
     { name: "Kullanılabilirlik", value: oeeSummary.availability ?? 0 },
@@ -650,9 +652,10 @@ export default function Reports() {
       <section className="operations-grid">
         <article className="panel oee-components-panel">
           <div className="panel-title-row">
-            <h2>OEE Bileşenleri</h2>
-            <span>Hedef 85%</span>
+            <h2>Operasyon Bazlı OEE</h2>
+            <span>Tahmini / hedef süre</span>
           </div>
+          <p className="panel-muted-text">Operasyon hedef süresi, açık operasyon süresi, duruş ve kalite kayıtlarından hesaplanır.</p>
           <div className="oee-component-list">
             {oeeComponentData.map((item) => {
               const tone = item.value >= 85 ? "good" : item.value >= 60 ? "warning" : "danger";
@@ -670,6 +673,42 @@ export default function Reports() {
               );
             })}
           </div>
+        </article>
+
+        <article className="panel oee-components-panel">
+          <div className="panel-title-row">
+            <h2>Makine / Vardiya Kapasite OEE</h2>
+            <span>Gerçek kapasiteye yakın</span>
+          </div>
+          <p className="panel-muted-text">Makinenin üretim veya duruş kaydı olan vardiyaları kapasite kabul edilir; üretim süresi, duruş ve fire ile hesaplanır.</p>
+          <div className="oee-component-list">
+            {[
+              { name: "Kapasite OEE", value: capacityOeeSummary.oee ?? 0 },
+              { name: "Kullanılabilirlik", value: capacityOeeSummary.availability ?? 0 },
+              { name: "Performans", value: capacityOeeSummary.performance ?? 0 },
+              { name: "Kalite", value: capacityOeeSummary.quality ?? 0 }
+            ].map((item) => {
+              const tone = item.value >= 85 ? "good" : item.value >= 60 ? "warning" : "danger";
+
+              return (
+                <div key={item.name} className={`oee-component-row oee-${tone}`}>
+                  <div className="oee-component-label">
+                    <span>{item.name}</span>
+                    <strong>{isLoading ? "..." : `${item.value}%`}</strong>
+                  </div>
+                  <div className="oee-component-track">
+                    <span style={{ width: `${Math.min(item.value, 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <dl className="capacity-oee-facts">
+            <div><dt>Aktif vardiya</dt><dd>{isLoading ? "..." : capacityOeeSummary.activeShiftCount ?? 0}</dd></div>
+            <div><dt>Planlı kapasite</dt><dd>{isLoading ? "..." : `${Math.round(capacityOeeSummary.plannedCapacityMinutes ?? 0)} dk`}</dd></div>
+            <div><dt>Üretken süre</dt><dd>{isLoading ? "..." : `${Math.round(capacityOeeSummary.productiveMinutes ?? 0)} dk`}</dd></div>
+            <div><dt>Duruş</dt><dd>{isLoading ? "..." : `${Math.round(capacityOeeSummary.downtimeMinutes ?? 0)} dk`}</dd></div>
+          </dl>
         </article>
 
         <article className="panel">
@@ -708,6 +747,51 @@ export default function Reports() {
             </table>
           </div>
         </article>
+      </section>
+
+      <section className="panel">
+        <h2>Makine / Vardiya Kapasite Analizi</h2>
+        <p className="panel-muted-text">Bu tablo, operasyon süresi yerine vardiya kapasitesini baz alır. Kapasite planlaması ve gerçek OEE yorumu için daha doğru referanstır.</p>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Makine</th>
+                <th>OEE</th>
+                <th>Kullanılabilirlik</th>
+                <th>Performans</th>
+                <th>Kalite</th>
+                <th>Aktif Vardiya</th>
+                <th>Kapasite</th>
+                <th>Üretken Süre</th>
+                <th>Duruş</th>
+              </tr>
+            </thead>
+            <tbody>
+              {capacityOeeByMachineData.slice(0, 12).map((item) => (
+                <tr key={item.machineId}>
+                  <td>
+                    <MachineBadge>{item.machineCode}</MachineBadge>
+                    <span className="table-subtext">{item.machineName}</span>
+                  </td>
+                  <td>{item.oee}%</td>
+                  <td>{item.availability}%</td>
+                  <td>{item.performance}%</td>
+                  <td>{item.quality}%</td>
+                  <td>{item.activeShiftCount}</td>
+                  <td>{Math.round(item.plannedCapacityMinutes)} dk</td>
+                  <td>{Math.round(item.productiveMinutes)} dk</td>
+                  <td>{Math.round(item.downtimeMinutes)} dk</td>
+                </tr>
+              ))}
+              {!isLoading && capacityOeeByMachineData.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Kapasite OEE için vardiya, üretim veya duruş verisi yok.</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel">

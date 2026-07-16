@@ -196,6 +196,24 @@ function minutesBetween(start, end) {
   return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
 }
 
+function dateKey(date) {
+  return new Date(date).toISOString().slice(0, 10);
+}
+
+function shiftDurationMinutes(shift) {
+  if (!shift?.startTime || !shift?.endTime) {
+    return 0;
+  }
+
+  const [startHour, startMinute] = shift.startTime.split(":").map(Number);
+  const [endHour, endMinute] = shift.endTime.split(":").map(Number);
+  const start = startHour * 60 + startMinute;
+  const end = endHour * 60 + endMinute;
+  const duration = end > start ? end - start : 24 * 60 - start + end;
+
+  return duration > 0 ? duration : 0;
+}
+
 function sumDowntimeMinutes(downtimes, fallbackEnd = new Date()) {
   return downtimes.reduce((sum, downtime) => sum + minutesBetween(downtime.startedAt, downtime.endedAt ?? fallbackEnd), 0);
 }
@@ -279,6 +297,131 @@ function finalizeOeeGroup(group) {
     performance: Number((performanceRate * 100).toFixed(2)),
     quality: Number((qualityRate * 100).toFixed(2)),
     oee: Number((oeeRate * 100).toFixed(2))
+  };
+}
+
+function createCapacityOeeGroup(base) {
+  return {
+    ...base,
+    activeShiftCount: 0,
+    plannedCapacityMinutes: 0,
+    downtimeMinutes: 0,
+    productiveMinutes: 0,
+    idealRunMinutes: 0,
+    producedQuantity: 0,
+    scrapQuantity: 0,
+    totalProcessedQuantity: 0,
+    logCount: 0,
+    downtimeCount: 0
+  };
+}
+
+function finalizeCapacityOeeGroup(group) {
+  const availabilityMinutes = Math.max(group.plannedCapacityMinutes - group.downtimeMinutes, 0);
+  const availabilityRate = clampRate(availabilityMinutes / group.plannedCapacityMinutes);
+  const performanceRate = clampRate(group.idealRunMinutes / group.productiveMinutes);
+  const qualityRate = clampRate(group.producedQuantity / group.totalProcessedQuantity);
+  const oeeRate = availabilityRate * performanceRate * qualityRate;
+
+  return {
+    ...group,
+    availabilityMinutes: Number(availabilityMinutes.toFixed(1)),
+    availability: Number((availabilityRate * 100).toFixed(2)),
+    performance: Number((performanceRate * 100).toFixed(2)),
+    quality: Number((qualityRate * 100).toFixed(2)),
+    oee: Number((oeeRate * 100).toFixed(2))
+  };
+}
+
+function buildCapacityOee({ productionLogs, operationDowntimes }) {
+  const summary = createCapacityOeeGroup({ scope: "CAPACITY", label: "Makine/Vardiya Kapasite OEE" });
+  const machineMap = new Map();
+  const capacitySlots = new Map();
+
+  function ensureMachine(machine) {
+    const machineId = machine?.id ?? "UNASSIGNED";
+
+    if (!machineMap.has(machineId)) {
+      machineMap.set(
+        machineId,
+        createCapacityOeeGroup({
+          machineId,
+          machineCode: machine?.code ?? "Makine Yok",
+          machineName: machine?.name ?? "Makine Yok"
+        })
+      );
+    }
+
+    return machineMap.get(machineId);
+  }
+
+  function addCapacitySlot({ machine, shift, date }) {
+    if (!machine?.id || !shift?.id || !date) {
+      return;
+    }
+
+    const key = `${machine.id}:${shift.id}:${dateKey(date)}`;
+
+    if (capacitySlots.has(key)) {
+      return;
+    }
+
+    const duration = shiftDurationMinutes(shift);
+
+    if (duration <= 0) {
+      return;
+    }
+
+    capacitySlots.set(key, true);
+    const machineGroup = ensureMachine(machine);
+
+    for (const group of [summary, machineGroup]) {
+      group.activeShiftCount += 1;
+      group.plannedCapacityMinutes += duration;
+    }
+  }
+
+  for (const log of productionLogs) {
+    const totalProcessedQuantity = log.producedQuantity + log.scrapQuantity;
+    const productiveMinutes = minutesBetween(log.startedAt, log.endedAt);
+    const plannedQuantity = log.workOrder?.plannedQuantity ?? 0;
+    const operationTargetMinutes = log.workOrderOperation?.routeOperation?.estimatedMinutes ?? 0;
+    const idealRunMinutes =
+      operationTargetMinutes > 0 && plannedQuantity > 0
+        ? Math.min(operationTargetMinutes * (totalProcessedQuantity / plannedQuantity), operationTargetMinutes)
+        : 0;
+    const machineGroup = ensureMachine(log.machine);
+
+    addCapacitySlot({ machine: log.machine, shift: log.shift, date: log.startedAt ?? log.createdAt });
+
+    for (const group of [summary, machineGroup]) {
+      group.productiveMinutes += productiveMinutes;
+      group.idealRunMinutes += idealRunMinutes;
+      group.producedQuantity += log.producedQuantity;
+      group.scrapQuantity += log.scrapQuantity;
+      group.totalProcessedQuantity += totalProcessedQuantity;
+      group.logCount += 1;
+    }
+  }
+
+  for (const downtime of operationDowntimes) {
+    const machineGroup = ensureMachine(downtime.machine);
+    const duration = minutesBetween(downtime.startedAt, downtime.endedAt ?? new Date());
+
+    addCapacitySlot({ machine: downtime.machine, shift: downtime.shift, date: downtime.startedAt });
+
+    for (const group of [summary, machineGroup]) {
+      group.downtimeMinutes += duration;
+      group.downtimeCount += 1;
+    }
+  }
+
+  return {
+    summary: finalizeCapacityOeeGroup(summary),
+    byMachine: [...machineMap.values()]
+      .filter((group) => group.activeShiftCount > 0 || group.logCount > 0 || group.downtimeCount > 0)
+      .map(finalizeCapacityOeeGroup)
+      .sort((first, second) => first.oee - second.oee)
   };
 }
 
@@ -754,6 +897,11 @@ export async function getOverviewReport(query = {}) {
         },
         machine: true,
         shift: true,
+        workOrderOperation: {
+          include: {
+            routeOperation: true
+          }
+        },
         operator: {
           select: { id: true, name: true, email: true, role: true }
         }
@@ -1327,6 +1475,7 @@ export async function getOverviewReport(query = {}) {
     operationDowntimeByMachine,
     qualityDecisionByMachine
   );
+  const capacityOee = buildCapacityOee({ productionLogs, operationDowntimes });
   const productionTrend = sqlAnalytics.productionTrend.length ? sqlAnalytics.productionTrend : groupDailyProduction(finalProductLogs);
   const managementInsights = buildManagementInsights({
     summary,
@@ -1395,6 +1544,8 @@ export async function getOverviewReport(query = {}) {
     oeeSummary,
     oeeByMachine,
     oeeByOperation,
+    capacityOeeSummary: capacityOee.summary,
+    capacityOeeByMachine: capacityOee.byMachine,
     machineLossAnalysis,
     qualityStatusCounts: countBy(qualityChecks, "status"),
     qualityDecisionCounts,

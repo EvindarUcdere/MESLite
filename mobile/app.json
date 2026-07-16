@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.meslite.mobile",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0b1f2b"
@@ -64,7 +64,7 @@
       "expo-sqlite"
     ],
     "extra": {
-      "apiUrl": "https://meslite-production.up.railway.app/api",
+      "apiUrl": "https://mes-lite-api.onrender.com/api",
       "eas": {
         "projectId": "24e1f2e1-73f0-49f4-9708-2878666d5c25"
       }

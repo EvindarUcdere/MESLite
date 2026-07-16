@@ -290,10 +290,11 @@ function AdminDashboardV2({ summary, live, executiveReport, isLoading, error, la
 
   const reportSummary = executiveReport?.summary ?? {};
   const dataQuality = executiveReport?.dataQuality ?? {};
+  const capacityOeeSummary = executiveReport?.capacityOeeSummary ?? {};
   const executiveMetrics = [
     { label: "Kayıt Bazlı Plan Gerçekleşmesi", value: `${reportSummary.planCompletionRate ?? 0}%`, hint: `${reportSummary.productionGapQuantity ?? 0} adet üretim açığı`, icon: ClipboardList, to: "/reports#plan-actual", tone: (reportSummary.planCompletionRate ?? 0) >= 85 ? "green" : "amber" },
     { label: "Tahmini OEE", value: `${reportSummary.oee ?? 0}%`, hint: `Veri güveni: %${dataQuality.score ?? 0}`, icon: Gauge, to: "/reports#oee", tone: (reportSummary.oee ?? 0) >= 65 ? "green" : "red" },
-    { label: "Tahmini Kullanılabilirlik", value: `${reportSummary.availability ?? 0}%`, hint: "Operasyon süresi ve duruş kayıtlarından", icon: Activity, to: "/reports#oee", tone: "teal" },
+    { label: "Kapasite OEE", value: `${capacityOeeSummary.oee ?? 0}%`, hint: `${capacityOeeSummary.activeShiftCount ?? 0} aktif makine/vardiya`, icon: Activity, to: "/reports#oee", tone: (capacityOeeSummary.oee ?? 0) >= 65 ? "green" : "amber" },
     { label: "Tahmini Performans", value: `${reportSummary.performance ?? 0}%`, hint: "Tanımlı hedef operasyon süresine göre", icon: Factory, to: "/reports#oee", tone: "blue" },
     { label: "Kayıt Bazlı Kalite", value: `${reportSummary.quality ?? 0}%`, hint: `${reportSummary.finalScrapQuantity ?? 0} adet final fire`, icon: ShieldCheck, to: "/reports#quality-results", tone: "green" },
     { label: "Fire Oranı", value: `${reportSummary.scrapRate ?? 0}%`, hint: `${reportSummary.scrapQuantity ?? 0} adet proses firesi`, icon: Flame, to: "/reports#scrap-reasons", tone: (reportSummary.scrapRate ?? 0) >= 5 ? "red" : "green" }

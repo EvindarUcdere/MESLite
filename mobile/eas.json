@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://meslite-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://mes-lite-api.onrender.com/api"
       }
     },
     "preview": {
@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://meslite-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://mes-lite-api.onrender.com/api"
       }
     },
     "production": {
@@ -24,7 +24,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://meslite-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_URL": "https://mes-lite-api.onrender.com/api"
       }
     }
   },
